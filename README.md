@@ -18,20 +18,30 @@
 
 ## Getting Started
 
-First, fork the repository. Then, go into your favorite terminal.
+1. Fork the repository, then clone your fork and move into the project folder.
+   ```bash
+   git clone git@github.com:YOUR_USERNAME/game.git
+   cd game
+   ```
+2. Install Node.js **10.24.1** (and npm 6.14.4). The repository now ships `.nvmrc`, `.node-version`, `.tool-versions`, and Volta metadata so `nvm install`, `nodenv`, `asdf`, or `volta install` will pick up the correct runtime automatically.
+3. Install dependencies.
+   ```bash
+   npm ci
+   ```
+   The postinstall build is skipped during local installs. When you need production assets run:
+   ```bash
+   npm run build-server && npm run build
+   ```
+   or set `DELAFORD_RUN_BUILD=1` before installing.
+4. Launch the full development stack with a single command.
+   ```bash
+   npm run dev
+   ```
+   This runs the Vue client (`npm run serve`) and the Node.js websocket server (`npm run dev:node`) in parallel.
 
-    git clone git@github.com:YOUR_USERNAME/game.git
-    cd game
-    npm install
-    npm run serve
+Visit `http://localhost:8080` to log in and start developing. The websocket server listens on port `9000` and the Express wrapper on port `6500`.
 
-> `npm run serve` will start the development server and watch for changes on the client-side code inside the `src` folder and otherwise elsewhere applicable.
-
-Now, while still inside the `game` folder, open another terminal session in that same location. Type and run `npm run dev:node`. This will start the Node.js game server.
-
-> If you want to debug, type `npm run ndb`. `ndb` is Google Chrome's Node Debugging tool which allows Node.js programs to be easily debugged and see all its context and variables. Highly recommended for a much easier time.
-
-Now you may visit `http://localhost:8080` to login and start developing!
+Need more detail? See [docs/development-setup.md](docs/development-setup.md) for platform-specific notes, environment variables, and troubleshooting steps.
 
 For a better time, make sure to join the [Discord channel](https://discord.gg/nkZnHvD) to talk to other developers for help and exclusive dicussions!
 

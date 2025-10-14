@@ -7,13 +7,14 @@
     "npm": "~6.14.4"
   },
   "scripts": {
-    "dev:node": "npx cross-env NODE_ENV=development nodemon --exec ./node_modules/.bin/babel-node server.js --route ./server/.babelrc",
+    "dev": "npm-run-all --parallel serve dev:node",
+    "dev:node": "cross-env NODE_ENV=development nodemon --exec ./node_modules/.bin/babel-node server.js --route ./server/.babelrc",
     "server:prod": "npx cross-env NODE_ENV=production node server.js",
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build --modern",
     "lint": "vue-cli-service lint",
     "start": "pm2-runtime start ecosystem.config.js --env production",
-    "postinstall": "npm run build-server && npm run build",
+    "postinstall": "node ./scripts/postinstall.js",
     "test:unit": "vue-cli-service test:unit",
     "ndb": "ndb npm run dev:node",
     "format": "eslint --fix",
@@ -60,12 +61,14 @@
     "@vue/eslint-config-airbnb": "^4.0.0",
     "@vue/test-utils": "^1.0.0-beta.20",
     "babel-plugin-root-import": "^6.4.1",
+    "cross-env": "^7.0.3",
     "eslint-import-resolver-babel-plugin-root-import": "^1.1.1",
     "eslint-plugin-import": "^2.18.2",
     "lint-staged": "^8.1.6",
     "ndb": "^1.1.5",
     "node-sass": "^4.14.1",
     "nodemon": "^1.18.4",
+    "npm-run-all": "^4.1.5",
     "sass-loader": "^7.0.1",
     "stylelint": "^10.0.1",
     "stylelint-config-standard": "^18.2.0",
@@ -95,5 +98,9 @@
       "npm run lint:css",
       "git add"
     ]
+  },
+  "volta": {
+    "node": "10.24.1",
+    "npm": "6.14.4"
   }
 }
