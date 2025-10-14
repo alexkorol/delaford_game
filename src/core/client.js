@@ -11,9 +11,9 @@ import generalImage from '../assets/graphics/items/general.png';
 import bus from './utilities/bus';
 
 import Socket from './utilities/socket';
+import MovementController from './utilities/movement-controller';
 
 import Map from './map';
-
 
 class Client {
   constructor(data) {
@@ -23,8 +23,11 @@ class Client {
     this.foreground = data.map.foreground;
 
     // Entities on map
-    this.player = data.player;
-    this.player.inventory = this.player.inventory.slots;
+    const playerData = { ...data.player };
+    playerData.inventory = playerData.inventory.slots;
+    playerData.movement = new MovementController().initialise(playerData.x, playerData.y);
+
+    this.player = playerData;
     this.players = [];
     this.droppedItems = data.droppedItems;
     this.npcs = data.npcs;

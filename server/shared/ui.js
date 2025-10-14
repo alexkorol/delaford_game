@@ -101,6 +101,10 @@ class UI {
     const nextY = steps.next.y;
     let direction = null;
 
+    if (nextX > currentX && nextY < currentY) direction = 'up-right';
+    if (nextX > currentX && nextY > currentY) direction = 'down-right';
+    if (nextX < currentX && nextY < currentY) direction = 'up-left';
+    if (nextX < currentX && nextY > currentY) direction = 'down-left';
     if (nextX === currentX && nextY < currentY) direction = 'up';
     if (nextX === currentX && nextY > currentY) direction = 'down';
     if (nextX > currentX && nextY === currentY) direction = 'right';

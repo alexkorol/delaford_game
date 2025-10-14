@@ -4,6 +4,7 @@ import config from 'root/config';
 import blockedMouse from '@/assets/graphics/ui/mouse/blocked.png';
 import bus from './utilities/bus';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
+import { centerOfTile } from './utilities/movement-controller';
 
 class Map {
   constructor(data, images) {
@@ -20,7 +21,9 @@ class Map {
 
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
-      finder: new PF.DijkstraFinder(),
+      finder: new PF.DijkstraFinder({
+        diagonalMovement: PF.DiagonalMovement.IfAtMostOneObstacle,
+      }),
       current: {
         name: '',
         length: 0, // Number of steps in current path
@@ -46,11 +49,46 @@ class Map {
     this.canvas = document.querySelector('.main-canvas');
     this.context = this.canvas.getContext('2d');
 
+    this.delta = {
+      elapsed: 0,
+    };
+
+    this.delta = {
+      elapsed: 0,
+    };
+
+    this.camera = {
+      offsetX: 0,
+      offsetY: 0,
+    };
+
     // Setup map
     this.setImages(images);
     this.setPlayer(data.player);
     this.setNPCs(data.npcs);
     this.setDroppedItems(data.droppedItems);
+  }
+
+  update(deltaSeconds) {
+    this.delta.elapsed += deltaSeconds;
+
+    const { tileset } = this.config.map;
+    const tileSize = tileset.tile.width;
+
+    if (this.player && this.player.movement) {
+      const renderPosition = this.player.movement.update();
+      const tileCenter = centerOfTile(this.player.x, this.player.y, tileSize);
+
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+      const offsetX = clamp(renderPosition.x - tileCenter.x, -tileSize, tileSize);
+      const offsetY = clamp(renderPosition.y - tileCenter.y, -tileSize, tileSize);
+
+      this.camera.offsetX = offsetX;
+      this.camera.offsetY = offsetY;
+    } else {
+      this.camera.offsetX = 0;
+      this.camera.offsetY = 0;
+    }
   }
 
   /**
@@ -162,6 +200,8 @@ class Map {
       tileset, size, viewport, objects,
     } = this.config.map;
 
+    const { offsetX, offsetY } = this.camera;
+
     const divider = {
       background: tileset.width / tileset.tile.width,
       foreground: objects.width / tileset.tile.width,
@@ -173,58 +213,74 @@ class Map {
     };
 
     // Drawing the map row by column.
-    for (let column = 0; column <= viewport.y; column += 1) {
-      for (let row = 0; row <= viewport.x; row += 1) {
-        const tileToFind = (((column + tileCrop.y) * size.x) + row) + tileCrop.x;
-        const backgroundTile = this.background[tileToFind] - 1;
-        const foregroundTile = (this.foreground[tileToFind] - 1) - 252;
+    for (let column = -1; column <= viewport.y + 1; column += 1) {
+      for (let row = -1; row <= viewport.x + 1; row += 1) {
+        const worldColumn = column + tileCrop.y;
+        const worldRow = row + tileCrop.x;
 
-        // Get the correct tile to draw
-        const tile = {
-          clip: {
-            background: {
-              x: Math.floor(backgroundTile % divider.background) * tileset.tile.width,
-              y: Math.floor(backgroundTile / divider.background) * tileset.tile.height,
-            },
-            foreground: {
-              x: Math.floor(foregroundTile % divider.foreground) * tileset.tile.width,
-              y: Math.floor(foregroundTile / divider.foreground) * tileset.tile.height,
-            },
-          },
-          pos: {
-            x: row * tileset.tile.width,
-            y: column * tileset.tile.height,
-          },
-          width: tileset.tile.width,
-          height: tileset.tile.height,
-        };
+        if (worldColumn >= 0 && worldColumn < size.y && worldRow >= 0 && worldRow < size.x) {
+          const tileToFind = (worldColumn * size.x) + worldRow;
+          const backgroundIndex = this.background[tileToFind];
+          const foregroundIndex = this.foreground[tileToFind];
 
-        // Draw the background (terrain)
-        this.context.drawImage(
-          this.images.terrainImage, // The Image() instance
-          tile.clip.background.x, // Coordinate to clip the X-axis
-          tile.clip.background.y, // Coordinate to clip the Y-axis
-          tile.width, // How wide, in pixels, to clip the sub-rectangle
-          tile.height, // How tall, in pixels, to clip the sub-rectangle
-          tile.pos.x, // Position the clipped picture along the X-axis
-          tile.pos.y, // Position the clipped picture along the Y-axis
-          tile.width, // The width, in pixels, to draw the image
-          tile.height, // The height, in pixels, to draw the image
-        );
+          if (backgroundIndex !== undefined) {
+            const backgroundTile = backgroundIndex - 1;
+            const foregroundTile = (foregroundIndex - 1) - 252;
 
-        // Draw the foreground (objects)
-        if (foregroundTile > -1) {
-          this.context.drawImage(
-            this.images.objectImage, // The Image() instance
-            tile.clip.foreground.x,
-            tile.clip.foreground.y,
-            tile.width,
-            tile.height,
-            tile.pos.x,
-            tile.pos.y,
-            tile.width,
-            tile.height,
-          );
+            // Get the correct tile to draw
+            const tile = {
+              clip: {
+                background: {
+                  x: Math.floor(backgroundTile % divider.background) * tileset.tile.width,
+                  y: Math.floor(backgroundTile / divider.background) * tileset.tile.height,
+                },
+                foreground: {
+                  x: Math.floor(foregroundTile % divider.foreground) * tileset.tile.width,
+                  y: Math.floor(foregroundTile / divider.foreground) * tileset.tile.height,
+                },
+              },
+              pos: {
+                x: row * tileset.tile.width,
+                y: column * tileset.tile.height,
+              },
+              width: tileset.tile.width,
+              height: tileset.tile.height,
+            };
+
+            // Draw the background (terrain)
+            const drawX = Math.round(tile.pos.x - offsetX);
+            const drawY = Math.round(tile.pos.y - offsetY);
+
+            this.context.drawImage(
+              this.images.terrainImage, // The Image() instance
+              tile.clip.background.x, // Coordinate to clip the X-axis
+              tile.clip.background.y, // Coordinate to clip the Y-axis
+              tile.width, // How wide, in pixels, to clip the sub-rectangle
+              tile.height, // How tall, in pixels, to clip the sub-rectangle
+              drawX, // Position the clipped picture along the X-axis
+              drawY, // Position the clipped picture along the Y-axis
+              tile.width, // The width, in pixels, to draw the image
+              tile.height, // The height, in pixels, to draw the image
+            );
+
+            // Draw the foreground (objects)
+            if (foregroundTile > -1) {
+              const foregroundDrawX = Math.round(tile.pos.x - offsetX);
+              const foregroundDrawY = Math.round(tile.pos.y - offsetY);
+
+              this.context.drawImage(
+                this.images.objectImage, // The Image() instance
+                tile.clip.foreground.x,
+                tile.clip.foreground.y,
+                tile.width,
+                tile.height,
+                foregroundDrawX,
+                foregroundDrawY,
+                tile.width,
+                tile.height,
+              );
+            }
+          }
         }
       }
     }
@@ -276,14 +332,17 @@ class Map {
       };
 
       // Paint the item on map
+      const drawX = Math.round((viewport.x * 32) - this.camera.offsetX);
+      const drawY = Math.round((viewport.y * 32) - this.camera.offsetY);
+
       this.context.drawImage(
         itemTileset(),
         ((info.graphics.column + qtyIndex) * 32), // Number in Item tileset
         (info.graphics.row * 32), // Y-axis of tileset
         32,
         32,
-        viewport.x * 32,
-        viewport.y * 32,
+        drawX,
+        drawY,
         32,
         32,
       );
@@ -294,12 +353,24 @@ class Map {
    * Draw the player on the board
    */
   drawPlayer() {
+    const center = this.getViewportCenter();
+    const drawX = Math.round(center.x - 16);
+    const drawY = Math.round(center.y - 16);
+
+    const sprite = this.images.playerImage;
+    const spriteWidth = sprite.width || 32;
+    const spriteHeight = sprite.height || 32;
+
     this.context.drawImage(
-      this.images.playerImage,
-      224,
-      160,
-      32,
-      32,
+      sprite,
+      0,
+      0,
+      spriteWidth,
+      spriteHeight,
+      drawX,
+      drawY,
+      spriteWidth,
+      spriteHeight,
     );
   }
 
@@ -324,15 +395,15 @@ class Map {
         y: Math.floor(this.config.map.viewport.y / 2) - (this.player.y - player.y),
       };
 
-      // Paint the Player on map
+        // Paint the Player on map
       this.context.drawImage(
         this.images.playerImage,
         0, // Number in NPC tileset
         0, // Y-axis always 0
         32,
         32,
-        viewport.x * 32,
-        viewport.y * 32,
+        Math.round((viewport.x * 32) - this.camera.offsetX),
+        Math.round((viewport.y * 32) - this.camera.offsetY),
         32,
         32,
       );
@@ -367,8 +438,8 @@ class Map {
         0, // Y-axis always 0
         32,
         32,
-        viewport.x * 32,
-        viewport.y * 32,
+        Math.round((viewport.x * 32) - this.camera.offsetX),
+        Math.round((viewport.y * 32) - this.camera.offsetY),
         32,
         32,
       );
@@ -428,7 +499,23 @@ class Map {
    * Draw the mouse selection on the canvas's viewport
    */
   drawMouse() {
-    this.context.drawImage(this.mouse.selection, (this.mouse.x * 32), (this.mouse.y * 32), 32, 32);
+    this.context.drawImage(
+      this.mouse.selection,
+      Math.round((this.mouse.x * 32) - this.camera.offsetX),
+      Math.round((this.mouse.y * 32) - this.camera.offsetY),
+      32,
+      32,
+    );
+  }
+
+  getViewportCenter() {
+    const { viewport, tileset } = this.config.map;
+    const tileSize = tileset.tile.width;
+
+    return {
+      x: Math.floor(viewport.x / 2) * tileSize + (tileSize / 2),
+      y: Math.floor(viewport.y / 2) * tileSize + (tileSize / 2),
+    };
   }
 }
 

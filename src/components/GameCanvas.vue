@@ -116,7 +116,7 @@ export default {
      * @param {event} event The mouse-click event
      */
     rightClick(event) {
-      const coordinates = UI.getViewportCoordinates(event);
+      const coordinates = this.resolveViewportCoordinates(event);
 
       const data = {
         event,
@@ -153,14 +153,13 @@ export default {
 
       if (!this.onGame) return;
       const mouseEvent = this.event || this.mouse;
-      const { tile } = config.map.tileset;
-
       // Save latest mouse data
       this.mouse = mouseEvent;
 
+      const coordinates = this.resolveViewportCoordinates(mouseEvent);
       const hoveredSquare = {
-        x: Math.floor(UI.getMousePos(mouseEvent).x / tile.width),
-        y: Math.floor(UI.getMousePos(mouseEvent).y / tile.height),
+        x: coordinates.x,
+        y: coordinates.y,
       };
 
       const data = { x: hoveredSquare.x, y: hoveredSquare.y };
@@ -190,6 +189,31 @@ export default {
           });
         }
       }
+    },
+
+    resolveViewportCoordinates(event) {
+      if (!event) {
+        return { x: 0, y: 0 };
+      }
+
+      const { tile } = config.map.tileset;
+      const camera = this.game.map && this.game.map.camera
+        ? this.game.map.camera
+        : { offsetX: 0, offsetY: 0 };
+      const viewport = this.game.map && this.game.map.config
+        ? this.game.map.config.map.viewport
+        : { x: 0, y: 0 };
+
+      const position = UI.getMousePos(event);
+      const tileX = Math.floor((position.x + camera.offsetX) / tile.width);
+      const tileY = Math.floor((position.y + camera.offsetY) / tile.height);
+
+      const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+      return {
+        x: clamp(tileX, 0, viewport.x),
+        y: clamp(tileY, 0, viewport.y),
+      };
     },
 
     /**

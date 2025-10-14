@@ -99,6 +99,8 @@ import Client from './core/client';
 import Engine from './core/engine';
 import bus from './core/utilities/bus';
 import Event from './core/player/events';
+import MovementController from './core/utilities/movement-controller';
+import { DEFAULT_MOVE_DURATION_MS } from './core/config/movement';
 
 export default {
   name: 'Delaford',
@@ -178,17 +180,69 @@ export default {
      * Player movement, do something
      */
     playerMovement(data) {
-      if (this.game.player.uuid === data.uuid) {
-        this.game.map.player = data;
-        this.game.player = data;
-        if (data.inventory.slots) {
-          this.game.map.player.inventory = data.inventory.slots;
-          this.game.player.inventory = data.inventory.slots;
-        }
-      } else {
-        const playerIndex = this.game.map.players.findIndex(p => p.uuid === data.uuid);
+      if (!this.game || !this.game.player) {
+        return;
+      }
 
-        this.game.map.players[playerIndex] = data;
+      const payload = { ...data };
+      if (payload.inventory && payload.inventory.slots) {
+        payload.inventory = payload.inventory.slots;
+      }
+
+      const { player } = this.game;
+      const isLocalPlayer = player.uuid === payload.uuid;
+
+      if (isLocalPlayer) {
+        if (!player.movement) {
+          player.movement = new MovementController().initialise(player.x, player.y);
+        }
+
+        const previousX = player.x;
+        const previousY = player.y;
+        const moved = previousX !== payload.x || previousY !== payload.y;
+
+        if (moved) {
+          const distance = Math.hypot(payload.x - previousX, payload.y - previousY) || 1;
+          player.movement.startMove(payload.x, payload.y, {
+            duration: DEFAULT_MOVE_DURATION_MS * distance,
+          });
+        } else {
+          player.movement.hardSync(payload.x, payload.y);
+        }
+
+        Object.assign(player, payload);
+        this.game.map.player = player;
+      } else {
+        const playerIndex = this.game.map.players.findIndex(p => p.uuid === payload.uuid);
+
+        if (playerIndex === -1) {
+          const newcomer = {
+            ...payload,
+            movement: new MovementController().initialise(payload.x, payload.y),
+          };
+          this.game.map.players.push(newcomer);
+          return;
+        }
+
+        const existing = this.game.map.players[playerIndex] || {};
+        const controller = existing.movement
+          || new MovementController().initialise(payload.x, payload.y);
+
+        const previousX = typeof existing.x === 'number' ? existing.x : payload.x;
+        const previousY = typeof existing.y === 'number' ? existing.y : payload.y;
+        const moved = previousX !== payload.x || previousY !== payload.y;
+
+        if (moved) {
+          const distance = Math.hypot(payload.x - previousX, payload.y - previousY) || 1;
+          controller.startMove(payload.x, payload.y, {
+            duration: DEFAULT_MOVE_DURATION_MS * distance,
+          });
+        } else {
+          controller.hardSync(payload.x, payload.y);
+        }
+
+        const updated = { ...existing, ...payload, movement: controller };
+        this.$set(this.game.map.players, playerIndex, updated);
       }
     },
 

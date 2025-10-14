@@ -4,19 +4,15 @@ class Engine {
   constructor(game) {
     this.game = game;
 
-    // Frames per Second
+    this.maxFps = 20;
     this.fps = {
-      main: 0,
-      max: 20,
-      lastUpdate: 0,
+      current: 0,
+      accumulator: 0,
+      lastSample: 0,
     };
 
-    // Frame on canvas painted
     this.frame = {
-      limit: 300,
-      lastTimeMS: 0,
-      thisSecond: 0,
-      update: 0,
+      lastTimestamp: 0,
     };
 
     // Bind context to same method as
@@ -29,7 +25,7 @@ class Engine {
   change(setting, val) {
     switch (setting) {
     case 'fps':
-      this.fps.max = val;
+      this.maxFps = val;
       break;
 
     default:
@@ -43,30 +39,21 @@ class Engine {
    * @param {decimal} timestamp The timestamp of when last called
    */
   loop(timestamp) {
-    // Throttle the frame rate.
-    if (timestamp < this.frame.lastTimeMS + (1000 / this.fps.max)) {
+    const minFrameMs = 1000 / this.maxFps;
+    if (this.frame.lastTimestamp && timestamp < this.frame.lastTimestamp + minFrameMs) {
       requestAnimationFrame(this.loop);
       return;
     }
 
-    // Note that the loop ran
-    this.frame.lastTimeMS = timestamp;
+    const deltaMs = this.frame.lastTimestamp ? timestamp - this.frame.lastTimestamp : minFrameMs;
+    this.frame.lastTimestamp = timestamp;
 
-    // Update every second
-    if (timestamp > this.frame.update + 1000) {
-      // Compute the new FPS
-      this.fps.main = (0.25 * this.frame.thisSecond) + (0.75 * this.fps.main);
+    const deltaSeconds = deltaMs / 1000;
 
-      this.frame.update = timestamp;
-      this.frame.thisSecond = 0;
-    }
-
-    // Saving the data
-    this.frame.thisSecond += 1;
-    this.lastFrame = Date.now();
+    this.sampleFps(deltaMs);
 
     // Paint the map
-    this.paintCanvas();
+    this.paintCanvas(deltaSeconds);
 
     // and back to the top...
     requestAnimationFrame(this.loop);
@@ -82,7 +69,11 @@ class Engine {
   /**
    * Draw the new game map
    */
-  paintCanvas() {
+  paintCanvas(deltaSeconds) {
+    if (typeof this.game.map.update === 'function') {
+      this.game.map.update(deltaSeconds);
+    }
+
     // Draw the tile map
     this.game.map.drawMap();
 
@@ -100,6 +91,15 @@ class Engine {
 
     // Draw the mouse selection
     this.game.map.drawMouse();
+  }
+
+  sampleFps(deltaMs) {
+    this.fps.accumulator += deltaMs;
+    if (this.fps.accumulator >= 1000) {
+      this.fps.current = 1000 / deltaMs;
+      this.fps.accumulator = 0;
+      this.fps.lastSample = Date.now();
+    }
   }
 }
 

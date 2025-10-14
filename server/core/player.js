@@ -57,7 +57,9 @@ class Player {
     // Pathfinding
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
-      finder: new PF.DijkstraFinder(),
+      finder: new PF.DijkstraFinder({
+        diagonalMovement: PF.DiagonalMovement.IfAtMostOneObstacle,
+      }),
       current: {
         name: '',
         length: 0, // Number of steps in current path
@@ -146,35 +148,53 @@ class Player {
       this.moving = true;
     }
 
-    switch (direction) {
-    default:
+    const delta = Player.directionDelta(direction);
+
+    if (!delta) {
       console.log('Nothing happened');
-      break;
-
-    case 'right':
-      if (!this.isBlocked(direction)) {
-        this.x += 1;
-      }
-      break;
-
-    case 'left':
-      if (!this.isBlocked(direction)) {
-        this.x -= 1;
-      }
-      break;
-
-    case 'up':
-      if (!this.isBlocked(direction)) {
-        this.y -= 1;
-      }
-      break;
-
-    case 'down':
-      if (!this.isBlocked(direction)) {
-        this.y += 1;
-      }
-      break;
+      return;
     }
+
+    if (!this.isBlocked(direction, delta)) {
+      this.x += delta.x;
+      this.y += delta.y;
+    }
+  }
+
+  static directionDelta(direction) {
+    const mapping = {
+      right: { x: 1, y: 0 },
+      left: { x: -1, y: 0 },
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      'up-right': { x: 1, y: -1 },
+      'down-right': { x: 1, y: 1 },
+      'up-left': { x: -1, y: -1 },
+      'down-left': { x: -1, y: 1 },
+    };
+
+    return mapping[direction] || null;
+  }
+
+  canMoveTo(tileX, tileY) {
+    const { size } = config.map;
+
+    if (tileX < 0 || tileY < 0 || tileX >= size.x || tileY >= size.y) {
+      return false;
+    }
+
+    const tileIndex = (tileY * size.x) + tileX;
+    const steppedOn = {
+      background: world.map.background[tileIndex] - 1,
+      foreground: world.map.foreground[tileIndex] - 1,
+    };
+
+    const tiles = {
+      background: steppedOn.background,
+      foreground: steppedOn.foreground - 252,
+    };
+
+    return MapUtils.gridWalkable(tiles, this, tileIndex) === 0;
   }
 
   /**
@@ -260,39 +280,30 @@ class Player {
    * @param direction {string} The direction player is going
    * @returns {boolean}
    */
-  isBlocked(direction) {
-    const { size, viewport } = config.map;
+  isBlocked(direction, delta = null) {
+    const vector = delta || Player.directionDelta(direction);
 
-    const tileCrop = {
-      x: this.x - Math.floor(0.5 * viewport.x),
-      y: this.y - Math.floor(0.5 * viewport.y),
-    };
+    if (!vector) {
+      return true;
+    }
 
-    const getY = (dirMove) => {
-      if (dirMove === 'right' || dirMove === 'left') return 5;
-      return dirMove === 'up' ? 4 : 6;
-    };
+    const targetX = this.x + vector.x;
+    const targetY = this.y + vector.y;
 
-    const getX = (dirMove) => {
-      if (dirMove === 'up' || dirMove === 'down') return 7;
-      return dirMove === 'left' ? 6 : 8;
-    };
+    if (!this.canMoveTo(targetX, targetY)) {
+      return true;
+    }
 
-    const onTile = (getY(direction) + tileCrop.y) * size.x + getX(direction) + tileCrop.x;
+    if (vector.x !== 0 && vector.y !== 0) {
+      const horizontal = this.canMoveTo(this.x + vector.x, this.y);
+      const vertical = this.canMoveTo(this.x, this.y + vector.y);
 
-    const steppedOn = {
-      // eslint-disable-next-line
-      background: world.map.background[onTile] - 1,
-      // eslint-disable-next-line
-      foreground: world.map.foreground[onTile] - 1,
-    };
+      if (!horizontal && !vertical) {
+        return true;
+      }
+    }
 
-    const tiles = {
-      foreground: steppedOn.foreground - 252,
-      background: steppedOn.background,
-    };
-
-    return MapUtils.gridWalkable(tiles, this, onTile);
+    return false;
   }
 
   /**
