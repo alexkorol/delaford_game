@@ -40,29 +40,24 @@ class Client {
    * Build the local Map based on data from server
    */
   async buildMap() {
-    return new Promise(async (resolve) => {
-      const images = await this.start();
+    const images = await this.start();
 
-      const data = {
-        droppedItems: this.droppedItems,
-        map: this.map,
-        npcs: this.npcs,
-        player: this.player,
-      };
+    const data = {
+      droppedItems: this.droppedItems,
+      map: this.map,
+      npcs: this.npcs,
+      player: this.player,
+    };
 
-      this.map = new Map(data, images);
-      resolve(200);
-    });
+    this.map = new Map(data, images);
+    return 200;
   }
 
   /**
    * Start loading assets from server
    */
   async start() {
-    return new Promise(async (resolve) => {
-      const assets = await Promise.all(this.loadAssets());
-      resolve(assets);
-    });
+    return Promise.all(this.loadAssets());
   }
 
   /**
@@ -94,7 +89,7 @@ class Client {
       generalImage,
     ];
 
-    const images = Object.values(assets).map(asset => this.constructor.uploadImage(asset));
+    const images = Object.values(assets).map((asset) => this.constructor.uploadImage(asset));
 
     return images;
   }

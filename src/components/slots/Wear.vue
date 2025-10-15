@@ -5,205 +5,238 @@
         x1="77"
         x2="77"
         y1="25"
-        y2="190"/>
+        y2="190"
+      />
       <line
         x1="25"
         x2="25"
         y1="130"
-        y2="190"/>
+        y2="190"
+      />
       <line
         x1="130"
         x2="130"
         y1="130"
-        y2="190"/>
+        y2="190"
+      />
       <line
         x1="137"
         x2="27"
         y1="145"
-        y2="145"/>
+        y2="145"
+      />
       <line
         x1="132"
         x2="27"
         y1="93"
-        y2="93"/>
+        y2="93"
+      />
     </svg>
 
     <div class="wrapper">
       <div class="first_row row">
         <div
-          v-tippy
           v-if="slotFilled('head')"
+          v-tippy
           :title="getTooltip('head')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'head')"
           @mouseover="showContextMenu($event, 'head', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('head')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('head').column * 32)}px top -${(tileOffset('head').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot head"/>
+          class="slot head"
+        />
       </div>
 
       <div class="second_row row">
         <div
-          v-tippy
           v-if="slotFilled('back')"
+          v-tippy
           :title="getTooltip('back')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'back')"
           @mouseover="showContextMenu($event, 'back', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('back')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('back').column * 32)}px top -${(tileOffset('back').row * 32)}px`
             }"
-            class="sword"/>
+            class="sword"
+          />
         </div>
         <div
           v-else
-          class="slot sword back"/>
+          class="slot sword back"
+        />
         <div
-          v-tippy
           v-if="slotFilled('necklace')"
+          v-tippy
           :title="getTooltip('necklace')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'necklace')"
           @mouseover="showContextMenu($event, 'necklace', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('necklace')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('necklace').column * 32)}px top -${(tileOffset('necklace').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot necklace"/>
-        <div class="slot arrows"/>
+          class="slot necklace"
+        />
+        <div class="slot arrows" />
       </div>
 
       <div class="third_row row">
         <div
-          v-tippy
           v-if="slotFilled('right_hand')"
+          v-tippy
           :title="getTooltip('right_hand')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'right_hand')"
           @mouseover="showContextMenu($event, 'right_hand', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('right_hand')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('right_hand').column * 32)}px top -${(tileOffset('right_hand').row * 32)}px`
             }"
-            class="sword"/>
+            class="sword"
+          />
         </div>
         <div
           v-else
-          class="slot sword right_hand"/>
+          class="slot sword right_hand"
+        />
         <div
-          v-tippy
           v-if="slotFilled('armor')"
+          v-tippy
           :title="getTooltip('armor')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'armor')"
           @mouseover="showContextMenu($event, 'armor', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('armor')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('armor').column * 32)}px top -${(tileOffset('armor').row * 32)}px`
             }"
-            class="torso"/></div>
+            class="torso"
+          />
+        </div>
         <div
           v-else
-          class="slot torso armor"/>
+          class="slot torso armor"
+        />
         <div
-          v-tippy
           v-if="slotFilled('left_hand')"
+          v-tippy
           :title="getTooltip('left_hand')"
           class="slot wearSlot"
           @click.left="selectItem($event)"
           @mouseover="showContextMenu($event, 'left_hand', true)"
-          @click.right="showContextMenu($event, 'left_hand')">
+          @click.right="showContextMenu($event, 'left_hand')"
+        >
           <div
             :class="showBackground('left_hand')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('left_hand').column * 32)}px top -${(tileOffset('left_hand').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot left_hand"/>
+          class="slot left_hand"
+        />
       </div>
 
       <div class="fourth_row row">
         <div
-          v-tippy
           v-if="slotFilled('gloves')"
+          v-tippy
           :title="getTooltip('gloves')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'gloves')"
           @mouseover="showContextMenu($event, 'gloves', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('gloves')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('gloves').column * 32)}px top -${(tileOffset('gloves').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot gloves"/>
+          class="slot gloves"
+        />
         <div
-          v-tippy
           v-if="slotFilled('feet')"
+          v-tippy
           :title="getTooltip('feet')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'feet')"
           @mouseover="showContextMenu($event, 'feet', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('feet')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('feet').column * 32)}px top -${(tileOffset('feet').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot feet"/>
+          class="slot feet"
+        />
         <div
-          v-tippy
           v-if="slotFilled('ring')"
+          v-tippy
           :title="getTooltip('ring')"
           class="slot wearSlot"
           @click.right="showContextMenu($event, 'ring')"
           @mouseover="showContextMenu($event, 'ring', true)"
-          @click.left="selectItem($event)">
+          @click.left="selectItem($event)"
+        >
           <div
             :class="showBackground('ring')"
             :style="{
               // eslint-disable-next-line
               backgroundPosition: `left -${(tileOffset('ring').column * 32)}px top -${(tileOffset('ring').row * 32)}px`
-          }"/>
+            }"
+          />
         </div>
         <div
           v-else
-          class="slot ring"/>
+          class="slot ring"
+        />
       </div>
     </div>
   </div>
@@ -367,6 +400,8 @@ export default {
 </style>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 div.wear {
   margin: 0;
   padding: 0;
@@ -376,7 +411,7 @@ div.wear {
   svg {
     position: absolute;
     z-index: 5;
-    stroke: darken(darkgrey, 25%);
+    stroke: color.adjust(darkgrey, $lightness: -25%);
     stroke-width: 3;
     height: 100%;
     width: 100%;
@@ -401,7 +436,7 @@ div.wear {
       box-sizing: border-box;
       width: 35px;
       margin: 0;
-      background-color: darken(darkgrey, 10%);
+      background-color: color.adjust(darkgrey, $lightness: -10%);
       background-repeat: no-repeat;
       background-position: center;
     }

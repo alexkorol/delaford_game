@@ -1,7 +1,9 @@
 <template>
   <div class="settings">
     <div class="section">
-      <div class="label">FPS</div>
+      <div class="label">
+        FPS
+      </div>
       <div class="range">
         <input
           v-model="selected.fps"
@@ -9,7 +11,8 @@
           min="1"
           max="5"
           steps="1"
-          value="1">
+          value="1"
+        >
       </div>
 
       <div class="fps-range">

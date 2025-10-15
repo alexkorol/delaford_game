@@ -2,9 +2,9 @@ import PF from 'pathfinding';
 import UI from 'shared/ui';
 import config from 'root/config';
 import blockedMouse from '@/assets/graphics/ui/mouse/blocked.png';
-import bus from './utilities/bus';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
-import { centerOfTile } from './utilities/movement-controller';
+import bus from './utilities/bus';
+import MovementController, { centerOfTile } from './utilities/movement-controller';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
@@ -63,10 +63,6 @@ class Map {
       elapsed: 0,
     };
 
-    this.delta = {
-      elapsed: 0,
-    };
-
     this.camera = {
       offsetX: 0,
       offsetY: 0,
@@ -77,6 +73,28 @@ class Map {
     this.setPlayer(data.player);
     this.setNPCs(data.npcs);
     this.setDroppedItems(data.droppedItems);
+  }
+
+  getViewportMetrics() {
+    const { viewport, tileset } = this.config.map;
+    return {
+      viewport,
+      tileSize: tileset.tile.width,
+      tileCrop: {
+        x: this.player.x - Math.floor(0.5 * viewport.x),
+        y: this.player.y - Math.floor(0.5 * viewport.y),
+      },
+    };
+  }
+
+  worldToScreen(position, metrics = null) {
+    const viewportMetrics = metrics || this.getViewportMetrics();
+    const { tileSize, tileCrop } = viewportMetrics;
+
+    return {
+      x: Math.round(position.x - (tileCrop.x * tileSize) - this.camera.offsetX),
+      y: Math.round(position.y - (tileCrop.y * tileSize) - this.camera.offsetY),
+    };
   }
 
   update(deltaSeconds) {
@@ -99,6 +117,22 @@ class Map {
       this.camera.offsetX = 0;
       this.camera.offsetY = 0;
     }
+
+    if (Array.isArray(this.players)) {
+      this.players.forEach((player) => {
+        if (player.movement) {
+          player.movement.update();
+        }
+      });
+    }
+
+    if (Array.isArray(this.npcs)) {
+      this.npcs.forEach((npc) => {
+        if (npc.movement) {
+          npc.movement.update();
+        }
+      });
+    }
   }
 
   /**
@@ -116,7 +150,32 @@ class Map {
    * @param {object} npcs The world NPCS
    */
   setNPCs(npcs) {
-    this.npcs = npcs;
+    const existing = new window.Map(
+      this.npcs
+        .map((npc) => {
+          const key = npc && (npc.uuid || npc.id);
+          if (!key) {
+            return null;
+          }
+          return [key, npc];
+        })
+        .filter((entry) => entry !== null),
+    );
+
+    this.npcs = (npcs || []).map((npc) => {
+      const key = npc && (npc.uuid || npc.id);
+      const previous = key ? existing.get(key) : null;
+      const controller = previous && previous.movement
+        ? previous.movement
+        : new MovementController().initialise(npc.x, npc.y);
+
+      controller.hardSync(npc.x, npc.y);
+
+      return {
+        ...npc,
+        movement: controller,
+      };
+    });
   }
 
   /**
@@ -134,9 +193,27 @@ class Map {
    * @param {Image} images Images of the player and terrain
    */
   setImages(images) {
-    // Define images
-    // eslint-disable-next-line
-    const [playerImage, npcsImage, objectImage, terrainImage, weaponsImage, armorImage, jewelryImage, generalImage] = images;
+    let normalized = [];
+    if (Array.isArray(images)) {
+      normalized = images;
+    } else if (images && typeof images === 'object') {
+      normalized = Object.values(images);
+    }
+
+    if (normalized.length < 8) {
+      console.warn('[Map] setImages received unexpected payload; falling back to placeholders.', normalized);
+    }
+
+    const fallback = (index) => normalized[index] || new Image();
+
+    const playerImage = fallback(0);
+    const npcsImage = fallback(1);
+    const objectImage = fallback(2);
+    const terrainImage = fallback(3);
+    const weaponsImage = fallback(4);
+    const armorImage = fallback(5);
+    const jewelryImage = fallback(6);
+    const generalImage = fallback(7);
 
     // Image and data
     this.images = {
@@ -272,26 +349,22 @@ class Map {
    * Paint the map based on player's position
    */
   drawMap() {
-    const { x, y } = this.player;
-
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const {
-      tileset, size, viewport, objects,
-    } = this.config.map;
 
+    const {
+      viewport,
+      tileSize,
+      tileCrop,
+    } = this.getViewportMetrics();
+
+    const { tileset, size, objects } = this.config.map;
     const { offsetX, offsetY } = this.camera;
 
     const divider = {
-      background: tileset.width / tileset.tile.width,
-      foreground: objects.width / tileset.tile.width,
+      background: tileset.width / tileSize,
+      foreground: objects.width / tileSize,
     };
 
-    const tileCrop = {
-      x: x - Math.floor(0.5 * viewport.x),
-      y: y - Math.floor(0.5 * viewport.y),
-    };
-
-    // Drawing the map row by column.
     for (let column = -1; column <= viewport.y + 1; column += 1) {
       for (let row = -1; row <= viewport.x + 1; row += 1) {
         const worldColumn = column + tileCrop.y;
@@ -306,57 +379,42 @@ class Map {
             const backgroundTile = backgroundIndex - 1;
             const foregroundTile = (foregroundIndex - 1) - 252;
 
-            // Get the correct tile to draw
-            const tile = {
-              clip: {
-                background: {
-                  x: Math.floor(backgroundTile % divider.background) * tileset.tile.width,
-                  y: Math.floor(backgroundTile / divider.background) * tileset.tile.height,
-                },
-                foreground: {
-                  x: Math.floor(foregroundTile % divider.foreground) * tileset.tile.width,
-                  y: Math.floor(foregroundTile / divider.foreground) * tileset.tile.height,
-                },
-              },
-              pos: {
-                x: row * tileset.tile.width,
-                y: column * tileset.tile.height,
-              },
-              width: tileset.tile.width,
-              height: tileset.tile.height,
+            const sourceBackground = {
+              x: Math.floor(backgroundTile % divider.background) * tileSize,
+              y: Math.floor(backgroundTile / divider.background) * tileSize,
             };
 
-            // Draw the background (terrain)
-            const drawX = Math.round(tile.pos.x - offsetX);
-            const drawY = Math.round(tile.pos.y - offsetY);
+            const sourceForeground = {
+              x: Math.floor(foregroundTile % divider.foreground) * tileSize,
+              y: Math.floor(foregroundTile / divider.foreground) * tileSize,
+            };
+
+            const drawX = Math.round((row * tileSize) - offsetX);
+            const drawY = Math.round((column * tileSize) - offsetY);
 
             this.context.drawImage(
-              this.images.terrainImage, // The Image() instance
-              tile.clip.background.x, // Coordinate to clip the X-axis
-              tile.clip.background.y, // Coordinate to clip the Y-axis
-              tile.width, // How wide, in pixels, to clip the sub-rectangle
-              tile.height, // How tall, in pixels, to clip the sub-rectangle
-              drawX, // Position the clipped picture along the X-axis
-              drawY, // Position the clipped picture along the Y-axis
-              tile.width, // The width, in pixels, to draw the image
-              tile.height, // The height, in pixels, to draw the image
+              this.images.terrainImage,
+              sourceBackground.x,
+              sourceBackground.y,
+              tileSize,
+              tileSize,
+              drawX,
+              drawY,
+              tileSize,
+              tileSize,
             );
 
-            // Draw the foreground (objects)
             if (foregroundTile > -1) {
-              const foregroundDrawX = Math.round(tile.pos.x - offsetX);
-              const foregroundDrawY = Math.round(tile.pos.y - offsetY);
-
               this.context.drawImage(
-                this.images.objectImage, // The Image() instance
-                tile.clip.foreground.x,
-                tile.clip.foreground.y,
-                tile.width,
-                tile.height,
-                foregroundDrawX,
-                foregroundDrawY,
-                tile.width,
-                tile.height,
+                this.images.objectImage,
+                sourceForeground.x,
+                sourceForeground.y,
+                tileSize,
+                tileSize,
+                drawX,
+                drawY,
+                tileSize,
+                tileSize,
               );
             }
           }
@@ -378,12 +436,17 @@ class Map {
       return foundItems;
     });
 
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+
     // Get relative X,Y coordinates to paint on viewport
     nearbyItems.forEach((item) => {
-      const viewport = {
-        x: Math.floor(this.config.map.viewport.x / 2) - (this.player.x - item.x),
-        y: Math.floor(this.config.map.viewport.y / 2) - (this.player.y - item.y),
+      const itemCenter = centerOfTile(item.x, item.y, tileSize);
+      const topLeft = {
+        x: itemCenter.x - (tileSize / 2),
+        y: itemCenter.y - (tileSize / 2),
       };
+      const screenPosition = this.worldToScreen(topLeft, metrics);
 
       // Get item information and get proper quantity index for graphic
       const info = UI.getItemData(item.id);
@@ -410,20 +473,16 @@ class Map {
         }
       };
 
-      // Paint the item on map
-      const drawX = Math.round((viewport.x * 32) - this.camera.offsetX);
-      const drawY = Math.round((viewport.y * 32) - this.camera.offsetY);
-
       this.context.drawImage(
         itemTileset(),
         ((info.graphics.column + qtyIndex) * 32), // Number in Item tileset
         (info.graphics.row * 32), // Y-axis of tileset
-        32,
-        32,
-        drawX,
-        drawY,
-        32,
-        32,
+        tileSize,
+        tileSize,
+        screenPosition.x,
+        screenPosition.y,
+        tileSize,
+        tileSize,
       );
     }, this);
   }
@@ -436,20 +495,16 @@ class Map {
     const drawX = Math.round(center.x - 16);
     const drawY = Math.round(center.y - 16);
 
-    const sprite = this.images.playerImage;
-    const spriteWidth = sprite.width || 32;
-    const spriteHeight = sprite.height || 32;
-
     this.context.drawImage(
-      sprite,
+      this.images.playerImage,
       0,
       0,
-      spriteWidth,
-      spriteHeight,
+      32,
+      32,
       drawX,
       drawY,
-      spriteWidth,
-      spriteHeight,
+      32,
+      32,
     );
   }
 
@@ -467,26 +522,33 @@ class Map {
       return foundPlayers;
     });
 
-    // Get relative X,Y coordinates to paint on viewport
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+
     nearbyPlayers.forEach((player) => {
-      const viewport = {
-        x: Math.floor(this.config.map.viewport.x / 2) - (this.player.x - player.x),
-        y: Math.floor(this.config.map.viewport.y / 2) - (this.player.y - player.y),
+      const centerPosition = player.movement
+        ? player.movement.getPosition()
+        : centerOfTile(player.x, player.y, tileSize);
+
+      const topLeft = {
+        x: centerPosition.x - (tileSize / 2),
+        y: centerPosition.y - (tileSize / 2),
       };
 
-        // Paint the Player on map
+      const screenPosition = this.worldToScreen(topLeft, metrics);
+
       this.context.drawImage(
         this.images.playerImage,
-        0, // Number in NPC tileset
-        0, // Y-axis always 0
-        32,
-        32,
-        Math.round((viewport.x * 32) - this.camera.offsetX),
-        Math.round((viewport.y * 32) - this.camera.offsetY),
-        32,
-        32,
+        0,
+        0,
+        tileSize,
+        tileSize,
+        screenPosition.x,
+        screenPosition.y,
+        tileSize,
+        tileSize,
       );
-    }, this);
+    });
   }
 
   /**
@@ -503,26 +565,34 @@ class Map {
       return foundNPCs;
     });
 
-    // Get relative X,Y coordinates to paint on viewport
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+
     nearbyNPCs.forEach((npc) => {
-      const viewport = {
-        x: Math.floor(this.config.map.viewport.x / 2) - (this.player.x - npc.x),
-        y: Math.floor(this.config.map.viewport.y / 2) - (this.player.y - npc.y),
+      const centerPosition = npc.movement
+        ? npc.movement.getPosition()
+        : centerOfTile(npc.x, npc.y, tileSize);
+
+      const topLeft = {
+        x: centerPosition.x - (tileSize / 2),
+        y: centerPosition.y - (tileSize / 2),
       };
+
+      const screenPosition = this.worldToScreen(topLeft, metrics);
 
       // Paint the NPC on map
       this.context.drawImage(
         this.images.npcsImage,
         (npc.column * 32), // Number in NPC tileset
         0, // Y-axis always 0
-        32,
-        32,
-        Math.round((viewport.x * 32) - this.camera.offsetX),
-        Math.round((viewport.y * 32) - this.camera.offsetY),
-        32,
-        32,
+        tileSize,
+        tileSize,
+        screenPosition.x,
+        screenPosition.y,
+        tileSize,
+        tileSize,
       );
-    }, this);
+    });
   }
 
   /**
@@ -578,18 +648,31 @@ class Map {
    * Draw the mouse selection on the canvas's viewport
    */
   drawMouse() {
+    if (this.mouse.x === null || this.mouse.y === null) {
+      return;
+    }
+
+    const metrics = this.getViewportMetrics();
+    const { tileSize, tileCrop } = metrics;
+
+    const topLeft = {
+      x: (this.mouse.x + tileCrop.x) * tileSize,
+      y: (this.mouse.y + tileCrop.y) * tileSize,
+    };
+
+    const screenPosition = this.worldToScreen(topLeft, metrics);
+
     this.context.drawImage(
       this.mouse.selection,
-      Math.round((this.mouse.x * 32) - this.camera.offsetX),
-      Math.round((this.mouse.y * 32) - this.camera.offsetY),
-      32,
-      32,
+      screenPosition.x,
+      screenPosition.y,
+      tileSize,
+      tileSize,
     );
   }
 
   getViewportCenter() {
-    const { viewport, tileset } = this.config.map;
-    const tileSize = tileset.tile.width;
+    const { viewport, tileSize } = this.getViewportMetrics();
 
     return {
       x: Math.floor(viewport.x / 2) * tileSize + (tileSize / 2),

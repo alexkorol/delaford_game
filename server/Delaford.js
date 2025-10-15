@@ -6,8 +6,8 @@ import Item from '@server/core/item';
 import Map from '@server/core/map';
 import NPC from '@server/core/npc';
 import Socket from '@server/socket';
-import emoji from 'node-emoji';
-import uuid from 'uuid/v4';
+import * as emoji from 'node-emoji';
+import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
 
 class Delaford {

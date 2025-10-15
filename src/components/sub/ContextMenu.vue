@@ -2,12 +2,14 @@
   <div
     id="context-menu"
     :style="style"
-    @click.right="contextClick">
+    @click.right="contextClick"
+  >
     <ul
       v-if="view"
       id="actions"
       tabindex="-1"
-      @blur="closeMenu">
+      @blur="closeMenu"
+    >
       <li
         v-for="(item, index) in items"
         :key="index"
@@ -17,7 +19,10 @@
       />
       <li
         class="action"
-        @click="selectAction($event, { action: { name: 'cancel'} })">Cancel</li>
+        @click="selectAction($event, { action: { name: 'cancel' } })"
+      >
+        Cancel
+      </li>
     </ul>
   </div>
 </template>

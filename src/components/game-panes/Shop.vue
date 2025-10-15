@@ -5,7 +5,8 @@
       :images="game.map.images"
       :items="data.inventory"
       :slots="200"
-      screen="shop" />
+      screen="shop"
+    />
   </div>
 </template>
 
@@ -35,6 +36,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 $color: #706559;
 $background_color: #ededed;
 $default_color: #383838;
@@ -42,10 +45,10 @@ $default_color: #383838;
 .shopView {
   background-color: $color;
   font-family: "GameFont", serif;
-  border: 5px solid darken($color, 10%);
+  border: 5px solid color.adjust($color, $lightness: -10%);
 
   .header {
-    background: lighten($color, 10%);
+    background: color.adjust($color, $lightness: 10%);
     height: 30px;
 
     .close {
@@ -53,7 +56,7 @@ $default_color: #383838;
       width: 30px;
       box-sizing: border-box;
       height: 30px;
-      background-color: darken(red, 10%);
+      background-color: color.adjust(red, $lightness: -10%);
       color: white;
       font-size: 1em;
       padding: 5px 2px 5px 5px;

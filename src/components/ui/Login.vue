@@ -3,13 +3,15 @@
     <div
       v-tippy
       title="Load pre-made guest account. No progress will be saved on this account."
-      class="checkbox guest_account">
+      class="checkbox guest_account"
+    >
       <label for="guest_account">
         <input
           id="guest_account"
           v-model="guestAccount"
           type="checkbox"
-          @change="toggleGuestAccount">
+          @change="toggleGuestAccount"
+        >
         Guest account?
       </label>
     </div>
@@ -17,7 +19,8 @@
       <form
         :class="{ hasErrors: invalid }"
         action=""
-        autocomplete="off">
+        autocomplete="off"
+      >
         <input
           ref="username"
           v-model="username"
@@ -26,21 +29,23 @@
           class="username"
           autocorrect="off"
           spellcheck="false"
-          autofocus
           autocomplete="off"
-          @keyup.enter="login">
+          @keyup.enter="login"
+        >
         <input
           v-model="password"
           placeholder="Password"
           type="password"
           class="password"
           autocomplete="off"
-          @keyup.enter="login">
+          @keyup.enter="login"
+        >
       </form>
 
       <div
         v-if="invalid"
-        class="error_message">
+        class="error_message"
+      >
         Incorrect login. Please try again.
       </div>
     </div>
@@ -48,24 +53,32 @@
     <div class="action_buttons">
       <button
         class="button login"
-        @click="login">Login</button>
+        @click="login"
+      >
+        Login
+      </button>
       <div
-        v-tippy
         v-if="inDevelopment"
+        v-tippy
         title="Dev account details will be saved and auto-logged in upon code changes."
-        class="checkbox">
+        class="checkbox"
+      >
         <label for="rememberMe">
           <input
             id="rememberMe"
             v-model="rememberMe"
             type="checkbox"
-            @change="toggleRememberMe">
+            @change="toggleRememberMe"
+          >
           Remember me?
         </label>
       </div>
       <button
         class="button"
-        @click="cancel">Cancel</button>
+        @click="cancel"
+      >
+        Cancel
+      </button>
     </div>
   </div>
 </template>
@@ -114,7 +127,7 @@ export default {
     this.rememberMe = this.$store.getters.rememberMe;
     this.guestAccount = tempGuest || this.$store.getters.guestAccount;
 
-    bus.$on('player:login-error', data => this.incorrectLogin(data));
+    bus.$on('player:login-error', (data) => this.incorrectLogin(data));
     bus.$on('login:done', () => this.setLoginProgress(false));
 
     console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -136,6 +149,13 @@ export default {
         setTimeout(() => document.querySelector('button.login').click(), 250);
       }
     }
+  },
+  mounted() {
+    this.$nextTick(() => {
+      if (this.$refs.username) {
+        this.$refs.username.focus();
+      }
+    });
   },
   methods: {
     toggleGuestAccount() {
@@ -194,7 +214,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "./src/assets/scss/main";
+@use "@/assets/scss/main" as *;
 
 div.form {
   width: 100%;

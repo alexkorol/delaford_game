@@ -19,7 +19,7 @@ class Engine {
     // we will be calling it out-of-context
     this.loop = this.loop.bind(this);
 
-    bus.$on('SETTINGS:FPS', s => this.change('fps', s));
+    bus.$on('SETTINGS:FPS', (s) => this.change('fps', s));
   }
 
   change(setting, val) {

@@ -17,7 +17,7 @@ import Query from '@server/core/data/query';
 import Socket from '@server/socket';
 import UI from 'shared/ui';
 import pipe from '@server/player/pipeline';
-import uuid from 'uuid/v4';
+import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
 
 export default {

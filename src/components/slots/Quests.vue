@@ -4,10 +4,12 @@
       <li
         v-for="(quest, i) in quests"
         :key="i"
-        class="item">
+        class="item"
+      >
         <span
           class="name"
-          v-text="quest.name"/>
+          v-text="quest.name"
+        />
       </li>
     </ul>
   </div>
@@ -35,14 +37,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 div.quests {
   height: 100%;
 
   ul.list {
     height: 100%;
     padding: 0;
-    border: 4px solid darken(grey, 10%);
-    background-color: lighten(grey, 8%);
+    border: 4px solid color.adjust(grey, $lightness: -10%);
+    background-color: color.adjust(grey, $lightness: 8%);
     box-sizing: border-box;
     margin: 0;
     width: 100%;
@@ -57,11 +61,11 @@ div.quests {
       color: rgb(255, 0, 0);
 
       &:nth-child(odd) {
-        background-color: lighten(grey, 15%);
+        background-color: color.adjust(grey, $lightness: 15%);
       }
 
       &:nth-child(even) {
-        background-color: darken(grey, 5%);
+        background-color: color.adjust(grey, $lightness: -5%);
       }
 
       span.name {

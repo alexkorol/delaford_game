@@ -1,6 +1,7 @@
 // Player event handler
 
 import bus from '../../utilities/bus';
+import MovementController from '../../utilities/movement-controller';
 
 export default {
   /**
@@ -37,8 +38,25 @@ export default {
   'player:joined': (data, context) => {
     setTimeout(() => {
       if (context.game.player) {
+        const existingPlayers = new Map(
+          (context.game.map.players || []).map((player) => [player.uuid, player]),
+        );
+
         context.game.map.players = data.data
-          .filter(p => p.socket_id !== context.game.player.socket_id);
+          .filter((p) => p.socket_id !== context.game.player.socket_id)
+          .map((player) => {
+            const existing = existingPlayers.get(player.uuid);
+            const controller = existing && existing.movement
+              ? existing.movement
+              : new MovementController().initialise(player.x, player.y);
+
+            controller.hardSync(player.x, player.y);
+
+            return {
+              ...player,
+              movement: controller,
+            };
+          });
       }
     }, 1000);
   },
@@ -47,10 +65,9 @@ export default {
    * A player leaves the game
    */
   'player:left': (data, context) => {
-    const playerIndex = context.game.map.players.findIndex(p => data.data === p.socket_id);
+    const playerIndex = context.game.map.players.findIndex((p) => data.data === p.socket_id);
     context.game.map.players.splice(playerIndex, 1);
   },
-
 
   /**
    * A player equips an item

@@ -19,10 +19,10 @@ export default new Vuex.Store({
     },
   },
   getters: {
-    account: state => state.account,
-    action: state => state.action,
-    guestAccount: state => state.guestAccount,
-    rememberMe: state => state.rememberMe,
+    account: (state) => state.account,
+    action: (state) => state.action,
+    guestAccount: (state) => state.guestAccount,
+    rememberMe: (state) => state.rememberMe,
   },
   mutations: {
     REMEMBER_DEV_ACCOUNT: (state, payload) => {

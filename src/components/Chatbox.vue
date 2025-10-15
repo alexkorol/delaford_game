@@ -1,15 +1,18 @@
 <template>
   <div
     class="chatbox"
-    @click="chatboxClicked">
+    @click="chatboxClicked"
+  >
     <div
       id="chat"
-      readonly>
+      readonly
+    >
       <div
         v-for="(chat, i) in chatbox"
         :key="i"
         class="message"
-        v-html="showChatMessage(chat)"/>
+        v-html="showChatMessage(chat)"
+      />
     </div>
 
     <input
@@ -18,7 +21,8 @@
       maxlength="50"
       type="text"
       class="typing"
-      @keydown.enter="sendMessage">
+      @keydown.enter="sendMessage"
+    >
   </div>
 </template>
 
@@ -45,10 +49,10 @@ export default {
     };
   },
   created() {
-    bus.$on('player:say', data => this.pipeline(data));
+    bus.$on('player:say', (data) => this.pipeline(data));
   },
   mounted() {
-    bus.$on('item:examine', data => this.pipeline(data));
+    bus.$on('item:examine', (data) => this.pipeline(data));
   },
   methods: {
     /**
@@ -151,6 +155,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 $background_color: #ededed;
 $default_color: #383838;
 
@@ -182,7 +188,7 @@ $default_color: #383838;
     }
 
     &::-webkit-scrollbar-thumb {
-      background-color: darken($background_color, 55%);
+      background-color: color.adjust($background_color, $lightness: -55%);
     }
   }
 

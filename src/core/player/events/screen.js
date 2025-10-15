@@ -1,6 +1,5 @@
 import bus from '../../utilities/bus';
 
-
 export default {
   /**
    * The bank updates

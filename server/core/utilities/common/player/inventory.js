@@ -1,6 +1,6 @@
 import Query from '@server/core/data/query';
 import UI from 'shared/ui';
-import uuid from 'uuid/v4';
+import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
 
 export default class Inventory {
@@ -9,7 +9,6 @@ export default class Inventory {
     this.socketId = socketId;
     this.playerIndex = world.players.findIndex(p => p.socket_id === this.socketId);
   }
-
 
   /**
    * Adds item to player's inventory

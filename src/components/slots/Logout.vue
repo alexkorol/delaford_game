@@ -3,7 +3,10 @@
     <p>Please logout using this button to safely exit the game to save your progress.</p>
     <button
       class="button is-danger is-big"
-      @click="logout">Logout</button>
+      @click="logout"
+    >
+      Logout
+    </button>
   </div>
 </template>
 
@@ -28,7 +31,7 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "./src/assets/scss/main";
+@use "@/assets/scss/main" as *;
 
 div.logout {
   font-family: "UIFont", sans-serif;

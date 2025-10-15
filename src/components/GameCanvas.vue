@@ -2,15 +2,18 @@
   <div class="game">
     <div
       class="first-action"
-      v-html="action" />
+      v-html="action"
+    />
     <div
       v-if="current !== false"
       :style="getPaneDimensions"
-      class="pane">
+      class="pane"
+    >
       <component
+        :is="current"
         :game="game"
         :data="screenData"
-        :is="current" />
+      />
     </div>
     <canvas
       id="game-map"
@@ -23,7 +26,8 @@
       @mousemove="mouseSelection"
       @click.left="leftClick"
       @click.right="rightClick"
-      @keyup="movePlayer"
+      @keydown.prevent="handleKeyDown"
+      @keyup.prevent="handleKeyUp"
     />
   </div>
 </template>
@@ -53,6 +57,9 @@ export default {
       tileX: 0,
       tileY: 0,
       event: false,
+      lastDirection: null,
+      movementRepeatId: null,
+      movementRepeatDelay: 175,
     };
   },
   computed: {
@@ -72,7 +79,7 @@ export default {
     },
     otherPlayers() {
       return this.game.players.filter(
-        p => p.socket_id !== this.game.player.socket_id,
+        (p) => p.socket_id !== this.game.player.socket_id,
       );
     },
   },
@@ -86,11 +93,15 @@ export default {
     },
   },
   created() {
+    this.keyState = new Set();
     bus.$on('canvas:getMouse', () => this.mouseSelection());
     bus.$on('open:screen', this.openScreen);
     bus.$on('screen:close', this.closePane);
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
     bus.$on('canvas:reset-context-menu', () => this.mouseSelection());
+  },
+  beforeDestroy() {
+    this.clearMovementRepeat();
   },
   methods: {
     /**
@@ -216,20 +227,111 @@ export default {
       };
     },
 
-    /**
-     * Player uses keyboard to move
-     *
-     * @param {event} event
-     */
-    movePlayer({ key }) {
-      if (UI.userPressToMove(key)) {
-        const direction = key.split('Arrow')[1].toLowerCase();
-        const data = {
-          id: this.game.player.uuid,
-          direction,
-        };
+    handleKeyDown(event) {
+      const key = this.normalizeKey(event.key);
+      if (!this.isMovementKey(key)) {
+        return;
+      }
 
-        Client.move(data);
+      if (!this.keyState.has(key)) {
+        this.keyState.add(key);
+        this.sendMovementFromKeys();
+      }
+    },
+    handleKeyUp(event) {
+      const key = this.normalizeKey(event.key);
+      if (!this.isMovementKey(key)) {
+        return;
+      }
+
+      if (this.keyState.has(key)) {
+        this.keyState.delete(key);
+        this.sendMovementFromKeys();
+      }
+    },
+    normalizeKey(key) {
+      if (key.length === 1) {
+        return key.toLowerCase();
+      }
+      return key;
+    },
+    isMovementKey(key) {
+      return [
+        'arrowup',
+        'arrowdown',
+        'arrowleft',
+        'arrowright',
+        'w',
+        'a',
+        's',
+        'd',
+      ].includes(key);
+    },
+    sendMovementFromKeys() {
+      const direction = this.getDirectionFromKeys();
+      if (!direction) {
+        this.lastDirection = null;
+        this.clearMovementRepeat();
+        return;
+      }
+
+      if (direction === this.lastDirection) {
+        this.ensureMovementRepeat();
+        return;
+      }
+
+      this.lastDirection = direction;
+      this.dispatchMovement(direction);
+      this.ensureMovementRepeat();
+    },
+    getDirectionFromKeys() {
+      const keySet = this.keyState;
+      const has = (keys) => keys.some((key) => keySet.has(key));
+
+      const up = has(['arrowup', 'w']);
+      const down = has(['arrowdown', 's']);
+      const left = has(['arrowleft', 'a']);
+      const right = has(['arrowright', 'd']);
+
+      if (up && down) return null;
+      if (left && right) return null;
+
+      if (up && right) return 'up-right';
+      if (down && right) return 'down-right';
+      if (up && left) return 'up-left';
+      if (down && left) return 'down-left';
+      if (up) return 'up';
+      if (down) return 'down';
+      if (left) return 'left';
+      if (right) return 'right';
+
+      return null;
+    },
+    dispatchMovement(direction) {
+      Client.move({
+        id: this.game.player.uuid,
+        direction,
+      });
+    },
+    ensureMovementRepeat() {
+      if (this.movementRepeatId !== null) {
+        return;
+      }
+
+      this.movementRepeatId = setInterval(() => {
+        const direction = this.getDirectionFromKeys();
+        if (!direction) {
+          this.clearMovementRepeat();
+          return;
+        }
+
+        this.dispatchMovement(direction);
+      }, this.movementRepeatDelay);
+    },
+    clearMovementRepeat() {
+      if (this.movementRepeatId !== null) {
+        clearInterval(this.movementRepeatId);
+        this.movementRepeatId = null;
       }
     },
   },

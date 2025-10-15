@@ -2,13 +2,15 @@
   <div class="stats_slot">
     <ul>
       <li
-        v-tippy
         v-for="(skill, key, index) in skills"
+        :key="index"
+        v-tippy
         :title="`${skill.exp} exp`"
-        :key="index">
+      >
         <span
           class="skill-name"
-          v-text="key" />
+          v-text="key"
+        />
         <span class="level">{{ skill.level }} / 99</span>
       </li>
     </ul>

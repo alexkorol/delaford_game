@@ -1,7 +1,7 @@
 import { addHours, addMinutes, addSeconds } from 'date-fns';
+import { v4 as uuid } from 'uuid';
 
 import Socket from '@server/socket';
-import uuid from 'uuid/v4';
 import world from './world';
 
 class Item {

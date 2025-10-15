@@ -14,18 +14,21 @@ const http = require('http');
 const compression = require('compression');
 const express = require('express');
 
-const onProduction = process.env.NODE_ENV === 'production'; // Accomodate process.env and eqeqeq eslint rule
+const onProduction = process.env.NODE_ENV === 'production'; // Accommodate process.env and eqeqeq eslint rule
 const serverFolder = onProduction ? 'build' : 'server';
-// eslint-disable-next-line
-const world = require(`./${serverFolder}/core/world`);
+moduleAlias.addAlias('@server', `${__dirname}/${serverFolder}`);
 moduleAlias.addAlias('shared', `${__dirname}/${serverFolder}/shared`);
 moduleAlias.addAlias('root', `${__dirname}/${serverFolder}`);
+// eslint-disable-next-line
+const world = require(`./${serverFolder}/core/world`);
 
 const port = process.env.PORT || 6500;
 const env = process.env.NODE_ENV || 'production';
 const app = express();
 
-app.use(secure);
+if (onProduction) {
+  app.use(secure);
+}
 
 // Compress Express server bytes
 app.use(compression());

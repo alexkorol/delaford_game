@@ -1,6 +1,6 @@
 import Socket from '@server/socket';
 import UI from 'shared/ui';
-import uuid from 'uuid/v4';
+import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
 
 export default class Skill {

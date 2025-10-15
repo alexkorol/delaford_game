@@ -3,12 +3,13 @@
   <div class="main grid_container">
     <div
       v-for="(item, i) in items"
-      :key="i">
+      :key="i"
+    >
       <div style="width: 75px">
         <div
           v-if="slotHasItem(i)"
           :style="{
-            backgroundImage: 'url(' + getBgUrl(i) + ')',
+            backgroundImage: `url(${getBgUrl(i)})`,
             // eslint-disable-next-line
           backgroundPosition: `left -${(getItem(i).column * 32)}px top -${(getItem(i).row * 32)}px`
           }"
@@ -17,11 +18,15 @@
           @mouseover="showContextMenu($event, i, true)"
           @click.right="showContextMenu($event, i)"
         />
-        <div class="name">{{ displayName(getItem(i).name) }}</div>
+        <div class="name">
+          {{ displayName(getItem(i).name) }}
+        </div>
         <div
           :class="{ canSmith: items[i].hasBars && items[i].hasLevel, notEnoughBars: !items[i].hasBars, levelNeeded: !items[i].hasLevel }"
           class="barsNeeded"
-        >{{ items[i].barsNeeded }} bar{{ items[i].barsNeeded === 1 ? '' : 's' }}</div>
+        >
+          {{ items[i].barsNeeded }} bar{{ items[i].barsNeeded === 1 ? '' : 's' }}
+        </div>
       </div>
     </div>
   </div>
@@ -107,12 +112,12 @@ export default {
      * @return {integer}
      */
     getQuantityColumn(slotNumber, graphics) {
-      const findCorrectItem = this.items.find(e => e.slot === slotNumber);
+      const findCorrectItem = this.items.find((e) => e.slot === slotNumber);
 
       if (findCorrectItem.qty && graphics.quantityLevel) {
         findCorrectItem.graphics = graphics;
         findCorrectItem.column = graphics.quantityLevel.findIndex(
-          x => x > findCorrectItem.qty,
+          (x) => x > findCorrectItem.qty,
         );
         findCorrectItem.column = (findCorrectItem.column === -1
           ? graphics.quantityLevel.length
@@ -240,7 +245,7 @@ export default {
      * @return {boolean}
      */
     slotHasItem(slotNumber) {
-      const itemFound = this.items.find(s => s.slot === slotNumber);
+      const itemFound = this.items.find((s) => s.slot === slotNumber);
       if (!itemFound) {
         return false;
       }
@@ -258,7 +263,7 @@ export default {
      * @returns {object}
      */
     getItemFromSlot(slotNumber) {
-      return this.items.find(s => s.slot === slotNumber);
+      return this.items.find((s) => s.slot === slotNumber);
     },
     /**
      * Get the correct background URL to show in inventory
@@ -290,6 +295,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 $color: #706559;
 $background_color: #ededed;
 $default_color: #383838;
@@ -311,7 +318,7 @@ div.grid_container {
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: darken($background_color, 35%);
+    background-color: color.adjust($background_color, $lightness: -35%);
   }
 
   .locked-item {

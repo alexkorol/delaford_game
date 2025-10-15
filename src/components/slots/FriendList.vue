@@ -4,19 +4,26 @@
       <li
         v-for="(friend, i) in sorted_list"
         :key="i"
-        class="item">
+        class="item"
+      >
         <span
           class="name"
-          v-text="friend.user"/>
+          v-text="friend.user"
+        />
         <span
-          :class="{ connected: friend.online}"
-          class="status"/>
+          :class="{ connected: friend.online }"
+          class="status"
+        />
       </li>
     </ul>
 
     <div class="actions">
-      <button class="button">Add</button>
-      <button class="button">Remove</button>
+      <button class="button">
+        Add
+      </button>
+      <button class="button">
+        Remove
+      </button>
     </div>
   </div>
 </template>
@@ -45,7 +52,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-@import "./src/assets/scss/main";
+@use 'sass:color';
+@use "@/assets/scss/main" as *;
 
 div.friend_list {
   height: 100%;
@@ -59,8 +67,8 @@ div.friend_list {
   }
 
   ul.list {
-    border: 4px solid darken(grey, 10%);
-    background-color: lighten(grey, 8%);
+    border: 4px solid color.adjust(grey, $lightness: -10%);
+    background-color: color.adjust(grey, $lightness: 8%);
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -74,11 +82,11 @@ div.friend_list {
       padding: 0 3px;
 
       &:nth-child(odd) {
-        background-color: lighten(grey, 15%);
+        background-color: color.adjust(grey, $lightness: 15%);
       }
 
       &:nth-child(even) {
-        background-color: darken(grey, 5%);
+        background-color: color.adjust(grey, $lightness: -5%);
       }
 
       span.name {

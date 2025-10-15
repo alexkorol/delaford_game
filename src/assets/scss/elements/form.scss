@@ -1,11 +1,12 @@
-@import 'colors';
+@use 'sass:color';
+@use './colors' as *;
 
 .button {
   $background_color: grey;
-  $text_color: lighten(orange, 5%);
+  $text_color: color.adjust(orange, $lightness: 5%);
 
-  background-color: darken($background_color, 5%);
-  border: 2px solid darken($background_color, 25%);
+  background-color: color.adjust($background_color, $lightness: -5%);
+  border: 2px solid color.adjust($background_color, $lightness: -25%);
   text-shadow: 1px 1px 0 #000;
   outline: none;
   cursor: pointer;

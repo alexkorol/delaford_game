@@ -1,16 +1,19 @@
 <template>
   <div
     v-if="player"
-    class="info">
-    <span v-text="player.username"/>
+    class="info"
+  >
+    <span v-text="player.username" />
 
     <div
       v-if="hp"
-      class="health">
+      class="health"
+    >
       <div
         :style="displayHealthPercentage"
-        class="bar">
-        <div>{{ hp.current + ' / ' + hp.max }}</div>
+        class="bar"
+      >
+        <div>{{ `${hp.current} / ${hp.max}` }}</div>
       </div>
     </div>
 
@@ -18,13 +21,13 @@
       <div class="level">
         <strong>Lvl:</strong> <span
           class="integer"
-          v-text="player.level"/>
+          v-text="player.level"
+        />
       </div>
       <div class="att_def">
         <!-- Should anything go here? -->
       </div>
     </div>
-
   </div>
 </template>
 
@@ -63,6 +66,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 $info_text_color: rgb(68, 68, 68);
 
 div.info {
@@ -121,7 +126,7 @@ div.info {
     }
 
     span.integer {
-      color: lighten($info_text_color, 15%);
+      color: color.adjust($info_text_color, $lightness: 15%);
       margin-left: .5em;
     }
   }

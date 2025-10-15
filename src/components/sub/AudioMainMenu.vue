@@ -61,8 +61,14 @@ export default {
     },
   },
   created() {
-    bus.$on('music:start', () => this.$nextTick(() => this.startPlayer()));
-    bus.$on('music:stop', () => this.$nextTick(() => this.stopPlayer()));
+    bus.$on('music:start', async () => {
+      await this.$nextTick();
+      this.startPlayer();
+    });
+    bus.$on('music:stop', async () => {
+      await this.$nextTick();
+      this.stopPlayer();
+    });
   },
   methods: {
     /**

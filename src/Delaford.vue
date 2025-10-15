@@ -3,47 +3,56 @@
     <!-- Login screen -->
     <div
       v-show="!loaded || game.exit"
-      class="wrapper login__screen">
+      class="wrapper login__screen"
+    >
       <AudioMainMenu />
       <div
         v-if="screen === 'server-down'"
-        class="bg server__down">
+        class="bg server__down"
+      >
         The game server is down. Please check the website for more information.
       </div>
       <div
         v-else
-        class="bg">
+        class="bg"
+      >
         <div
           v-if="screen === 'register'"
-          class="register">
+          class="register"
+        >
           To register an account, please visit <a href="https://delaford.com/register">this page</a> to get started and then come back.
         </div>
         <div
           v-if="screen === 'login'"
-          class="login">
+          class="login"
+        >
           <img
             class="logo"
             src="./assets/logo.png"
-            alt="Logo">
+            alt="Logo"
+          >
 
-          <Login/>
+          <Login />
         </div>
         <div v-if="screen === 'main'">
           <img
             class="logo"
             src="./assets/logo.png"
-            alt="Logo">
+            alt="Logo"
+          >
 
           <div class="button_group">
             <button
               class="login"
-              @click="screen = 'login'">
+              @click="screen = 'login'"
+            >
               Login
             </button>
 
             <button
               class="register"
-              @click="screen = 'register'">
+              @click="screen = 'register'"
+            >
               Register
             </button>
           </div>
@@ -55,7 +64,8 @@
     <div
       v-show="loaded && game.map"
       class="wrapper game__wrapper"
-      @click.right="nothing">
+      @click.right="nothing"
+    >
       <div class="left">
         <!-- Main canvas -->
         <GameCanvas :game="game" />
@@ -65,17 +75,19 @@
       </div>
       <div
         class="right"
-        @click="sidebarClicked">
+        @click="sidebarClicked"
+      >
         <!-- Player overview -->
         <Info :game="game" />
 
         <!-- Slots (Stats, Wear, Inventory, etc.) -->
         <Slots
           ref="sidebarSlots"
-          :game="game" />
+          :game="game"
+        />
       </div>
 
-      <context-menu :game="game"/>
+      <context-menu :game="game" />
     </div>
     <!-- End Game wrapper -->
   </div>
@@ -128,7 +140,7 @@ export default {
       const data = JSON.parse(evt.data);
       const eventName = data.event;
 
-      const canRefresh = ['world', 'player', 'item'].some(e => eventName.split(':').includes(e));
+      const canRefresh = ['world', 'player', 'item'].some((e) => eventName.split(':').includes(e));
       // Did the game canvas change that we need
       // to refresh the first context action?
       if (data && eventName && canRefresh) {
@@ -221,7 +233,7 @@ export default {
         Object.assign(player, payload);
         this.game.map.player = player;
       } else {
-        const playerIndex = this.game.map.players.findIndex(p => p.uuid === payload.uuid);
+        const playerIndex = this.game.map.players.findIndex((p) => p.uuid === payload.uuid);
 
         if (playerIndex === -1) {
           const newcomer = {
@@ -258,10 +270,46 @@ export default {
      * On NPC movement, update NPCs
      */
     npcMovement(data) {
-      if (this.game.npcs) {
-        this.game.map.npcs = data;
-        this.game.npcs = data;
+      if (!this.game || !this.game.map) {
+        return;
       }
+
+      const existing = new Map(
+        (this.game.map.npcs || []).map((npc, index) => {
+          const key = npc && (npc.uuid || `${npc.id}-${index}`);
+          return [key, npc];
+        }),
+      );
+
+      const updated = (data || []).map((npc, index) => {
+        const key = npc && (npc.uuid || `${npc.id}-${index}`);
+        const previous = existing.get(key);
+
+        const controller = previous && previous.movement
+          ? previous.movement
+          : new MovementController().initialise(npc.x, npc.y);
+
+        const previousX = previous ? previous.x : npc.x;
+        const previousY = previous ? previous.y : npc.y;
+        const moved = previous && (previousX !== npc.x || previousY !== npc.y);
+
+        if (moved) {
+          const distance = Math.hypot(npc.x - previousX, npc.y - previousY) || 1;
+          controller.startMove(npc.x, npc.y, {
+            duration: DEFAULT_MOVE_DURATION_MS * distance,
+          });
+        } else {
+          controller.hardSync(npc.x, npc.y);
+        }
+
+        return {
+          ...npc,
+          movement: controller,
+        };
+      });
+
+      this.game.map.npcs = updated;
+      this.game.npcs = updated;
     },
 
     /**
@@ -314,6 +362,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 #app {
   font-family: "Roboto Slab", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -367,7 +417,7 @@ export default {
 
       button {
         background: #dedede;
-        border: 2px solid darken(#dedede, 10%);
+        border: 2px solid color.adjust(#dedede, $lightness: -10%);
         font-size: 1.5em;
         cursor: pointer;
       }

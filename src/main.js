@@ -7,7 +7,7 @@ import VueTippy from 'vue-tippy';
 // Import Delaford
 import Delaford from './Delaford.vue';
 import store from './store';
-
+import Socket from './core/utilities/socket';
 
 // Vue configuration
 Vue.config.productionTip = false;
@@ -26,8 +26,8 @@ Vue.use(VueTippy, {
 // Import game-panes
 const files = require.context('./components/game-panes', true, /\.vue$/i);
 const utilFiles = require.context('./components/util', true, /\.vue$/i);
-files.keys().map(key => Vue.component(key.split('/').pop().split('.')[0], files(key).default));
-utilFiles.keys().map(key => Vue.component(key.split('/').pop().split('.')[0], utilFiles(key).default));
+files.keys().map((key) => Vue.component(key.split('/').pop().split('.')[0], files(key).default));
+utilFiles.keys().map((key) => Vue.component(key.split('/').pop().split('.')[0], utilFiles(key).default));
 
 // Start the websocket server client-side
 if ('WebSocket' in window) {
@@ -38,6 +38,8 @@ if ('WebSocket' in window) {
 
   const url = process.env.NODE_ENV === 'production' ? wsurl.prod : wsurl.dev;
   window.ws = new WebSocket(url);
+  Socket.ensureListeners();
+  Socket.flushQueue();
 }
 
 // Add an event listener to close the websocket
@@ -52,5 +54,5 @@ window.focusOnGame = () => {
 /* eslint-disable no-new */
 new Vue({
   store,
-  render: h => h(Delaford),
+  render: (h) => h(Delaford),
 }).$mount('#delaford');

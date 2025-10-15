@@ -4,7 +4,7 @@ import MapUtils from 'shared/map-utils';
 import PF from 'pathfinding';
 import config from '@server/config';
 import surfaceMap from '@server/maps/layers/surface.json';
-import uuid from 'uuid/v4';
+import { v4 as uuid } from 'uuid';
 import { Shop } from './functions';
 import world from './world';
 

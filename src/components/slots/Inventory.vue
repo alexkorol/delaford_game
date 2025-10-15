@@ -4,7 +4,8 @@
     :images="game.map.images"
     :items="items"
     :slots="24"
-    screen="inventory" />
+    screen="inventory"
+  />
 </template>
 
 <script>

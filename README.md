@@ -23,10 +23,16 @@
    git clone git@github.com:YOUR_USERNAME/game.git
    cd game
    ```
-2. Install Node.js **10.24.1** (and npm 6.14.4). The repository now ships `.nvmrc`, `.node-version`, `.tool-versions`, and Volta metadata so `nvm install`, `nodenv`, `asdf`, or `volta install` will pick up the correct runtime automatically.
+2. Install and **select** Node.js **22.x** (current LTS). The repository ships `.nvmrc`, `.node-version`, `.tool-versions`, and Volta metadata so `nvm install`, `nodenv`, `asdf`, or `volta install` will pick up the correct runtime automatically. For example with nvm:
+   ```bash
+    nvm install 22
+    nvm use 22
+    node -v   # v22.x
+    npm -v    # v10.x
+   ```
 3. Install dependencies.
    ```bash
-   npm ci
+   npm install
    ```
    The postinstall build is skipped during local installs. When you need production assets run:
    ```bash
@@ -35,13 +41,14 @@
    or set `DELAFORD_RUN_BUILD=1` before installing.
 4. Launch the full development stack with a single command.
    ```bash
-   npm run dev
+   npm run start:dev
    ```
    This runs the Vue client (`npm run serve`) and the Node.js websocket server (`npm run dev:node`) in parallel.
 
 Visit `http://localhost:8080` to log in and start developing. The websocket server listens on port `9000` and the Express wrapper on port `6500`.
 
 Need more detail? See [docs/development-setup.md](docs/development-setup.md) for platform-specific notes, environment variables, and troubleshooting steps.
+
 
 For a better time, make sure to join the [Discord channel](https://discord.gg/nkZnHvD) to talk to other developers for help and exclusive dicussions!
 

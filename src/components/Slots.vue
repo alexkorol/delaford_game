@@ -5,37 +5,46 @@
         v-for="(slot, i) in slots"
         v-if="i < 3"
         :key="i"
-        :class="{active: selected === i}"
+        :class="{ active: selected === i }"
         class="slot inventorySlot"
-        @click="setPane($event, i)">
+        @click="setPane($event, i)"
+      >
         <img
           :src="svg[slot.toLowerCase()]"
-          :alt="slot">
+          :alt="slot"
+        >
       </div>
     </div>
 
     <div
       v-if="game.player"
-      class="pane">
+      class="pane"
+    >
       <Stats
         v-show="selected === 0"
-        :game="game" />
+        :game="game"
+      />
       <Inventory
         v-show="selected === 1"
-        :game="game" />
+        :game="game"
+      />
       <Wear
         v-show="selected === 2"
-        :game="game" />
+        :game="game"
+      />
       <Friend-List
         v-show="selected === 3"
-        :game="game" />
+        :game="game"
+      />
       <Settings v-show="selected === 4" />
       <Logout
         v-show="selected === 5"
-        :game="game" />
+        :game="game"
+      />
       <Quests
         v-show="selected === 6"
-        :game="game" />
+        :game="game"
+      />
     </div>
 
     <div class="bottom_slots">
@@ -43,12 +52,14 @@
         v-for="(slot, i) in slots"
         v-if="i > 2"
         :key="i"
-        :class="{active: selected === i}"
+        :class="{ active: selected === i }"
         class="slot"
-        @click="setPane($event, i)">
+        @click="setPane($event, i)"
+      >
         <img
           :src="svg[slot.toLowerCase()]"
-          :alt="slot">
+          :alt="slot"
+        >
       </div>
     </div>
   </div>
@@ -127,6 +138,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use 'sass:color';
+
 $main_bg_color: grey;
 
 div.slots {
@@ -160,17 +173,17 @@ div.slots {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    background: darken($main_bg_color, 10%);
+    background: color.adjust($main_bg_color, $lightness: -10%);
     height: 35px;
     z-index: 10;
 
     svg {
       z-index: 5;
-      fill: darken($main_bg_color, 35%);
+      fill: color.adjust($main_bg_color, $lightness: -35%);
     }
 
     &:hover {
-      background-color: lighten($main_bg_color, 5%);
+      background-color: color.adjust($main_bg_color, $lightness: 5%);
     }
   }
 

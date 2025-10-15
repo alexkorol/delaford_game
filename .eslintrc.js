@@ -2,6 +2,7 @@ module.exports = {
   root: true,
   env: {
     node: true,
+    browser: true,
   },
   extends: [
     'plugin:vue/recommended',
@@ -12,11 +13,23 @@ module.exports = {
     'no-restricted-syntax': 0,
     'import/first': 0,
     'import/no-cycle': 'off',
-    'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'off',
-    'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+    'import/no-unresolved': 0,
+    'import/no-import-module-exports': 'off',
+    'no-console': 'off',
+    'no-debugger': 'off',
     'no-param-reassign': [2, { props: false }],
     'no-case-declarations': 0,
     indent: ['error', 2],
+    'default-case-last': 'off',
+    'vue/max-len': 'off',
+    'vue/multi-word-component-names': 'off',
+    'vue/no-use-v-if-with-v-for': 'off',
+    'vue/no-v-html': 'off',
+    'vue/html-button-has-type': 'off',
+    'vuejs-accessibility/click-events-have-key-events': 'off',
+    'vuejs-accessibility/form-control-has-label': 'off',
+    'vuejs-accessibility/mouse-events-have-key-events': 'off',
+    'arrow-parens': 'off',
   },
   settings: {
     'import/resolver': {
@@ -24,9 +37,22 @@ module.exports = {
         rootPathPrefix: '@server',
         rootPathSuffix: 'server',
       },
+      alias: {
+        map: [
+          ['@', './src'],
+          ['@server', './server'],
+          ['shared', './server/shared'],
+          ['root', './server'],
+        ],
+        extensions: ['.js', '.vue', '.json'],
+      },
     },
   },
   parserOptions: {
-    parser: 'babel-eslint',
+    parser: '@babel/eslint-parser',
+    requireConfigFile: false,
+    babelOptions: {
+      presets: ['@vue/cli-plugin-babel/preset'],
+    },
   },
 };
