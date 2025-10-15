@@ -54,7 +54,7 @@
     <!-- Game wrapper -->
     <div
       v-show="loaded && game.map"
-      class="wrapper"
+      class="wrapper game__wrapper"
       @click.right="nothing">
       <div class="left">
         <!-- Main canvas -->
@@ -158,11 +158,19 @@ export default {
     bus.$on('player:logout', this.logout);
     bus.$on('go:main', this.cancelLogin);
   },
+  beforeDestroy() {
+    if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
+      this.game.map.destroy();
+    }
+  },
   methods: {
     /**
      * Logout player
      */
     logout() {
+      if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
+        this.game.map.destroy();
+      }
       this.screen = 'login';
       this.game = { exit: true };
       this.$refs.sidebarSlots.selected = 1;
@@ -313,13 +321,19 @@ export default {
   text-align: center;
   color: #fff;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
   flex-direction: column;
+  min-height: 100vh;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
 
   img.logo {
     margin-bottom: 1em;
+  }
+
+  div.wrapper {
+    width: 100%;
+    box-sizing: border-box;
   }
 
   div.login__screen {
@@ -329,6 +343,7 @@ export default {
     box-sizing: border-box;
     display: flex;
     height: 505px;
+    margin: auto;
     align-content: center;
     justify-content: center;
     background-image: url("./assets/bg-screen.png");
@@ -359,23 +374,59 @@ export default {
     }
   }
 
-  div.wrapper {
-    background-color: #ababab;
-    padding: 5px;
+  div.game__wrapper {
+    flex: 1 1 auto;
     display: grid;
-    grid-template-columns: 512px auto;
-    border-radius: 5px;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding: 0.75rem;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    align-items: stretch;
+    align-content: stretch;
+    align-self: stretch;
+    box-sizing: border-box;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 12px;
+
+    div.left {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+      min-width: 0;
+      height: 100%;
+    }
 
     div.right {
       display: flex;
       flex-direction: column;
       position: relative;
       justify-content: flex-end;
+      background-color: rgba(0, 0, 0, 0.35);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-y: auto;
+      min-height: 0;
 
       div.content {
         background-color: #c7c7c7;
         height: 100px;
         font-size: 12px;
+      }
+    }
+  }
+
+  @media (max-width: 1200px) {
+    div.game__wrapper {
+      grid-template-columns: minmax(0, 1fr);
+      grid-auto-rows: auto;
+
+      div.right {
+        order: 2;
+        margin-top: 1rem;
       }
     }
   }
