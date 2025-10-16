@@ -49,6 +49,18 @@ export default {
         x: null,
         y: null,
       },
+      world: {
+        x: null,
+        y: null,
+      },
+      viewport: {
+        x: null,
+        y: null,
+      },
+      center: {
+        x: null,
+        y: null,
+      },
       style: {
         top: '0px',
         left: '0px',
@@ -64,6 +76,26 @@ export default {
     });
   },
   methods: {
+    getTilePayload() {
+      const payload = {
+        x: this.tile.x,
+        y: this.tile.y,
+      };
+
+      if (this.world.x !== null && this.world.y !== null) {
+        payload.world = { ...this.world };
+      }
+
+      if (this.viewport.x !== null && this.viewport.y !== null) {
+        payload.viewport = { ...this.viewport };
+      }
+
+      if (this.center.x !== null && this.center.y !== null) {
+        payload.center = { ...this.center };
+      }
+
+      return payload;
+    },
     /**
      * Tell the game to do the selected action
      *
@@ -72,9 +104,10 @@ export default {
      */
     async selectAction(event, item) {
       // Data to perform action
+      const tilePayload = this.getTilePayload();
       const data = {
         item,
-        tile: this.tile,
+        tile: tilePayload,
       };
 
       // Data for queued action
@@ -83,12 +116,16 @@ export default {
           uuid: item.uuid,
           id: item.id,
         },
-        tile: this.tile,
+        tile: tilePayload,
         action: item.action,
         at: item.at || false,
         coordinates: item.coordinates || false,
         queueable: item.action.queueable,
       };
+
+      if (tilePayload.world) {
+        queueItem.world = { ...tilePayload.world };
+      }
 
       // Tell server to do action
       Socket.emit('player:context-menu:action', {
@@ -132,16 +169,45 @@ export default {
       this.tile.x = data.coordinates.x;
       this.tile.y = data.coordinates.y;
 
+      if (data.world) {
+        this.world = {
+          x: data.world.x,
+          y: data.world.y,
+        };
+      } else {
+        this.world = { x: null, y: null };
+      }
+
+      if (data.viewport) {
+        this.viewport = {
+          x: data.viewport.x,
+          y: data.viewport.y,
+        };
+      } else {
+        this.viewport = { x: null, y: null };
+      }
+
+      if (data.center) {
+        this.center = {
+          x: data.center.x,
+          y: data.center.y,
+        };
+      } else {
+        this.center = { x: null, y: null };
+      }
+
       // Remove misc info
       const miscData = omit(
         { ...data, clickedOn: data.event.target.classList },
-        ['coordinates', 'event', 'target'],
+        ['coordinates', 'event', 'target', 'world', 'viewport', 'center'],
       );
 
       // Tell server to start building context menu
       Socket.emit('player:context-menu:build', {
         miscData,
-        tile: this.tile,
+        tile: this.getTilePayload(),
+        viewport: this.viewport,
+        center: this.center,
         player: {
           socket_id: this.game.player.socket_id,
         },

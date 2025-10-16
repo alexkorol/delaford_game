@@ -104,6 +104,65 @@ export default {
     this.clearMovementRepeat();
   },
   methods: {
+    getViewportSnapshot() {
+      const fallbackViewport = {
+        x: config.map.viewport.x,
+        y: config.map.viewport.y,
+      };
+      const fallbackCenter = {
+        x: config.map.player.x,
+        y: config.map.player.y,
+      };
+
+      if (!this.game || !this.game.map || !this.game.map.config) {
+        return {
+          viewport: { ...fallbackViewport },
+          center: { ...fallbackCenter },
+        };
+      }
+
+      const viewport = this.game.map.config.map.viewport || fallbackViewport;
+      const center = this.game.map.config.map.player || fallbackCenter;
+
+      return {
+        viewport: {
+          x: viewport.x,
+          y: viewport.y,
+        },
+        center: {
+          x: center.x,
+          y: center.y,
+        },
+      };
+    },
+    getWorldCoordinates(local) {
+      if (!local) {
+        return null;
+      }
+
+      const snapshot = this.getViewportSnapshot();
+      if (this.game && this.game.map && typeof this.game.map.getViewportMetrics === 'function') {
+        const metrics = this.game.map.getViewportMetrics();
+        if (metrics && metrics.tileCrop) {
+          return {
+            x: metrics.tileCrop.x + local.x,
+            y: metrics.tileCrop.y + local.y,
+          };
+        }
+      }
+
+      if (this.game && this.game.player) {
+        return {
+          x: this.game.player.x - snapshot.center.x + local.x,
+          y: this.game.player.y - snapshot.center.y + local.y,
+        };
+      }
+
+      return {
+        x: snapshot.center.x + local.x,
+        y: snapshot.center.y + local.y,
+      };
+    },
     /**
      * Close the context-menu
      */
@@ -128,11 +187,16 @@ export default {
      */
     rightClick(event) {
       const coordinates = this.resolveViewportCoordinates(event);
+      const snapshot = this.getViewportSnapshot();
+      const world = this.getWorldCoordinates(coordinates);
 
       const data = {
         event,
         coordinates,
         target: event.target,
+        world,
+        viewport: snapshot.viewport,
+        center: snapshot.center,
       };
 
       event.preventDefault();
@@ -168,6 +232,8 @@ export default {
       this.mouse = mouseEvent;
 
       const coordinates = this.resolveViewportCoordinates(mouseEvent);
+      const snapshot = this.getViewportSnapshot();
+      const world = this.getWorldCoordinates(coordinates);
       const hoveredSquare = {
         x: coordinates.x,
         y: coordinates.y,
@@ -197,6 +263,9 @@ export default {
             event: this.event,
             target: this.event.target,
             firstOnly: true,
+            world,
+            viewport: snapshot.viewport,
+            center: snapshot.center,
           });
         }
       }
@@ -308,6 +377,10 @@ export default {
       return null;
     },
     dispatchMovement(direction) {
+      if (!this.game || !this.game.player || !direction) {
+        return;
+      }
+
       Client.move({
         id: this.game.player.uuid,
         direction,
@@ -353,16 +426,19 @@ div.game {
 
   canvas.main-canvas {
     border-top-left-radius: 3px;
-    width: var(--map-canvas-width, 100%);
-    height: var(--map-canvas-height, 100%);
-    max-width: 100%;
-    max-height: 100%;
+    width: var(--map-canvas-width);
+    height: var(--map-canvas-height);
+    min-width: var(--map-canvas-width);
+    min-height: var(--map-canvas-height);
+    max-width: var(--map-canvas-width);
+    max-height: var(--map-canvas-height);
     background: #fff;
     outline: none;
     cursor: pointer;
     image-rendering: pixelated;
     display: block;
     margin: 0 auto;
+    flex-shrink: 0;
   }
 
   .first-action {

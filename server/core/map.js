@@ -40,12 +40,26 @@ class Map {
   static findQuickestPath(x, y, playerIndex) {
     const player = world.players[playerIndex];
     return new Promise((resolve) => {
+      if (!player || !player.path || !player.path.grid) {
+        resolve([]);
+        return;
+      }
+
+      const defaultCenter = {
+        x: Math.floor(config.map.viewport.x / 2),
+        y: Math.floor(config.map.viewport.y / 2),
+      };
+      const center = player.path.center || defaultCenter;
+      const grid = typeof player.path.grid.clone === 'function'
+        ? player.path.grid.clone()
+        : player.path.grid;
+
       /**
        * Get location of all 4 spots, check tile if blocked
        * Get direction based off player and where to check first
        */
 
-      const path = player.path.finder.findPath(7, 5, x, y, player.path.grid);
+      const path = player.path.finder.findPath(center.x, center.y, x, y, grid);
       resolve(path);
     });
   }
@@ -80,6 +94,7 @@ class Map {
     if (world.players[playerIndex].path.current.walkable && path.length && path.length >= 1) {
       world.players[playerIndex].path.current.path.walking = path;
       world.players[playerIndex].path.current.step = 0;
+      world.players[playerIndex].path.current.interrupted = false;
 
       // We start moving the player along their path
       world.players[playerIndex].walkPath(playerIndex);
@@ -162,15 +177,45 @@ class Map {
    *
    * @param {object} player The player asking
    */
-  static getMatrix(player) {
+  static getMatrix(player, options = {}) {
     const { x, y } = player;
-
-    const { size, viewport } = config.map;
+    const { size } = config.map;
+    const defaultViewport = player.path && player.path.viewport
+      ? player.path.viewport
+      : config.map.viewport;
 
     return new Promise((resolve) => {
+      const requestedViewport = options.viewport || defaultViewport;
+      const viewport = {
+        x: Math.max(
+          0,
+          Math.min(
+            typeof requestedViewport.x === 'number' ? requestedViewport.x : defaultViewport.x,
+            size.x - 1,
+          ),
+        ),
+        y: Math.max(
+          0,
+          Math.min(
+            typeof requestedViewport.y === 'number' ? requestedViewport.y : defaultViewport.y,
+            size.y - 1,
+          ),
+        ),
+      };
+
+      const requestedCenter = options.center || null;
+      const center = {
+        x: requestedCenter && typeof requestedCenter.x === 'number'
+          ? requestedCenter.x
+          : Math.floor(viewport.x / 2),
+        y: requestedCenter && typeof requestedCenter.y === 'number'
+          ? requestedCenter.y
+          : Math.floor(viewport.y / 2),
+      };
+
       const tileCrop = {
-        x: x - Math.floor(0.5 * viewport.x),
-        y: y - Math.floor(0.5 * viewport.y),
+        x: x - center.x,
+        y: y - center.y,
       };
 
       const matrix = [];
@@ -179,22 +224,34 @@ class Map {
       for (let column = 0; column <= viewport.y; column += 1) {
         const grid = [];
         for (let row = 0; row <= viewport.x; row += 1) {
-          const onTile = (((column + tileCrop.y) * size.x) + row) + tileCrop.x;
-          const tiles = {
-            background: world.map.background[onTile] - 1,
-            foreground: (world.map.foreground[onTile] - 1) - 252,
-          };
+          const worldColumn = column + tileCrop.y;
+          const worldRow = row + tileCrop.x;
 
-          // Push the block/non-blocked tile to the
-          // grid so that the pathfinder can use it
-          // 0 - walkable; 1 - blocked
-          grid.push(MapUtils.gridWalkable(
-            tiles,
-            player,
-            onTile,
-            row,
-            column,
-          ));
+          if (
+            worldColumn < 0
+            || worldRow < 0
+            || worldColumn >= size.y
+            || worldRow >= size.x
+          ) {
+            grid.push(1);
+          } else {
+            const onTile = (worldColumn * size.x) + worldRow;
+            const tiles = {
+              background: world.map.background[onTile] - 1,
+              foreground: (world.map.foreground[onTile] - 1) - 252,
+            };
+
+            // Push the block/non-blocked tile to the
+            // grid so that the pathfinder can use it
+            // 0 - walkable; 1 - blocked
+            grid.push(MapUtils.gridWalkable(
+              tiles,
+              player,
+              onTile,
+              row,
+              column,
+            ));
+          }
         }
 
         // Push blocked/non-blocked array for pathfinding
@@ -202,7 +259,11 @@ class Map {
       }
 
       // The new walkable/non-walkable grid
-      resolve(new PF.Grid(matrix));
+      resolve({
+        grid: new PF.Grid(matrix),
+        viewport,
+        center,
+      });
     });
   }
 }

@@ -25,6 +25,17 @@ class Action {
     this.tile = false;
   }
 
+  getViewportCenter() {
+    if (this.player.path && this.player.path.center) {
+      return this.player.path.center;
+    }
+
+    return {
+      x: config.map.player.x,
+      y: config.map.player.y,
+    };
+  }
+
   /**
    * Get the walkable tile status of all 4 corners of an action's tile
    *
@@ -34,6 +45,8 @@ class Action {
    */
   getEdgeTiles(action, { x, y }) {
     if (action.nearby === 'edge') {
+      const center = this.getViewportCenter();
+      const options = { center };
       const tiles = {
         up: UI.getTileOverMouse(
           this.background,
@@ -41,6 +54,8 @@ class Action {
           this.player.y,
           x,
           y - 1,
+          'background',
+          options,
         ),
         right: UI.getTileOverMouse(
           this.background,
@@ -48,6 +63,8 @@ class Action {
           this.player.y,
           x + 1,
           y,
+          'background',
+          options,
         ),
         down: UI.getTileOverMouse(
           this.background,
@@ -55,6 +72,8 @@ class Action {
           this.player.y,
           x,
           y + 1,
+          'background',
+          options,
         ),
         left: UI.getTileOverMouse(
           this.background,
@@ -62,6 +81,8 @@ class Action {
           this.player.y,
           x - 1,
           y,
+          'background',
+          options,
         ),
       };
 
@@ -79,11 +100,17 @@ class Action {
    * @param {object} clickedOn The x,y the player clicked on
    */
   getTileNumber(clickedOn) {
-    const { size, viewport } = config.map;
+    const { size } = config.map;
+    const center = this.getViewportCenter();
     const tileCrop = {
-      x: this.player.x - Math.floor(0.5 * viewport.x),
-      y: this.player.y - Math.floor(0.5 * viewport.y),
+      x: this.player.x - center.x,
+      y: this.player.y - center.y,
     };
+
+    if (clickedOn.world && typeof clickedOn.world.x === 'number' && typeof clickedOn.world.y === 'number') {
+      this.tile = (clickedOn.world.y * size.x) + clickedOn.world.x;
+      return;
+    }
 
     // eslint-disable-next-line
     const onTile = (((clickedOn.y + tileCrop.y) * size.x) + clickedOn.x) + tileCrop.x;
@@ -102,6 +129,25 @@ class Action {
     const doing = incomingAction.name.toLowerCase();
 
     this.getTileNumber(clickedTile);
+    const center = this.getViewportCenter();
+    const worldCoordinates = (clickedTile.world
+      && typeof clickedTile.world.x === 'number'
+      && typeof clickedTile.world.y === 'number')
+      ? clickedTile.world
+      : {
+        x: this.player.x - center.x + clickedTile.x,
+        y: this.player.y - center.y + clickedTile.y,
+      };
+    const viewportState = (clickedTile.viewport
+      && typeof clickedTile.viewport.x === 'number'
+      && typeof clickedTile.viewport.y === 'number')
+      ? clickedTile.viewport
+      : null;
+    const centerState = (clickedTile.center
+      && typeof clickedTile.center.x === 'number'
+      && typeof clickedTile.center.y === 'number')
+      ? clickedTile.center
+      : center;
 
     const tileWalkable = UI.tileWalkable(UI.getTileOverMouse(
       this.background,
@@ -109,10 +155,12 @@ class Action {
       this.player.y,
       clickedTile.x,
       clickedTile.y,
+      'background',
+      { center },
     )); // TODO: Add foreground.
 
     // If the player clicked on himself make the action be immediate
-    if (clickedTile.x === 7 && clickedTile.y === 5) {
+    if (clickedTile.x === center.x && clickedTile.y === center.y) {
       incomingAction.queueable = false;
       queuedAction.queueable = false;
     }
@@ -130,6 +178,9 @@ class Action {
           ...data.item.action,
           onTile: this.tile,
           coordinates: { x: clickedTile.x, y: clickedTile.y },
+          world: worldCoordinates,
+          viewport: viewportState,
+          center: centerState,
         },
       }));
     }
@@ -147,6 +198,9 @@ class Action {
       },
       location: incomingAction.nearby,
       coordinates: { x: clickedTile.x, y: clickedTile.y },
+      world: worldCoordinates,
+      viewport: viewportState,
+      center: centerState,
     };
 
     // TODO

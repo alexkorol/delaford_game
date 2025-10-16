@@ -6,6 +6,7 @@
 import { Bank, Shop } from '@server/core/functions';
 import { wearableItems } from '@server/core/data/items';
 
+import config from '@server/config';
 import Action from '@server/player/action';
 import ContextMenu from '@server/core/context-menu';
 import Handler from '@server/player/handler';
@@ -27,6 +28,9 @@ export default {
         data: {
           id: data.player.uuid,
           coordinates: { x: data.clickedTile.x, y: data.clickedTile.y },
+          world: data.world || null,
+          viewport: data.viewport || null,
+          center: data.center || null,
         },
         player: {
           socket_id: data.player.uuid,
@@ -41,20 +45,126 @@ export default {
     const movingData = Object.hasOwnProperty.call(data, 'doing')
       ? data
       : data.data;
-    const { x, y } = movingData.coordinates;
+    const coordinates = movingData.coordinates || data.coordinates || { x: 0, y: 0 };
+    const localX = Number.isFinite(coordinates.x) ? coordinates.x : 0;
+    const localY = Number.isFinite(coordinates.y) ? coordinates.y : 0;
 
     const playerId = movingData.id || data.player.id;
     const playerIndexMoveTo = world.players.findIndex(
       p => p.uuid === playerId,
     );
-    const matrix = await Map.getMatrix(world.players[playerIndexMoveTo]);
+    if (playerIndexMoveTo === -1) {
+      return;
+    }
 
-    world.players[playerIndexMoveTo].path.grid = matrix;
-    world.players[playerIndexMoveTo].path.current.walkable = true;
+    const player = world.players[playerIndexMoveTo];
+
+    const providedViewport = movingData.viewport || data.viewport;
+    const providedCenter = movingData.center || data.center;
+    const providedWorld = movingData.world || data.world;
+
+    if (providedViewport
+      && typeof providedViewport.x === 'number'
+      && typeof providedViewport.y === 'number') {
+      player.path.viewport = {
+        x: providedViewport.x,
+        y: providedViewport.y,
+      };
+    }
+
+    if (providedCenter
+      && typeof providedCenter.x === 'number'
+      && typeof providedCenter.y === 'number') {
+      player.path.center = {
+        x: providedCenter.x,
+        y: providedCenter.y,
+      };
+    }
+
+    const baseViewport = player.path && player.path.viewport
+      ? player.path.viewport
+      : config.map.viewport;
+
+    const baseCenter = player.path && player.path.center
+      ? player.path.center
+      : {
+        x: Math.floor(baseViewport.x / 2),
+        y: Math.floor(baseViewport.y / 2),
+      };
+
+    const targetWorld = (providedWorld
+      && typeof providedWorld.x === 'number'
+      && typeof providedWorld.y === 'number')
+      ? providedWorld
+      : {
+        x: player.x - baseCenter.x + localX,
+        y: player.y - baseCenter.y + localY,
+      };
+
+    const offsets = {
+      left: Math.max(0, player.x - targetWorld.x),
+      right: Math.max(0, targetWorld.x - player.x),
+      up: Math.max(0, player.y - targetWorld.y),
+      down: Math.max(0, targetWorld.y - player.y),
+    };
+
+    const desiredCenter = {
+      x: Math.max(baseCenter.x, offsets.left),
+      y: Math.max(baseCenter.y, offsets.up),
+    };
+
+    const desiredViewport = {
+      x: Math.max(baseViewport.x, desiredCenter.x + offsets.right),
+      y: Math.max(baseViewport.y, desiredCenter.y + offsets.down),
+    };
+
+    const matrix = await Map.getMatrix(player, {
+      viewport: desiredViewport,
+      center: desiredCenter,
+    });
+
+    const clampCoordinate = (value, max) => Math.max(0, Math.min(value, max));
+    const relativeTarget = {
+      x: clampCoordinate(
+        targetWorld.x - (player.x - matrix.center.x),
+        matrix.viewport.x,
+      ),
+      y: clampCoordinate(
+        targetWorld.y - (player.y - matrix.center.y),
+        matrix.viewport.y,
+      ),
+    };
+
+    movingData.coordinates = relativeTarget;
+    movingData.world = targetWorld;
+    movingData.viewport = matrix.viewport;
+    movingData.center = matrix.center;
+
+    if (player.action && player.action.coordinates) {
+      player.action.coordinates = { ...relativeTarget };
+      player.action.world = { ...targetWorld };
+      player.action.viewport = { ...matrix.viewport };
+      player.action.center = { ...matrix.center };
+    }
+
+    if (Object.hasOwnProperty.call(data, 'doing') && player.queue.length) {
+      const latestQueued = player.queue[player.queue.length - 1];
+      if (latestQueued && latestQueued.actionToQueue && latestQueued.actionToQueue.coordinates) {
+        latestQueued.actionToQueue.coordinates = { ...relativeTarget };
+        latestQueued.actionToQueue.world = { ...targetWorld };
+        latestQueued.actionToQueue.viewport = { ...matrix.viewport };
+        latestQueued.actionToQueue.center = { ...matrix.center };
+      }
+    }
+
+    player.path.grid = matrix.grid;
+    player.path.viewport = matrix.viewport;
+    player.path.center = matrix.center;
+    player.path.current.walkable = true;
 
     const location = movingData.location || null;
 
-    Map.findPath(movingData.id, x, y, location);
+    Map.findPath(movingData.id, relativeTarget.x, relativeTarget.y, location);
   },
   'player:examine': (data) => {
     Socket.emit('item:examine', {
@@ -140,6 +250,32 @@ export default {
    * Start building the context menu for the player
    */
   'player:context-menu:build': async (incomingData) => {
+    const playerIndexForMenu = world.players.findIndex(
+      p => p.socket_id === incomingData.data.player.socket_id,
+    );
+
+    if (playerIndexForMenu > -1) {
+      const playerForMenu = world.players[playerIndexForMenu];
+
+      if (incomingData.data.viewport
+        && typeof incomingData.data.viewport.x === 'number'
+        && typeof incomingData.data.viewport.y === 'number') {
+        playerForMenu.path.viewport = {
+          x: incomingData.data.viewport.x,
+          y: incomingData.data.viewport.y,
+        };
+      }
+
+      if (incomingData.data.center
+        && typeof incomingData.data.center.x === 'number'
+        && typeof incomingData.data.center.y === 'number') {
+        playerForMenu.path.center = {
+          x: incomingData.data.center.x,
+          y: incomingData.data.center.y,
+        };
+      }
+    }
+
     // TODO
     // Pass only socket_id and grep from
     // instead of passing whole player object

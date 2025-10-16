@@ -10,6 +10,10 @@ const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
   y: config.map.viewport.y,
 };
+const INITIAL_CENTER = {
+  x: Math.floor(INITIAL_VIEWPORT.x / 2),
+  y: Math.floor(INITIAL_VIEWPORT.y / 2),
+};
 
 class Map {
   constructor(data, images) {
@@ -20,6 +24,7 @@ class Map {
     this.npcs = [];
     this.config = config;
     this.defaultViewport = { ...INITIAL_VIEWPORT };
+    this.defaultCenter = { ...INITIAL_CENTER };
     this.minViewport = { x: 5, y: 4 };
 
     this.droppedItems = [];
@@ -293,9 +298,13 @@ class Map {
 
     viewportX = Math.min(viewportX, size.x - 1);
     viewportY = Math.min(viewportY, size.y - 1);
+    viewportX = Math.max(viewportX, this.defaultViewport.x);
+    viewportY = Math.max(viewportY, this.defaultViewport.y);
 
     this.config.map.viewport.x = viewportX;
     this.config.map.viewport.y = viewportY;
+    this.config.map.player.x = Math.floor(viewportX / 2);
+    this.config.map.player.y = Math.floor(viewportY / 2);
 
     const canvasWidth = tileWidth * (1 + viewportX);
     const canvasHeight = tileHeight * (1 + viewportY);
@@ -343,6 +352,8 @@ class Map {
     }
     this.config.map.viewport.x = this.defaultViewport.x;
     this.config.map.viewport.y = this.defaultViewport.y;
+    this.config.map.player.x = this.defaultCenter.x;
+    this.config.map.player.y = this.defaultCenter.y;
   }
 
   /**

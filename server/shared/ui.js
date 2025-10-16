@@ -50,8 +50,22 @@ class UI {
    *
    * @returns {integer}
    */
-  static getTileOverMouse(board, playerX, playerY, mouseX, mouseY, layer = 'background') {
-    const tile = (((mouseY + (playerY - 5)) * map.size.x) + mouseX) + (playerX - 7);
+  static getTileOverMouse(
+    board,
+    playerX,
+    playerY,
+    mouseX,
+    mouseY,
+    layer = 'background',
+    options = {},
+  ) {
+    const viewport = options.viewport || map.viewport;
+    const center = options.center || map.player || {
+      x: Math.floor(viewport.x / 2),
+      y: Math.floor(viewport.y / 2),
+    };
+
+    const tile = (((mouseY + (playerY - center.y)) * map.size.x) + mouseX) + (playerX - center.x);
 
     if (board !== undefined) {
       const specialEquation = layer === 'foreground' ? 253 : 1;

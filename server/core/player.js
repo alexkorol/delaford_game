@@ -57,6 +57,14 @@ class Player {
     // Pathfinding
     this.path = {
       grid: null, // a 0/1 grid of blocked tiles
+      viewport: {
+        x: config.map.viewport.x,
+        y: config.map.viewport.y,
+      },
+      center: {
+        x: Math.floor(config.map.viewport.x / 2),
+        y: Math.floor(config.map.viewport.y / 2),
+      },
       finder: new PF.DijkstraFinder({
         diagonalMovement: PF.DiagonalMovement.IfAtMostOneObstacle,
       }),
@@ -70,6 +78,7 @@ class Player {
         step: 0, // Steps player has taken to walk
         walkable: false, // Did we click on a blocked tile?
         interrupted: false, // Did we click-to-walk elsewhere while walking current loop?
+        walkId: 0,
       },
     };
 
@@ -144,6 +153,10 @@ class Player {
    * @param {boolean} pathfind Whether pathfinding is being used to move player
    */
   move(direction, pathfind = false) {
+    if (!pathfind) {
+      this.cancelPathfinding();
+    }
+
     if (pathfind) {
       this.moving = true;
     }
@@ -155,10 +168,36 @@ class Player {
       return;
     }
 
-    if (!this.isBlocked(direction, delta)) {
-      this.x += delta.x;
-      this.y += delta.y;
+    if (this.isBlocked(direction, delta)) {
+      return;
     }
+
+    this.x += delta.x;
+    this.y += delta.y;
+  }
+
+  cancelPathfinding() {
+    const { path } = this;
+    if (!path || !path.current) {
+      return;
+    }
+
+    if (typeof path.current.walkId === 'number') {
+      path.current.walkId += 1;
+    } else {
+      path.current.walkId = 1;
+    }
+
+    path.current.path.walking = [];
+    path.current.path.set = [];
+    path.current.length = 0;
+    path.current.step = 0;
+    path.current.walkable = false;
+    path.current.interrupted = true;
+
+    this.moving = false;
+    this.queue = [];
+    this.action = false;
   }
 
   static directionDelta(direction) {
@@ -204,63 +243,94 @@ class Player {
    * @param {object} map The map object associated with player
    */
   walkPath(playerIndex) {
-    const { path } = world.players[playerIndex];
-    const speed = 150; // Delay to next step during walk
+    const player = world.players[playerIndex];
+    const { path } = player;
+    const baseSpeed = 150; // Base delay per cardinal step in ms
 
-    // Immediately-invoked function expression (IIFE) for the setTimeout
-    // so that the setTimeouts queue up and do not mix with each other
-    (() => {
-      setTimeout(() => {
-        // If equal, it means our last step is the same as from
-        // when our pathfinding first started, so we keep going.
+    if (!path || !path.current || !Array.isArray(path.current.path.walking)) {
+      return;
+    }
 
-        if (path.current.step + 1 === path.current.path.walking.length) {
-          // If they queue is not empty
-          // let's do it after destination is reached
-          if (!Player.queueEmpty(playerIndex)) {
-            const todo = world.players[playerIndex].queue[0];
+    if (path.current.path.walking.length <= 1) {
+      if (!Player.queueEmpty(playerIndex)) {
+        const todo = world.players[playerIndex].queue[0];
 
-            playerEvent[todo.action.actionId]({
-              todo,
-              playerIndex,
-            });
+        playerEvent[todo.action.actionId]({
+          todo,
+          playerIndex,
+        });
 
-            // Remove action from queue
-            this.queue.shift();
-          }
+        this.queue.shift();
+      }
 
-          this.stopMovement({ player: { socket_id: world.players[playerIndex].socket_id } });
-        } else {
-          const steps = {
-            current: {
-              x: path.current.path.walking[path.current.step][0],
-              y: path.current.path.walking[path.current.step][1],
-            },
-            next: {
-              x: path.current.path.walking[path.current.step + 1][0],
-              y: path.current.path.walking[path.current.step + 1][1],
-            },
-          };
+      this.stopMovement({ player: { socket_id: player.socket_id } });
+      return;
+    }
 
-          const movement = UI.getMovementDirection(steps);
+    path.current.walkId = (path.current.walkId || 0) + 1;
+    const activeWalkId = path.current.walkId;
+    path.current.interrupted = false;
 
-          this.move(movement, true);
+    const scheduleNextStep = () => {
+      if (path.current.walkId !== activeWalkId) {
+        return;
+      }
 
-          const playerChanging = world.players[playerIndex];
-          world.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-              Socket.broadcast('player:movement', playerChanging);
-            }
+      if (path.current.step + 1 >= path.current.path.walking.length) {
+        if (!Player.queueEmpty(playerIndex)) {
+          const todo = world.players[playerIndex].queue[0];
+
+          playerEvent[todo.action.actionId]({
+            todo,
+            playerIndex,
           });
 
-          world.players[playerIndex].path.current.step += 1;
-
-          if (path.current.step <= path.current.path.walking.length) {
-            this.walkPath(playerIndex);
-          }
+          this.queue.shift();
         }
-      }, speed);
-    })();
+
+        this.stopMovement({ player: { socket_id: world.players[playerIndex].socket_id } });
+        return;
+      }
+
+      const currentIndex = path.current.step;
+      const currentCoordinates = {
+        x: path.current.path.walking[currentIndex][0],
+        y: path.current.path.walking[currentIndex][1],
+      };
+      const nextCoordinates = {
+        x: path.current.path.walking[currentIndex + 1][0],
+        y: path.current.path.walking[currentIndex + 1][1],
+      };
+
+      const movement = UI.getMovementDirection({
+        current: currentCoordinates,
+        next: nextCoordinates,
+      });
+
+      const deltaX = Math.abs(nextCoordinates.x - currentCoordinates.x);
+      const deltaY = Math.abs(nextCoordinates.y - currentCoordinates.y);
+      const stepDuration = Math.round(baseSpeed * (deltaX && deltaY ? Math.SQRT2 : 1));
+
+      setTimeout(() => {
+        if (path.current.walkId !== activeWalkId) {
+          return;
+        }
+
+        this.move(movement, true);
+
+        const playerChanging = world.players[playerIndex];
+        world.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            Socket.broadcast('player:movement', playerChanging);
+          }
+        });
+
+        path.current.step += 1;
+        scheduleNextStep();
+      }, stepDuration);
+    };
+
+    scheduleNextStep();
   }
 
   /**

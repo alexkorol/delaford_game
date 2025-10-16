@@ -9,6 +9,8 @@ class ContextMenu {
     // Player
     this.player = world.players.find(p => p.socket_id === player.socket_id);
 
+    this.tileData = tile;
+
     // Map layers
     this.background = world.map.background;
     this.foreground = world.map.foreground;
@@ -24,6 +26,48 @@ class ContextMenu {
     // Element clicked on
     this.context = Object.values(miscData.clickedOn);
 
+    const defaultCenter = {
+      x: Config.map.player.x,
+      y: Config.map.player.y,
+    };
+
+    const hasCustomCenter = tile && tile.center
+      && typeof tile.center.x === 'number'
+      && typeof tile.center.y === 'number';
+    const hasPathCenter = this.player.path && this.player.path.center;
+    if (hasCustomCenter) {
+      this.viewportCenter = tile.center;
+    } else if (hasPathCenter) {
+      this.viewportCenter = this.player.path.center;
+    } else {
+      this.viewportCenter = defaultCenter;
+    }
+
+    const hasCustomViewport = tile && tile.viewport
+      && typeof tile.viewport.x === 'number'
+      && typeof tile.viewport.y === 'number';
+    const hasPathViewport = this.player.path && this.player.path.viewport;
+    if (hasCustomViewport) {
+      this.viewportSize = tile.viewport;
+    } else if (hasPathViewport) {
+      this.viewportSize = this.player.path.viewport;
+    } else {
+      this.viewportSize = {
+        x: Config.map.viewport.x,
+        y: Config.map.viewport.y,
+      };
+    }
+
+    const hasWorldCoordinates = tile && tile.world
+      && typeof tile.world.x === 'number'
+      && typeof tile.world.y === 'number';
+    const worldCoordinates = hasWorldCoordinates
+      ? tile.world
+      : {
+        x: this.player.x - this.viewportCenter.x + tile.x,
+        y: this.player.y - this.viewportCenter.y + tile.y,
+      };
+
     // Coordinates of mouse-click and player
     this.coordinates = {
       // Where player is currently
@@ -33,8 +77,8 @@ class ContextMenu {
       },
       // Where on map they clicked on
       map: {
-        x: this.player.x - Config.map.player.x + tile.x,
-        y: this.player.y - Config.map.player.y + tile.y,
+        x: worldCoordinates.x,
+        y: worldCoordinates.y,
       },
       // Where in viewport they clicked on
       viewport: {
@@ -126,6 +170,7 @@ class ContextMenu {
       this.coordinates.viewport.x,
       this.coordinates.viewport.y,
       'foreground',
+      { center: this.viewportCenter },
     );
 
     const foregroundData = Query.getForegroundData(foregroundTile);
