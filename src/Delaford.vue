@@ -427,10 +427,10 @@ export default {
   div.game__wrapper {
     flex: 1 1 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+    grid-template-columns: minmax(0, 1fr) clamp(16.25rem, 22vw, 22.5rem);
     grid-template-rows: minmax(0, 1fr);
-    gap: 1.5rem;
-    padding: 0.75rem;
+    gap: clamp(1rem, 2vw, 1.5rem);
+    padding: clamp(0.5rem, 1vw, 1rem);
     width: 100%;
     height: 100%;
     min-height: 0;
@@ -448,6 +448,10 @@ export default {
       min-height: 0;
       min-width: 0;
       height: 100%;
+      align-items: stretch;
+      justify-content: flex-start;
+      overflow: auto;
+      width: 100%;
     }
 
     div.right {
@@ -460,6 +464,8 @@ export default {
       border-radius: 8px;
       overflow-y: auto;
       min-height: 0;
+      max-height: 100%;
+      flex: 0 0 auto;
 
       div.content {
         background-color: #c7c7c7;
@@ -469,7 +475,14 @@ export default {
     }
   }
 
-  @media (max-width: 1200px) {
+  /* stylelint-disable media-feature-range-notation */
+  @media (width <= 1440px) {
+    div.game__wrapper {
+      grid-template-columns: minmax(0, 1fr) clamp(15rem, 26vw, 20rem);
+    }
+  }
+
+  @media (width <= 1200px) {
     div.game__wrapper {
       grid-template-columns: minmax(0, 1fr);
       grid-auto-rows: auto;
@@ -480,5 +493,6 @@ export default {
       }
     }
   }
+  /* stylelint-enable media-feature-range-notation */
 }
 </style>
