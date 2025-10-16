@@ -239,23 +239,32 @@ export default {
 <style lang="scss" scoped>
 /** Main canvas **/
 div.game {
-  height: 352px;
-  margin-bottom: 5px;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 
   canvas.main-canvas {
     border-top-left-radius: 3px;
-    height: 352px;
+    width: var(--map-canvas-width, 100%);
+    height: var(--map-canvas-height, 100%);
+    max-width: 100%;
+    max-height: 100%;
     background: #fff;
     outline: none;
     cursor: pointer;
-    position: absolute;
-    top: 0;
-    left: 0;
+    image-rendering: pixelated;
+    display: block;
+    margin: 0 auto;
   }
 
   .first-action {
-    position: relative;
+    position: absolute;
     z-index: 9;
     left: 0.5em;
     top: 0.5em;

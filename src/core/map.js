@@ -6,6 +6,11 @@ import bus from './utilities/bus';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
 import { centerOfTile } from './utilities/movement-controller';
 
+const INITIAL_VIEWPORT = {
+  x: config.map.viewport.x,
+  y: config.map.viewport.y,
+};
+
 class Map {
   constructor(data, images) {
     this.foreground = data.map.foreground;
@@ -14,6 +19,8 @@ class Map {
     this.images = [];
     this.npcs = [];
     this.config = config;
+    this.defaultViewport = { ...INITIAL_VIEWPORT };
+    this.minViewport = { x: 5, y: 4 };
 
     this.droppedItems = [];
     this.players = [];
@@ -48,6 +55,9 @@ class Map {
     // Canvas
     this.canvas = document.querySelector('.main-canvas');
     this.context = this.canvas.getContext('2d');
+    this.resizeRaf = null;
+    this.configureCanvas = this.configureCanvas.bind(this);
+    this.handleResize = this.handleResize.bind(this);
 
     this.delta = {
       elapsed: 0,
@@ -171,22 +181,91 @@ class Map {
    */
   setUpCanvas() {
     this.configureCanvas();
+    window.removeEventListener('resize', this.handleResize);
+    window.addEventListener('resize', this.handleResize, { passive: true });
+    this.handleResize();
   }
 
   /**
    * Configure the canvas paramters correctly
    */
   configureCanvas() {
-    const { tileset } = this.config.map;
-    const canvasWidth = tileset.tile.width * (1 + this.config.map.viewport.x);
-    const canvasHeight = tileset.tile.height * (1 + this.config.map.viewport.y);
+    if (!this.canvas || !this.context) {
+      return;
+    }
+
+    const { tileset, size } = this.config.map;
+    const container = this.canvas ? this.canvas.parentElement : null;
+    const tileWidth = tileset.tile.width;
+    const tileHeight = tileset.tile.height;
+
+    let viewportX = this.defaultViewport.x;
+    let viewportY = this.defaultViewport.y;
+
+    if (container) {
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      if (containerWidth && containerHeight) {
+        const maxTilesX = Math.floor(containerWidth / tileWidth) - 1;
+        const maxTilesY = Math.floor(containerHeight / tileHeight) - 1;
+        viewportX = Math.max(this.minViewport.x, Math.min(maxTilesX, size.x - 1));
+        viewportY = Math.max(this.minViewport.y, Math.min(maxTilesY, size.y - 1));
+      }
+    }
+
+    viewportX = Math.min(viewportX, size.x - 1);
+    viewportY = Math.min(viewportY, size.y - 1);
+
+    this.config.map.viewport.x = viewportX;
+    this.config.map.viewport.y = viewportY;
+
+    const canvasWidth = tileWidth * (1 + viewportX);
+    const canvasHeight = tileHeight * (1 + viewportY);
 
     // Make sure canvas is set accordingly
-    this.canvas.setAttribute('width', canvasWidth);
-    this.canvas.setAttribute('height', canvasHeight);
+    this.canvas.width = canvasWidth;
+    this.canvas.height = canvasHeight;
+    this.canvas.style.width = `${canvasWidth}px`;
+    this.canvas.style.height = `${canvasHeight}px`;
+
+    if (container) {
+      container.style.setProperty('--map-canvas-width', `${canvasWidth}px`);
+      container.style.setProperty('--map-canvas-height', `${canvasHeight}px`);
+    }
 
     // Do not smooth any pixels painted on
     this.context.imageSmoothingEnabled = false;
+  }
+
+  handleResize() {
+    if (this.resizeRaf) {
+      window.cancelAnimationFrame(this.resizeRaf);
+    }
+
+    this.resizeRaf = window.requestAnimationFrame(() => {
+      this.resizeRaf = null;
+      this.configureCanvas();
+    });
+  }
+
+  destroy() {
+    window.removeEventListener('resize', this.handleResize);
+    if (this.resizeRaf) {
+      window.cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = null;
+    }
+    if (this.canvas) {
+      this.canvas.style.width = '';
+      this.canvas.style.height = '';
+      const container = this.canvas.parentElement;
+      if (container) {
+        container.style.removeProperty('--map-canvas-width');
+        container.style.removeProperty('--map-canvas-height');
+      }
+    }
+    this.config.map.viewport.x = this.defaultViewport.x;
+    this.config.map.viewport.y = this.defaultViewport.y;
   }
 
   /**
