@@ -287,14 +287,17 @@ export default {
       const canvasElement = (this.game && this.game.map && this.game.map.canvas)
         ? this.game.map.canvas
         : event.target;
+      const bufferCanvas = (this.game && this.game.map && this.game.map.bufferCanvas)
+        ? this.game.map.bufferCanvas
+        : null;
       const rect = canvasElement && typeof canvasElement.getBoundingClientRect === 'function'
         ? canvasElement.getBoundingClientRect()
         : { width: tile.width, height: tile.height };
-      const internalWidth = canvasElement && typeof canvasElement.width === 'number'
-        ? canvasElement.width
+      const internalWidth = bufferCanvas && typeof bufferCanvas.width === 'number'
+        ? bufferCanvas.width
         : tile.width * (viewport.x || 1);
-      const internalHeight = canvasElement && typeof canvasElement.height === 'number'
-        ? canvasElement.height
+      const internalHeight = bufferCanvas && typeof bufferCanvas.height === 'number'
+        ? bufferCanvas.height
         : tile.height * (viewport.y || 1);
 
       const position = UI.getMousePos(event);
@@ -436,17 +439,18 @@ export default {
 div.game {
   position: relative;
   display: block;
-  width: 100%;
-  max-width: 100%;
-  aspect-ratio: var(--map-aspect-ratio, 16 / 10);
+  width: var(--map-display-width, var(--map-native-width, auto));
+  min-width: var(--map-display-width, var(--map-native-width, auto));
+  height: var(--map-display-height, var(--map-native-height, auto));
+  min-height: var(--map-display-height, var(--map-native-height, auto));
+  max-width: none;
+  max-height: none;
   background: transparent;
   overflow: hidden;
 
   canvas.main-canvas {
     width: 100%;
     height: 100%;
-    max-width: 100%;
-    max-height: 100%;
     background: #fff;
     outline: none;
     cursor: pointer;

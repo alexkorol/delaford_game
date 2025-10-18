@@ -91,6 +91,24 @@ class Engine {
 
     // Draw the mouse selection
     this.game.map.drawMouse();
+
+    const mainCtx = this.game.map.context;
+    const { bufferCanvas } = this.game.map;
+
+    if (mainCtx && bufferCanvas) {
+      mainCtx.clearRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
+      mainCtx.drawImage(
+        bufferCanvas,
+        0,
+        0,
+        bufferCanvas.width,
+        bufferCanvas.height,
+        0,
+        0,
+        mainCtx.canvas.width,
+        mainCtx.canvas.height,
+      );
+    }
   }
 
   sampleFps(deltaMs) {

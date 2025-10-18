@@ -58,8 +58,11 @@ class Map {
     };
 
     // Canvas
+    this.scale = 2;
     this.canvas = document.querySelector('.main-canvas');
     this.context = this.canvas.getContext('2d');
+    this.bufferCanvas = document.createElement('canvas');
+    this.bufferContext = this.bufferCanvas.getContext('2d');
     this.resizeRaf = null;
     this.configureCanvas = this.configureCanvas.bind(this);
     this.handleResize = this.handleResize.bind(this);
@@ -277,6 +280,7 @@ class Map {
     }
 
     const { tileset } = this.config.map;
+    const viewportConfig = this.config.map.viewport;
     const container = this.canvas ? this.canvas.parentElement : null;
     const tileWidth = tileset.tile.width;
     const tileHeight = tileset.tile.height;
@@ -284,30 +288,38 @@ class Map {
     const viewportX = this.defaultViewport.x;
     const viewportY = this.defaultViewport.y;
 
-    this.config.map.viewport.x = viewportX;
-    this.config.map.viewport.y = viewportY;
+    viewportConfig.x = viewportX;
+    viewportConfig.y = viewportY;
+
     this.config.map.player.x = Math.floor(viewportX / 2);
     this.config.map.player.y = Math.floor(viewportY / 2);
 
-    const canvasWidth = tileWidth * viewportX;
-    const canvasHeight = tileHeight * viewportY;
+    const nativeWidth = tileWidth * viewportX;
+    const nativeHeight = tileHeight * viewportY;
+    const scale = this.scale || 1;
+    const displayWidth = nativeWidth * scale;
+    const displayHeight = nativeHeight * scale;
 
-    // Make sure canvas is set accordingly
-    this.canvas.width = canvasWidth;
-    this.canvas.height = canvasHeight;
-    this.canvas.style.width = '100%';
-    this.canvas.style.height = '100%';
-    this.canvas.style.maxWidth = '';
-    this.canvas.style.maxHeight = '';
+    this.bufferCanvas.width = nativeWidth;
+    this.bufferCanvas.height = nativeHeight;
+
+    this.canvas.width = displayWidth;
+    this.canvas.height = displayHeight;
+    this.canvas.style.width = `${displayWidth}px`;
+    this.canvas.style.height = `${displayHeight}px`;
+    this.canvas.style.maxWidth = `${displayWidth}px`;
+    this.canvas.style.maxHeight = `${displayHeight}px`;
 
     if (container) {
-      container.style.setProperty('--map-canvas-internal-width', `${canvasWidth}px`);
-      container.style.setProperty('--map-canvas-internal-height', `${canvasHeight}px`);
-      container.style.setProperty('--map-aspect-ratio', `${canvasWidth} / ${canvasHeight}`);
+      container.style.setProperty('--map-native-width', `${nativeWidth}px`);
+      container.style.setProperty('--map-native-height', `${nativeHeight}px`);
+      container.style.setProperty('--map-display-width', `${displayWidth}px`);
+      container.style.setProperty('--map-display-height', `${displayHeight}px`);
+      container.style.setProperty('--map-aspect-ratio', `${nativeWidth} / ${nativeHeight}`);
     }
 
-    // Do not smooth any pixels painted on
     this.context.imageSmoothingEnabled = false;
+    this.bufferContext.imageSmoothingEnabled = false;
   }
 
   handleResize() {
@@ -330,10 +342,14 @@ class Map {
     if (this.canvas) {
       this.canvas.style.width = '';
       this.canvas.style.height = '';
+      this.canvas.style.maxWidth = '';
+      this.canvas.style.maxHeight = '';
       const container = this.canvas.parentElement;
       if (container) {
-        container.style.removeProperty('--map-canvas-internal-width');
-        container.style.removeProperty('--map-canvas-internal-height');
+        container.style.removeProperty('--map-native-width');
+        container.style.removeProperty('--map-native-height');
+        container.style.removeProperty('--map-display-width');
+        container.style.removeProperty('--map-display-height');
         container.style.removeProperty('--map-aspect-ratio');
       }
     }
@@ -347,7 +363,13 @@ class Map {
    * Paint the map based on player's position
    */
   drawMap() {
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const ctx = this.bufferContext || this.context;
+    const targetCanvas = this.bufferCanvas || this.canvas;
+    if (!ctx || !targetCanvas) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
 
     const {
       viewport,
@@ -390,7 +412,7 @@ class Map {
             const drawX = Math.round((row * tileSize) - offsetX);
             const drawY = Math.round((column * tileSize) - offsetY);
 
-            this.context.drawImage(
+            ctx.drawImage(
               this.images.terrainImage,
               sourceBackground.x,
               sourceBackground.y,
@@ -403,7 +425,7 @@ class Map {
             );
 
             if (foregroundTile > -1) {
-              this.context.drawImage(
+              ctx.drawImage(
                 this.images.objectImage,
                 sourceForeground.x,
                 sourceForeground.y,
@@ -425,6 +447,11 @@ class Map {
    * Draw dropped items on the map
    */
   drawItems() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx) {
+      return;
+    }
+
     // Filter out NPCs in viewport
     const nearbyItems = this.droppedItems.filter((item) => {
       const foundItems = (this.player.x <= (8 + item.x))
@@ -471,7 +498,7 @@ class Map {
         }
       };
 
-      this.context.drawImage(
+      ctx.drawImage(
         itemTileset(),
         ((info.graphics.column + qtyIndex) * 32), // Number in Item tileset
         (info.graphics.row * 32), // Y-axis of tileset
@@ -489,11 +516,16 @@ class Map {
    * Draw the player on the board
    */
   drawPlayer() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx) {
+      return;
+    }
+
     const center = this.getViewportCenter();
     const drawX = Math.round(center.x - 16);
     const drawY = Math.round(center.y - 16);
 
-    this.context.drawImage(
+    ctx.drawImage(
       this.images.playerImage,
       0,
       0,
@@ -510,6 +542,11 @@ class Map {
    * Draw the other players on the screen
    */
   drawPlayers() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx) {
+      return;
+    }
+
     // Filter out nearby players
     const nearbyPlayers = this.players.filter((player) => {
       const foundPlayers = (this.player.x <= (8 + player.x))
@@ -535,7 +572,7 @@ class Map {
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
-      this.context.drawImage(
+      ctx.drawImage(
         this.images.playerImage,
         0,
         0,
@@ -553,6 +590,11 @@ class Map {
    * Draw the NPCs on the game viewport canvas
    */
   drawNPCs() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx) {
+      return;
+    }
+
     // Filter out NPCs in viewport
     const nearbyNPCs = this.npcs.filter((npc) => {
       const foundNPCs = (this.player.x <= (8 + npc.x))
@@ -579,7 +621,7 @@ class Map {
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
       // Paint the NPC on map
-      this.context.drawImage(
+      ctx.drawImage(
         this.images.npcsImage,
         (npc.column * 32), // Number in NPC tileset
         0, // Y-axis always 0
@@ -646,6 +688,10 @@ class Map {
    * Draw the mouse selection on the canvas's viewport
    */
   drawMouse() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx) {
+      return;
+    }
     if (this.mouse.x === null || this.mouse.y === null) {
       return;
     }
@@ -660,7 +706,7 @@ class Map {
 
     const screenPosition = this.worldToScreen(topLeft, metrics);
 
-    this.context.drawImage(
+    ctx.drawImage(
       this.mouse.selection,
       screenPosition.x,
       screenPosition.y,

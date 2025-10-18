@@ -33,6 +33,12 @@ export default {
   },
   created() {
     bus.$on('game:images:loaded', this.imagesLoaded);
+    if (this.game && this.game.map && this.game.map.images && Object.keys(this.game.map.images).length) {
+      this.loaded = true;
+    }
+  },
+  beforeDestroy() {
+    bus.$off('game:images:loaded', this.imagesLoaded);
   },
   methods: {
     imagesLoaded() {

@@ -37,6 +37,7 @@ export default {
 div.stats_slot {
   height: 100%;
   font-family: "GameFont", sans-serif;
+  color: #f1f1f1;
   text-align: left;
   text-shadow: 1px 1px 0 black;
   font-size: .75em;

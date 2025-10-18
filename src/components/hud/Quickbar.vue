@@ -36,13 +36,13 @@ export default {
 .quickbar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
-  gap: clamp(6px, 1vw, 10px);
+  gap: clamp(4px, 1vw, 8px);
   width: clamp(320px, 50vw, 520px);
-  padding: clamp(6px, 1vw, 10px);
-  border-radius: 16px;
-  background: rgba(20, 20, 24, 0.85);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
+  padding: clamp(4px, 0.8vw, 8px);
+  border-radius: 0;
+  background: rgba(20, 20, 24, 0.9);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  backdrop-filter: none;
 }
 
 .quickbar__slot {
@@ -52,28 +52,27 @@ export default {
   align-items: center;
   justify-content: center;
   padding: clamp(4px, 1vw, 6px);
-  border-radius: 10px;
-  background: linear-gradient(180deg, rgba(68, 68, 68, 0.8), rgba(38, 38, 38, 0.9));
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(56, 56, 56, 0.9), rgba(26, 26, 26, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #f4f4f4;
   font-family: "GameFont", sans-serif;
   cursor: pointer;
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out, border-color 120ms ease-out;
+  transition: box-shadow 120ms ease-out, border-color 120ms ease-out;
 
   &:hover {
-    transform: translateY(-2px);
     border-color: rgba(255, 255, 255, 0.25);
-    box-shadow: 0 12px 16px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
   }
 
   &:focus-visible {
-    outline: 3px solid rgba(255, 255, 255, 0.85);
-    outline-offset: 3px;
+    outline: 2px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 2px;
   }
 }
 
 .quickbar__slot--active {
-  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.6), 0 14px 20px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.6);
   border-color: rgba(255, 214, 102, 0.8);
 }
 
@@ -84,8 +83,8 @@ export default {
   width: clamp(26px, 3vw, 32px);
   height: clamp(26px, 3vw, 32px);
   margin-bottom: 0.25em;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.45);
   font-size: clamp(12px, 2vw, 16px);
 }
 

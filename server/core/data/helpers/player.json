@@ -79,6 +79,12 @@
       "id": "hammer",
       "slot": 5,
       "uuid": "q70e08d6-0a86-4a31-9635-77e58c58d6ef"
+    },
+    {
+      "id": "coins",
+      "slot": 6,
+      "qty": 100,
+      "uuid": "c40e08d6-0a86-4a31-9635-77e58c58d6ef"
     }
   ],
   "bank": [

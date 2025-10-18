@@ -69,113 +69,130 @@
       <div
         class="game-stage"
         :class="gameStageClasses"
-        :style="gameStageStyle"
       >
-        <transition name="pane-side">
-          <aside
-            v-if="shouldShowDesktopPane"
-            ref="desktopPane"
-            :class="['side-pane', `side-pane--${panePosition}`]"
+        <aside
+          v-if="isDesktop"
+          class="side-pane side-pane--left"
+        >
+          <header class="side-pane__header">
+            <h2 class="side-pane__title">
+              Stats
+            </h2>
+          </header>
+          <div class="side-pane__body">
+            <StatsPane :game="game" />
+          </div>
+        </aside>
+
+        <div class="center-column">
+          <div
+            class="world-shell"
+            :style="worldShellStyle"
           >
-            <header class="side-pane__header">
-              <h2 class="side-pane__title">
-                {{ paneTitle }}
-              </h2>
-              <button
-                type="button"
-                class="side-pane__close"
-                @click="closePane"
-              >
-                X
-              </button>
-            </header>
-            <div class="side-pane__body">
-              <component
-                :is="activePaneComponent"
-                v-if="activePaneComponent"
-                :game="game"
+            <GameCanvas :game="game" />
+
+            <div class="hud-layer">
+              <HudOrb
+                variant="hp"
+                label="HP"
+                :current="playerVitals.hp.current"
+                :max="playerVitals.hp.max"
+              />
+              <HudOrb
+                variant="mp"
+                label="MP"
+                :current="playerVitals.mp.current"
+                :max="playerVitals.mp.max"
               />
             </div>
-          </aside>
-        </transition>
 
-        <div
-          class="world-shell"
-          :style="worldShellStyle"
-        >
-          <GameCanvas :game="game" />
+            <div
+              v-if="!isDesktop"
+              class="chat-layer"
+            >
+              <div
+                class="chat-toggle"
+                :class="chatToggleClasses"
+              >
+                <button
+                  type="button"
+                  class="chat-toggle__button"
+                  @click="toggleChat"
+                >
+                  {{ chatToggleLabel }}
+                </button>
+                <div class="chat-toggle__preview">
+                  <span class="chat-toggle__text">{{ chatPreviewText }}</span>
+                  <span
+                    v-if="chatUnreadCount > 0"
+                    class="chat-toggle__badge"
+                  >
+                    {{ chatUnreadCount }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="chat-toggle__pin"
+                  @click="toggleChatPin"
+                >
+                  {{ layout.chat.isPinned ? 'Unpin' : 'Pin' }}
+                </button>
+              </div>
 
-          <div class="hud-layer">
-            <HudOrb
-              variant="hp"
-              label="HP"
-              :current="playerVitals.hp.current"
-              :max="playerVitals.hp.max"
-              @activate="requestPane('stats')"
-            />
+              <transition name="chat-overlay">
+                <div
+                  v-if="chatExpanded"
+                  class="chat-overlay"
+                  @mouseenter="cancelChatAutohide"
+                  @mouseleave="scheduleChatAutoHide"
+                >
+                  <Chatbox
+                    ref="chatbox"
+                    :game="game"
+                    @message-appended="handleChatMessage"
+                    @mouseenter.native="cancelChatAutohide"
+                    @focusin.native="cancelChatAutohide"
+                    @mouseleave.native="scheduleChatAutoHide"
+                    @focusout.native="scheduleChatAutoHide"
+                  />
+                </div>
+              </transition>
+            </div>
+          </div>
+
+          <div class="quickbar-shell">
             <Quickbar
               :slots="quickSlots"
               :active-index="quickbarActiveIndex"
               @slot-activate="handleQuickSlot"
             />
-            <HudOrb
-              variant="mp"
-              label="MP"
-              :current="playerVitals.mp.current"
-              :max="playerVitals.mp.max"
-              @activate="requestPane('inventory')"
+          </div>
+
+          <div
+            v-if="isDesktop"
+            class="chat-shell"
+          >
+            <Chatbox
+              ref="chatbox"
+              :game="game"
+              @message-appended="handleChatMessageDesktop"
             />
           </div>
-          <div class="chat-layer">
-            <div
-              class="chat-toggle"
-              :class="chatToggleClasses"
-            >
-              <button
-                type="button"
-                class="chat-toggle__button"
-                @click="toggleChat"
-              >
-                {{ chatToggleLabel }}
-              </button>
-              <div class="chat-toggle__preview">
-                <span class="chat-toggle__text">{{ chatPreviewText }}</span>
-                <span
-                  v-if="chatUnreadCount > 0"
-                  class="chat-toggle__badge"
-                >
-                  {{ chatUnreadCount }}
-                </span>
-              </div>
-              <button
-                type="button"
-                class="chat-toggle__pin"
-                @click="toggleChatPin"
-              >
-                {{ layout.chat.isPinned ? 'Unpin' : 'Pin' }}
-              </button>
-            </div>
-
-            <transition name="chat-overlay">
-              <div
-                v-if="chatExpanded"
-                class="chat-overlay"
-                @mouseenter="cancelChatAutohide"
-                @mouseleave="scheduleChatAutoHide"
-              >
-                <Chatbox
-                  ref="chatbox"
-                  :game="game"
-                  @message-appended="handleChatMessage"
-                  @mouseenter.native="cancelChatAutohide"
-                  @focusin.native="cancelChatAutohide"
-                  @mouseleave.native="scheduleChatAutoHide"
-                  @focusout.native="scheduleChatAutoHide"
-                />
-              </div>
-            </transition>
-          </div>
         </div>
+
+        <aside
+          v-if="isDesktop"
+          class="side-pane side-pane--right"
+        >
+          <header class="side-pane__header">
+            <h2 class="side-pane__title">
+              Inventory
+            </h2>
+          </header>
+          <div class="side-pane__body">
+            <InventoryPane :game="game" />
+          </div>
+        </aside>
 
         <transition name="pane-overlay">
           <div
@@ -273,16 +290,6 @@ const paneTitles = {
   settings: 'Settings',
   logout: 'Logout',
   quests: 'Quests',
-};
-
-const panePositions = {
-  stats: 'left',
-  inventory: 'right',
-  wear: 'right',
-  friendlist: 'right',
-  settings: 'right',
-  logout: 'right',
-  quests: 'right',
 };
 
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
@@ -404,9 +411,6 @@ export default {
         'chat-toggle--unread': this.chatUnreadCount > 0,
       };
     },
-    hasActivePane() {
-      return Boolean(this.layout.activePane);
-    },
     activePaneComponent() {
       const key = this.layout.activePane;
       return key ? paneRegistry[key] || null : null;
@@ -415,61 +419,37 @@ export default {
       const key = this.layout.activePane;
       return key ? paneTitles[key] || '' : '';
     },
-    panePosition() {
-      const key = this.layout.activePane;
-      return key ? panePositions[key] || 'right' : 'right';
-    },
     gameStageClasses() {
-      const classes = [`mode-${this.layoutMode}`];
-      if (this.hasActivePane) {
-        classes.push('pane-active');
-        classes.push(`pane-${this.panePosition}`);
-      } else {
-        classes.push('pane-inactive');
-      }
-      return classes;
-    },
-    gameStageStyle() {
-      if (this.layoutMode !== 'desktop') {
-        return {};
-      }
-      const paneWidth = 'clamp(280px, 22vw, 360px)';
-      if (!this.hasActivePane) {
-        return {
-          gridTemplateColumns: 'minmax(0, 1fr)',
-          justifyItems: 'center',
-        };
-      }
-      if (this.panePosition === 'left') {
-        return {
-          gridTemplateColumns: `${paneWidth} minmax(0, 1fr)`,
-          justifyItems: 'stretch',
-        };
-      }
-      return {
-        gridTemplateColumns: `minmax(0, 1fr) ${paneWidth}`,
-        justifyItems: 'stretch',
-      };
+      return [`mode-${this.layoutMode}`];
     },
     worldShellStyle() {
-      const runtimeConfig = this.game && this.game.map && this.game.map.config
-        ? this.game.map.config.map
+      const mapInstance = this.game && this.game.map ? this.game.map : null;
+      const runtimeConfig = mapInstance && mapInstance.config
+        ? mapInstance.config.map
         : this.config.map;
       const { tile } = runtimeConfig.tileset;
       const { viewport } = runtimeConfig;
       const width = tile.width * viewport.x;
       const height = tile.height * viewport.y;
+      const scale = mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1;
+      const displayWidth = width * scale;
+      const displayHeight = height * scale;
       return {
         '--map-aspect-ratio': `${width} / ${height}`,
         '--world-internal-width': `${width}px`,
         '--world-internal-height': `${height}px`,
+        '--world-display-width': `${displayWidth}px`,
+        '--world-display-height': `${displayHeight}px`,
       };
     },
-    shouldShowDesktopPane() {
-      return this.isDesktop && !!this.activePaneComponent;
-    },
     shouldShowOverlayPane() {
-      return !this.isDesktop && !!this.activePaneComponent;
+      if (!this.activePaneComponent || !this.layout.activePane) {
+        return false;
+      }
+      if (this.isDesktop) {
+        return !['stats', 'inventory'].includes(this.layout.activePane);
+      }
+      return true;
     },
   },
   watch: {
@@ -637,6 +617,10 @@ export default {
 
     openPane(pane) {
       bus.$emit('contextmenu:close');
+      if (this.isDesktop && ['stats', 'inventory'].includes(pane)) {
+        this.layout.activePane = null;
+        return;
+      }
       if (this.layout.activePane === pane) {
         this.closePane();
         return;
@@ -682,6 +666,14 @@ export default {
           this.scheduleChatAutoHide();
         }
       }
+    },
+
+    handleChatMessageDesktop(message = {}) {
+      const preview = this.formatChatPreview(message);
+      if (preview) {
+        this.layout.chat.preview = preview;
+      }
+      this.layout.chat.unreadCount = 0;
     },
 
     formatChatPreview(message) {
@@ -808,10 +800,10 @@ export default {
     },
 
     focusActivePane() {
-      const focusTargets = [
-        this.$refs.desktopPane,
-        this.$refs.overlayPane,
-      ];
+      const focusTargets = [];
+      if (this.$refs.overlayPane) {
+        focusTargets.push(this.$refs.overlayPane);
+      }
 
       const selectors = [
         'button',
@@ -1103,7 +1095,7 @@ export default {
     div.bg {
       background-color: rgba(0, 0, 0, 0.5);
       padding: 1em 0;
-      border-radius: 5px;
+      border-radius: 0;
       display: inline-flex;
       justify-content: space-around;
     }
@@ -1133,6 +1125,7 @@ export default {
     min-height: 0;
     box-sizing: border-box;
     background: radial-gradient(circle at top, rgba(37, 29, 41, 0.95), rgba(18, 14, 20, 0.95));
+    overflow: auto;
   }
 
   div.game-stage {
@@ -1149,11 +1142,17 @@ export default {
   }
 
   div.game-stage.mode-desktop {
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: stretch;
   }
 
-  div.game-stage.mode-desktop.pane-active {
-    justify-items: stretch;
+  div.center-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(0.75rem, 1.8vw, 1.25rem);
+    width: 100%;
+    grid-column: 2;
   }
 
   aside.side-pane {
@@ -1163,11 +1162,17 @@ export default {
     width: clamp(280px, 22vw, 360px);
     align-self: stretch;
     max-height: 100%;
-    border-radius: 18px;
-    background: rgba(20, 20, 26, 0.95);
-    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+    border-radius: 0;
     overflow: hidden;
     z-index: 3;
+  }
+
+  aside.side-pane,
+  .floating-pane__card {
+    background: rgba(20, 15, 25, 0.85);
+    backdrop-filter: blur(4px);
+    border: 4px solid #1a1423;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.6);
   }
 
   aside.side-pane.side-pane--left {
@@ -1176,7 +1181,7 @@ export default {
   }
 
   aside.side-pane.side-pane--right {
-    grid-column: 2;
+    grid-column: 3;
     justify-self: end;
   }
 
@@ -1185,8 +1190,8 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    background: rgba(12, 12, 16, 0.85);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 8, 12, 0.7);
+    border-bottom: 2px solid #1a1423;
   }
 
   .side-pane__title {
@@ -1220,18 +1225,18 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: min(100%, max(var(--world-internal-width, 512px), clamp(320px, 90vw, 1080px)));
-    max-width: 100%;
-    aspect-ratio: var(--map-aspect-ratio, 16 / 10);
-    border-radius: 18px;
+    width: var(--world-display-width, var(--world-internal-width, 512px));
+    min-width: var(--world-display-width, var(--world-internal-width, 512px));
+    height: var(--world-display-height, auto);
+    min-height: var(--world-display-height, auto);
+    max-width: none;
+    max-height: none;
+    margin: 0 auto;
+    border-radius: 0;
     background: rgba(12, 12, 16, 0.4);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
     overflow: hidden;
     grid-column: 1;
-  }
-
-  div.game-stage.mode-desktop.pane-left div.world-shell {
-    grid-column: 2;
   }
 
   div.world-shell::after {
@@ -1250,22 +1255,47 @@ export default {
     height: 100%;
   }
 
+  div.chat-shell {
+    width: var(--world-display-width, var(--world-internal-width, 512px));
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+    margin: 0 auto;
+    align-self: stretch;
+  }
+
+  div.chat-shell :deep(.chatbox) {
+    width: 100%;
+  }
+
   div.hud-layer {
     position: absolute;
     z-index: 2;
     left: 50%;
     bottom: clamp(0.85rem, 1.8vw, 1.8rem);
     transform: translateX(-50%);
-    width: min(100%, clamp(420px, 58vw, 680px));
+    width: min(100%, clamp(260px, 40vw, 420px));
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: clamp(0.55rem, 1.2vw, 1.25rem);
+    grid-template-columns: repeat(2, minmax(0, auto));
+    gap: clamp(0.5rem, 1vw, 1rem);
+    justify-content: center;
     align-items: flex-end;
     pointer-events: none;
   }
 
   div.hud-layer > * {
     pointer-events: auto;
+  }
+
+  div.quickbar-shell {
+    width: var(--world-display-width, var(--world-internal-width, 512px));
+    max-width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  div.quickbar-shell :deep(.quickbar) {
+    width: 100%;
   }
 
   div.chat-layer {
@@ -1289,7 +1319,7 @@ export default {
     width: 100%;
     min-height: 48px;
     padding: 0.5rem 0.75rem;
-    border-radius: 16px;
+    border-radius: 0;
     background: rgba(16, 16, 20, 0.9);
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.48);
     pointer-events: auto;
@@ -1311,7 +1341,7 @@ export default {
   .chat-toggle__pin {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 999px;
+    border-radius: 0;
     padding: 0.4rem 0.9rem;
     color: #fff;
     font-size: 0.85rem;
@@ -1351,7 +1381,7 @@ export default {
     justify-content: center;
     min-width: 1.75rem;
     height: 1.75rem;
-    border-radius: 999px;
+    border-radius: 0;
     background: rgba(255, 214, 102, 0.9);
     color: #171313;
     font-weight: 600;
@@ -1362,7 +1392,7 @@ export default {
     width: 100%;
     pointer-events: auto;
     background: rgba(18, 18, 24, 0.92);
-    border-radius: 18px;
+    border-radius: 0;
     box-shadow: 0 22px 40px rgba(0, 0, 0, 0.6);
     padding: 0.75rem;
   }
@@ -1376,12 +1406,12 @@ export default {
   .chat-overlay :deep(#chat) {
     height: clamp(160px, 24vh, 220px);
     background: rgba(236, 236, 240, 0.95);
-    border-radius: 12px;
+    border-radius: 0;
   }
 
   .chat-overlay :deep(input.typing) {
     margin-top: 0.5rem;
-    border-radius: 12px;
+    border-radius: 0;
     border: 1px solid rgba(40, 40, 44, 0.25);
   }
 
@@ -1405,9 +1435,7 @@ export default {
   .floating-pane__card {
     width: min(640px, 92vw);
     max-height: min(520px, 82vh);
-    background: rgba(24, 24, 30, 0.96);
-    border-radius: 24px 24px 12px 12px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.65);
+    border-radius: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1418,7 +1446,8 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 8, 12, 0.7);
+    border-bottom: 2px solid #1a1423;
   }
 
   .floating-pane__title {
@@ -1451,22 +1480,6 @@ export default {
     padding: 1rem 1.25rem;
   }
 
-  .pane-side-enter-active,
-  .pane-side-leave-active {
-    transition: opacity 150ms ease, transform 150ms ease;
-  }
-
-  .pane-side-enter-from,
-  .pane-side-leave-to {
-    opacity: 0;
-    transform: translateX(-16px);
-  }
-
-  .game-stage.pane-right .pane-side-enter-from,
-  .game-stage.pane-right .pane-side-leave-to {
-    transform: translateX(16px);
-  }
-
   .pane-overlay-enter-active,
   .pane-overlay-leave-active {
     transition: opacity 180ms ease;
@@ -1493,12 +1506,8 @@ export default {
       gap: clamp(0.75rem, 3vw, 1.5rem);
     }
 
-    div.world-shell {
-      width: min(100%, max(var(--world-internal-width, 512px), clamp(300px, 92vw, 880px)));
-    }
-
     div.chat-layer {
-      width: min(100%, clamp(400px, 88vw, 640px));
+      width: min(100%, clamp(320px, 88vw, 560px));
     }
   }
 
@@ -1508,16 +1517,11 @@ export default {
     }
 
     div.world-shell {
-      width: 100%;
-      border-radius: 14px;
+      border-radius: 0;
     }
 
     div.hud-layer {
-      width: min(100%, clamp(340px, 78vw, 560px));
-    }
-
-    .floating-pane {
-      align-items: center;
+      width: min(100%, clamp(220px, 70vw, 360px));
     }
 
     div.chat-layer {
@@ -1528,6 +1532,7 @@ export default {
 
     .chat-overlay :deep(#chat) {
       height: clamp(220px, 40vh, 360px);
+      border-radius: 0;
     }
   }
 }

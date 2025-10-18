@@ -19,6 +19,7 @@
 ## Responsive Behaviour
 - Sweep viewport widths 480px to 1920px ensuring:
   - Canvas scales smoothly while preserving a 16:10 aspect ratio; horizontal scroll never appears.
+  - Pixel edges remain crisp at 2x scale; no browser smoothing or stretching artifacts when resizing.
   - Quickbar stays anchored between orbs; chat toggle relocates (fixed) on mobile.
   - Pane overlay switches between push (desktop) and float (tablet/mobile) with safe tap targets.
 - Mobile (<768px) landscape: open chat; overlay behaves like a bottom sheet and world remains scrollable.
