@@ -66,118 +66,114 @@
       class="wrapper game__wrapper"
       @click.right="nothing"
     >
-      <div class="game-stage">
+      <div
+        class="game-stage"
+        :class="gameStageClasses"
+        :style="gameStageStyle"
+      >
+        <transition name="pane-side">
+          <aside
+            v-if="shouldShowDesktopPane"
+            ref="desktopPane"
+            :class="['side-pane', `side-pane--${panePosition}`]"
+          >
+            <header class="side-pane__header">
+              <h2 class="side-pane__title">
+                {{ paneTitle }}
+              </h2>
+              <button
+                type="button"
+                class="side-pane__close"
+                @click="closePane"
+              >
+                X
+              </button>
+            </header>
+            <div class="side-pane__body">
+              <component
+                :is="activePaneComponent"
+                v-if="activePaneComponent"
+                :game="game"
+              />
+            </div>
+          </aside>
+        </transition>
+
         <div
-          class="pane-shell"
-          :class="paneShellClasses"
+          class="world-shell"
+          :style="worldShellStyle"
         >
-          <transition name="pane-side">
-            <aside
-              v-if="shouldShowDesktopPane"
-              ref="desktopPane"
-              :class="['side-pane', `side-pane--${panePosition}`]"
+          <GameCanvas :game="game" />
+
+          <div class="hud-layer">
+            <HudOrb
+              variant="hp"
+              label="HP"
+              :current="playerVitals.hp.current"
+              :max="playerVitals.hp.max"
+              @activate="requestPane('stats')"
+            />
+            <Quickbar
+              :slots="quickSlots"
+              :active-index="quickbarActiveIndex"
+              @slot-activate="handleQuickSlot"
+            />
+            <HudOrb
+              variant="mp"
+              label="MP"
+              :current="playerVitals.mp.current"
+              :max="playerVitals.mp.max"
+              @activate="requestPane('inventory')"
+            />
+          </div>
+          <div class="chat-layer">
+            <div
+              class="chat-toggle"
+              :class="chatToggleClasses"
             >
-              <header class="side-pane__header">
-                <h2 class="side-pane__title">
-                  {{ paneTitle }}
-                </h2>
-                <button
-                  type="button"
-                  class="side-pane__close"
-                  @click="closePane"
+              <button
+                type="button"
+                class="chat-toggle__button"
+                @click="toggleChat"
+              >
+                {{ chatToggleLabel }}
+              </button>
+              <div class="chat-toggle__preview">
+                <span class="chat-toggle__text">{{ chatPreviewText }}</span>
+                <span
+                  v-if="chatUnreadCount > 0"
+                  class="chat-toggle__badge"
                 >
-                  X
-                </button>
-              </header>
-              <div class="side-pane__body">
-                <component
-                  :is="activePaneComponent"
-                  v-if="activePaneComponent"
+                  {{ chatUnreadCount }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="chat-toggle__pin"
+                @click="toggleChatPin"
+              >
+                {{ layout.chat.isPinned ? 'Unpin' : 'Pin' }}
+              </button>
+            </div>
+
+            <transition name="chat-overlay">
+              <div
+                v-if="chatExpanded"
+                class="chat-overlay"
+                @mouseenter="cancelChatAutohide"
+                @mouseleave="scheduleChatAutoHide"
+              >
+                <Chatbox
+                  ref="chatbox"
                   :game="game"
+                  @message-appended="handleChatMessage"
+                  @mouseenter.native="cancelChatAutohide"
+                  @focusin.native="cancelChatAutohide"
+                  @mouseleave.native="scheduleChatAutoHide"
+                  @focusout.native="scheduleChatAutoHide"
                 />
               </div>
-            </aside>
-          </transition>
-
-          <div class="world-region">
-            <div class="world-rail">
-              <div class="world-scroll">
-                <div class="world-shell">
-                  <GameCanvas :game="game" />
-
-                  <div class="hud-layer">
-                    <HudOrb
-                      variant="hp"
-                      label="HP"
-                      :current="playerVitals.hp.current"
-                      :max="playerVitals.hp.max"
-                      @activate="requestPane('stats')"
-                    />
-                    <Quickbar
-                      :slots="quickSlots"
-                      :active-index="quickbarActiveIndex"
-                      @slot-activate="handleQuickSlot"
-                    />
-                    <HudOrb
-                      variant="mp"
-                      label="MP"
-                      :current="playerVitals.mp.current"
-                      :max="playerVitals.mp.max"
-                      @activate="requestPane('inventory')"
-                    />
-                  </div>
-                  <div class="chat-layer">
-                    <div
-                      class="chat-toggle"
-                      :class="chatToggleClasses"
-                    >
-                      <button
-                        type="button"
-                        class="chat-toggle__button"
-                        @click="toggleChat"
-                      >
-                        {{ chatToggleLabel }}
-                      </button>
-                      <div class="chat-toggle__preview">
-                        <span class="chat-toggle__text">{{ chatPreviewText }}</span>
-                        <span
-                          v-if="chatUnreadCount > 0"
-                          class="chat-toggle__badge"
-                        >
-                          {{ chatUnreadCount }}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        class="chat-toggle__pin"
-                        @click="toggleChatPin"
-                      >
-                        {{ layout.chat.isPinned ? 'Unpin' : 'Pin' }}
-                      </button>
-                    </div>
-
-                    <transition name="chat-overlay">
-                      <div
-                        v-if="chatExpanded"
-                        class="chat-overlay"
-                        @mouseenter="cancelChatAutohide"
-                        @mouseleave="scheduleChatAutoHide"
-                      >
-                        <Chatbox
-                          ref="chatbox"
-                          :game="game"
-                          @message-appended="handleChatMessage"
-                          @mouseenter.native="cancelChatAutohide"
-                          @focusin.native="cancelChatAutohide"
-                          @mouseleave.native="scheduleChatAutoHide"
-                          @focusout.native="scheduleChatAutoHide"
-                        />
-                      </div>
-                    </transition>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </transition>
           </div>
         </div>
 
@@ -423,17 +419,51 @@ export default {
       const key = this.layout.activePane;
       return key ? panePositions[key] || 'right' : 'right';
     },
-    paneShellClasses() {
+    gameStageClasses() {
       const classes = [`mode-${this.layoutMode}`];
       if (this.hasActivePane) {
         classes.push('pane-active');
-        if (this.panePosition === 'right') {
-          classes.push('pane-shell--reverse');
-        }
+        classes.push(`pane-${this.panePosition}`);
       } else {
         classes.push('pane-inactive');
       }
       return classes;
+    },
+    gameStageStyle() {
+      if (this.layoutMode !== 'desktop') {
+        return {};
+      }
+      const paneWidth = 'clamp(280px, 22vw, 360px)';
+      if (!this.hasActivePane) {
+        return {
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          justifyItems: 'center',
+        };
+      }
+      if (this.panePosition === 'left') {
+        return {
+          gridTemplateColumns: `${paneWidth} minmax(0, 1fr)`,
+          justifyItems: 'stretch',
+        };
+      }
+      return {
+        gridTemplateColumns: `minmax(0, 1fr) ${paneWidth}`,
+        justifyItems: 'stretch',
+      };
+    },
+    worldShellStyle() {
+      const runtimeConfig = this.game && this.game.map && this.game.map.config
+        ? this.game.map.config.map
+        : this.config.map;
+      const { tile } = runtimeConfig.tileset;
+      const { viewport } = runtimeConfig;
+      const width = tile.width * viewport.x;
+      const height = tile.height * viewport.y;
+      return {
+        '--map-aspect-ratio': `${width} / ${height}`,
+        '--world-internal-width': `${width}px`,
+        '--world-internal-height': `${height}px`,
+      };
     },
     shouldShowDesktopPane() {
       return this.isDesktop && !!this.activePaneComponent;
@@ -1107,42 +1137,31 @@ export default {
 
   div.game-stage {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     flex: 1 1 auto;
-    gap: clamp(0.75rem, 2vw, 1.5rem);
-    min-height: 0;
-    width: 100%;
-  }
-
-  div.pane-shell {
-    position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
-    justify-content: center;
-    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+    justify-items: center;
+    gap: clamp(1rem, 3vw, 2rem);
     width: 100%;
+    height: 100%;
     min-height: 0;
   }
 
-  div.pane-shell.pane-shell--reverse {
-    flex-direction: row-reverse;
+  div.game-stage.mode-desktop {
+    align-items: stretch;
   }
 
-  div.pane-shell.pane-inactive {
-    justify-content: center;
-  }
-
-  div.pane-shell.pane-active {
-    justify-content: center;
+  div.game-stage.mode-desktop.pane-active {
+    justify-items: stretch;
   }
 
   aside.side-pane {
     position: relative;
     display: flex;
     flex-direction: column;
-    width: clamp(310px, 22vw, 360px);
+    width: clamp(280px, 22vw, 360px);
+    align-self: stretch;
     max-height: 100%;
     border-radius: 18px;
     background: rgba(20, 20, 26, 0.95);
@@ -1151,8 +1170,14 @@ export default {
     z-index: 3;
   }
 
+  aside.side-pane.side-pane--left {
+    grid-column: 1;
+    justify-self: start;
+  }
+
   aside.side-pane.side-pane--right {
-    text-align: left;
+    grid-column: 2;
+    justify-self: end;
   }
 
   .side-pane__header {
@@ -1190,43 +1215,23 @@ export default {
     padding: 1rem;
   }
 
-  div.world-region {
-    position: relative;
-    flex: 1 1 auto;
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    min-height: 0;
-  }
-
-  div.world-rail {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    max-width: 1200px;
-  }
-
-  div.world-scroll {
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: visible;
-    padding-bottom: clamp(1.25rem, 2.5vw, 2.75rem);
-  }
-
   div.world-shell {
     position: relative;
-    margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: clamp(640px, 70vw, 960px);
-    min-width: 640px;
-    max-width: 960px;
-    aspect-ratio: 16 / 9;
+    width: min(100%, max(var(--world-internal-width, 512px), clamp(320px, 90vw, 1080px)));
+    max-width: 100%;
+    aspect-ratio: var(--map-aspect-ratio, 16 / 10);
     border-radius: 18px;
     background: rgba(12, 12, 16, 0.4);
     box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
     overflow: hidden;
+    grid-column: 1;
+  }
+
+  div.game-stage.mode-desktop.pane-left div.world-shell {
+    grid-column: 2;
   }
 
   div.world-shell::after {
@@ -1241,10 +1246,8 @@ export default {
   div.world-shell > :deep(.game) {
     position: relative;
     z-index: 0;
-  }
-
-  div.pane-shell.mode-desktop.pane-active div.world-shell {
-    width: clamp(640px, 60vw, 880px);
+    width: 100%;
+    height: 100%;
   }
 
   div.hud-layer {
@@ -1459,8 +1462,8 @@ export default {
     transform: translateX(-16px);
   }
 
-  div.pane-shell.pane-shell--reverse .pane-side-enter-from,
-  div.pane-shell.pane-shell--reverse .pane-side-leave-to {
+  .game-stage.pane-right .pane-side-enter-from,
+  .game-stage.pane-right .pane-side-leave-to {
     transform: translateX(16px);
   }
 
@@ -1486,12 +1489,16 @@ export default {
   }
 
   @media (width <= 1024px) {
+    div.game-stage {
+      gap: clamp(0.75rem, 3vw, 1.5rem);
+    }
+
     div.world-shell {
-      width: clamp(640px, 80vw, 960px);
+      width: min(100%, max(var(--world-internal-width, 512px), clamp(300px, 92vw, 880px)));
     }
 
     div.chat-layer {
-      width: min(100%, clamp(420px, 80vw, 680px));
+      width: min(100%, clamp(400px, 88vw, 640px));
     }
   }
 
@@ -1501,11 +1508,12 @@ export default {
     }
 
     div.world-shell {
+      width: 100%;
       border-radius: 14px;
     }
 
     div.hud-layer {
-      width: min(100%, clamp(380px, 72vw, 600px));
+      width: min(100%, clamp(340px, 78vw, 560px));
     }
 
     .floating-pane {

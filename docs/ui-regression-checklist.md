@@ -6,7 +6,7 @@
 - Watch NPC patrols for hitching after resizing the window; interpolation should remain smooth at 60 FPS.
 
 ## Pane Mechanics
-- Desktop >= 1200px: click the HP orb (or press `S` in debug) to open the Stats pane; confirm the pane docks left, the canvas width clamps >= 640px, and closing with `Esc` restores layout.
+- Desktop >= 1200px: click the HP orb (or press `S` in debug) to open the Stats pane; confirm the pane docks left, the world view stays centered, and closing with `Esc` restores layout.
 - Desktop: click the MP orb to open Inventory; verify the pane docks right, retains scroll position on reopen, and outside clicks close it.
 - Tablet 768-1199px: resize the window, open Stats/Inventory, ensure the overlay slides in, ESC + backdrop click closes, and focus returns to game.
 
@@ -18,7 +18,7 @@
 
 ## Responsive Behaviour
 - Sweep viewport widths 480px to 1920px ensuring:
-  - Canvas clamps to 16:9, horizontal scroll appears instead of shrinking below 640px.
+  - Canvas scales smoothly while preserving a 16:10 aspect ratio; horizontal scroll never appears.
   - Quickbar stays anchored between orbs; chat toggle relocates (fixed) on mobile.
   - Pane overlay switches between push (desktop) and float (tablet/mobile) with safe tap targets.
 - Mobile (<768px) landscape: open chat; overlay behaves like a bottom sheet and world remains scrollable.

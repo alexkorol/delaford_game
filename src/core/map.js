@@ -276,48 +276,34 @@ class Map {
       return;
     }
 
-    const { tileset, size } = this.config.map;
+    const { tileset } = this.config.map;
     const container = this.canvas ? this.canvas.parentElement : null;
     const tileWidth = tileset.tile.width;
     const tileHeight = tileset.tile.height;
 
-    let viewportX = this.defaultViewport.x;
-    let viewportY = this.defaultViewport.y;
-
-    if (container) {
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
-
-      if (containerWidth && containerHeight) {
-        const maxTilesX = Math.floor(containerWidth / tileWidth) - 1;
-        const maxTilesY = Math.floor(containerHeight / tileHeight) - 1;
-        viewportX = Math.max(this.minViewport.x, Math.min(maxTilesX, size.x - 1));
-        viewportY = Math.max(this.minViewport.y, Math.min(maxTilesY, size.y - 1));
-      }
-    }
-
-    viewportX = Math.min(viewportX, size.x - 1);
-    viewportY = Math.min(viewportY, size.y - 1);
-    viewportX = Math.max(viewportX, this.defaultViewport.x);
-    viewportY = Math.max(viewportY, this.defaultViewport.y);
+    const viewportX = this.defaultViewport.x;
+    const viewportY = this.defaultViewport.y;
 
     this.config.map.viewport.x = viewportX;
     this.config.map.viewport.y = viewportY;
     this.config.map.player.x = Math.floor(viewportX / 2);
     this.config.map.player.y = Math.floor(viewportY / 2);
 
-    const canvasWidth = tileWidth * (1 + viewportX);
-    const canvasHeight = tileHeight * (1 + viewportY);
+    const canvasWidth = tileWidth * viewportX;
+    const canvasHeight = tileHeight * viewportY;
 
     // Make sure canvas is set accordingly
     this.canvas.width = canvasWidth;
     this.canvas.height = canvasHeight;
-    this.canvas.style.width = `${canvasWidth}px`;
-    this.canvas.style.height = `${canvasHeight}px`;
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = '100%';
+    this.canvas.style.maxWidth = '';
+    this.canvas.style.maxHeight = '';
 
     if (container) {
-      container.style.setProperty('--map-canvas-width', `${canvasWidth}px`);
-      container.style.setProperty('--map-canvas-height', `${canvasHeight}px`);
+      container.style.setProperty('--map-canvas-internal-width', `${canvasWidth}px`);
+      container.style.setProperty('--map-canvas-internal-height', `${canvasHeight}px`);
+      container.style.setProperty('--map-aspect-ratio', `${canvasWidth} / ${canvasHeight}`);
     }
 
     // Do not smooth any pixels painted on
@@ -346,8 +332,9 @@ class Map {
       this.canvas.style.height = '';
       const container = this.canvas.parentElement;
       if (container) {
-        container.style.removeProperty('--map-canvas-width');
-        container.style.removeProperty('--map-canvas-height');
+        container.style.removeProperty('--map-canvas-internal-width');
+        container.style.removeProperty('--map-canvas-internal-height');
+        container.style.removeProperty('--map-aspect-ratio');
       }
     }
     this.config.map.viewport.x = this.defaultViewport.x;

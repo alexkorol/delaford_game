@@ -284,15 +284,35 @@ export default {
         ? this.game.map.config.map.viewport
         : { x: 0, y: 0 };
 
+      const canvasElement = (this.game && this.game.map && this.game.map.canvas)
+        ? this.game.map.canvas
+        : event.target;
+      const rect = canvasElement && typeof canvasElement.getBoundingClientRect === 'function'
+        ? canvasElement.getBoundingClientRect()
+        : { width: tile.width, height: tile.height };
+      const internalWidth = canvasElement && typeof canvasElement.width === 'number'
+        ? canvasElement.width
+        : tile.width * (viewport.x || 1);
+      const internalHeight = canvasElement && typeof canvasElement.height === 'number'
+        ? canvasElement.height
+        : tile.height * (viewport.y || 1);
+
       const position = UI.getMousePos(event);
-      const tileX = Math.floor((position.x + camera.offsetX) / tile.width);
-      const tileY = Math.floor((position.y + camera.offsetY) / tile.height);
+
+      const scaleX = rect && rect.width ? internalWidth / rect.width : 1;
+      const scaleY = rect && rect.height ? internalHeight / rect.height : 1;
+
+      const canvasX = position.x * scaleX;
+      const canvasY = position.y * scaleY;
+
+      const tileX = Math.floor((canvasX + camera.offsetX) / tile.width);
+      const tileY = Math.floor((canvasY + camera.offsetY) / tile.height);
 
       const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
       return {
-        x: clamp(tileX, 0, viewport.x),
-        y: clamp(tileY, 0, viewport.y),
+        x: clamp(tileX, 0, Math.max(viewport.x - 1, 0)),
+        y: clamp(tileY, 0, Math.max(viewport.y - 1, 0)),
       };
     },
 
@@ -415,30 +435,23 @@ export default {
 /** Main canvas **/
 div.game {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 auto;
+  display: block;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  max-width: 100%;
+  aspect-ratio: var(--map-aspect-ratio, 16 / 10);
+  background: transparent;
   overflow: hidden;
 
   canvas.main-canvas {
-    border-top-left-radius: 3px;
-    width: var(--map-canvas-width);
-    height: var(--map-canvas-height);
-    min-width: var(--map-canvas-width);
-    min-height: var(--map-canvas-height);
-    max-width: var(--map-canvas-width);
-    max-height: var(--map-canvas-height);
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     background: #fff;
     outline: none;
     cursor: pointer;
     image-rendering: pixelated;
     display: block;
-    margin: 0 auto;
-    flex-shrink: 0;
   }
 
   .first-action {
