@@ -66,25 +66,153 @@
       class="wrapper game__wrapper"
       @click.right="nothing"
     >
-      <div class="left">
-        <!-- Main canvas -->
-        <GameCanvas :game="game" />
+      <div class="game-stage">
+        <div
+          class="pane-shell"
+          :class="paneShellClasses"
+        >
+          <transition name="pane-side">
+            <aside
+              v-if="shouldShowDesktopPane"
+              ref="desktopPane"
+              :class="['side-pane', `side-pane--${panePosition}`]"
+            >
+              <header class="side-pane__header">
+                <h2 class="side-pane__title">
+                  {{ paneTitle }}
+                </h2>
+                <button
+                  type="button"
+                  class="side-pane__close"
+                  @click="closePane"
+                >
+                  X
+                </button>
+              </header>
+              <div class="side-pane__body">
+                <component
+                  :is="activePaneComponent"
+                  v-if="activePaneComponent"
+                  :game="game"
+                />
+              </div>
+            </aside>
+          </transition>
 
-        <!-- Chatbox -->
-        <Chatbox :game="game" />
-      </div>
-      <div
-        class="right"
-        @click="sidebarClicked"
-      >
-        <!-- Player overview -->
-        <Info :game="game" />
+          <div class="world-region">
+            <div class="world-rail">
+              <div class="world-scroll">
+                <div class="world-shell">
+                  <GameCanvas :game="game" />
 
-        <!-- Slots (Stats, Wear, Inventory, etc.) -->
-        <Slots
-          ref="sidebarSlots"
-          :game="game"
-        />
+                  <div class="hud-layer">
+                    <HudOrb
+                      variant="hp"
+                      label="HP"
+                      :current="playerVitals.hp.current"
+                      :max="playerVitals.hp.max"
+                      @activate="requestPane('stats')"
+                    />
+                    <Quickbar
+                      :slots="quickSlots"
+                      :active-index="quickbarActiveIndex"
+                      @slot-activate="handleQuickSlot"
+                    />
+                    <HudOrb
+                      variant="mp"
+                      label="MP"
+                      :current="playerVitals.mp.current"
+                      :max="playerVitals.mp.max"
+                      @activate="requestPane('inventory')"
+                    />
+                  </div>
+                  <div class="chat-layer">
+                    <div
+                      class="chat-toggle"
+                      :class="chatToggleClasses"
+                    >
+                      <button
+                        type="button"
+                        class="chat-toggle__button"
+                        @click="toggleChat"
+                      >
+                        {{ chatToggleLabel }}
+                      </button>
+                      <div class="chat-toggle__preview">
+                        <span class="chat-toggle__text">{{ chatPreviewText }}</span>
+                        <span
+                          v-if="chatUnreadCount > 0"
+                          class="chat-toggle__badge"
+                        >
+                          {{ chatUnreadCount }}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        class="chat-toggle__pin"
+                        @click="toggleChatPin"
+                      >
+                        {{ layout.chat.isPinned ? 'Unpin' : 'Pin' }}
+                      </button>
+                    </div>
+
+                    <transition name="chat-overlay">
+                      <div
+                        v-if="chatExpanded"
+                        class="chat-overlay"
+                        @mouseenter="cancelChatAutohide"
+                        @mouseleave="scheduleChatAutoHide"
+                      >
+                        <Chatbox
+                          ref="chatbox"
+                          :game="game"
+                          @message-appended="handleChatMessage"
+                          @mouseenter.native="cancelChatAutohide"
+                          @focusin.native="cancelChatAutohide"
+                          @mouseleave.native="scheduleChatAutoHide"
+                          @focusout.native="scheduleChatAutoHide"
+                        />
+                      </div>
+                    </transition>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <transition name="pane-overlay">
+          <div
+            v-if="shouldShowOverlayPane"
+            class="floating-pane"
+            @click.self="closePane"
+          >
+            <div
+              ref="overlayPane"
+              class="floating-pane__card"
+            >
+              <header class="floating-pane__header">
+                <h2 class="floating-pane__title">
+                  {{ paneTitle }}
+                </h2>
+                <button
+                  type="button"
+                  class="floating-pane__close"
+                  @click="closePane"
+                >
+                  Close
+                </button>
+              </header>
+              <div class="floating-pane__body">
+                <component
+                  :is="activePaneComponent"
+                  v-if="activePaneComponent"
+                  :game="game"
+                />
+              </div>
+            </div>
+          </div>
+        </transition>
       </div>
 
       <context-menu :game="game" />
@@ -98,8 +226,15 @@
 import config from 'root/config';
 import GameCanvas from './components/GameCanvas.vue';
 import Chatbox from './components/Chatbox.vue';
-import Slots from './components/Slots.vue';
-import Info from './components/Info.vue';
+import Quickbar from './components/hud/Quickbar.vue';
+import HudOrb from './components/hud/HudOrb.vue';
+import StatsPane from './components/slots/Stats.vue';
+import InventoryPane from './components/slots/Inventory.vue';
+import WearPane from './components/slots/Wear.vue';
+import FriendListPane from './components/slots/FriendList.vue';
+import SettingsPane from './components/slots/Settings.vue';
+import LogoutPane from './components/slots/Logout.vue';
+import QuestsPane from './components/slots/Quests.vue';
 
 // Sub Vue components
 import ContextMenu from './components/sub/ContextMenu.vue';
@@ -114,10 +249,58 @@ import Event from './core/player/events';
 import MovementController from './core/utilities/movement-controller';
 import { DEFAULT_MOVE_DURATION_MS } from './core/config/movement';
 
+const createDefaultQuickSlots = () => Array.from(
+  { length: 8 },
+  (_value, index) => ({
+    id: `slot-${index + 1}`,
+    label: `Empty Slot ${index + 1}`,
+    hotkey: `${index + 1}`,
+    icon: '',
+  }),
+);
+
+const paneRegistry = {
+  stats: StatsPane,
+  inventory: InventoryPane,
+  wear: WearPane,
+  friendlist: FriendListPane,
+  settings: SettingsPane,
+  logout: LogoutPane,
+  quests: QuestsPane,
+};
+
+const paneTitles = {
+  stats: 'Stats',
+  inventory: 'Inventory',
+  wear: 'Equipment',
+  friendlist: 'Friends',
+  settings: 'Settings',
+  logout: 'Logout',
+  quests: 'Quests',
+};
+
+const panePositions = {
+  stats: 'left',
+  inventory: 'right',
+  wear: 'right',
+  friendlist: 'right',
+  settings: 'right',
+  logout: 'right',
+  quests: 'right',
+};
+
+const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
+
 export default {
   name: 'Delaford',
   components: {
-    GameCanvas, Chatbox, Info, Slots, ContextMenu, Login, AudioMainMenu,
+    GameCanvas,
+    Chatbox,
+    Quickbar,
+    HudOrb,
+    ContextMenu,
+    Login,
+    AudioMainMenu,
   },
   data() {
     return {
@@ -125,7 +308,156 @@ export default {
       loaded: false,
       game: { exit: true },
       screen: 'login',
+      layout: {
+        activePane: null,
+        chat: {
+          isPinned: false,
+          isOpen: false,
+          unreadCount: 0,
+          preview: DEFAULT_CHAT_PREVIEW,
+        },
+      },
+      quickSlots: createDefaultQuickSlots(),
+      viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1440,
+      viewportResizeRaf: null,
+      bodyOverflowBackup: '',
+      chatHideTimeout: null,
+      quickbarActiveIndex: null,
+      quickbarFlashTimeout: null,
     };
+  },
+  computed: {
+    layoutMode() {
+      if (this.viewportWidth < 768) {
+        return 'mobile';
+      }
+      if (this.viewportWidth < 1200) {
+        return 'tablet';
+      }
+      return 'desktop';
+    },
+    isDesktop() {
+      return this.layoutMode === 'desktop';
+    },
+    playerVitals() {
+      const fallback = {
+        hp: { current: 0, max: 0 },
+        mp: { current: 0, max: 0 },
+      };
+      const player = this.game && this.game.player;
+      if (!player) {
+        return fallback;
+      }
+
+      const firstDefined = (candidates, defaultValue) => {
+        for (let index = 0; index < candidates.length; index += 1) {
+          const value = candidates[index];
+          if (value !== undefined && value !== null) {
+            return value;
+          }
+        }
+        return defaultValue;
+      };
+
+      const normaliseMeter = (meter, fallbackMax) => {
+        if (!meter || typeof meter !== 'object') {
+          return { current: 0, max: fallbackMax || 0 };
+        }
+
+        const currentSource = firstDefined([meter.current, meter.value, meter.amount], 0);
+        const maxSource = firstDefined([meter.max, meter.maximum, meter.capacity, fallbackMax], fallbackMax || 0);
+
+        const current = Number(currentSource);
+        const max = Number(maxSource);
+
+        return {
+          current: Number.isFinite(current) ? current : 0,
+          max: Number.isFinite(max) ? max : 0,
+        };
+      };
+
+      const stats = player.stats || {};
+      const hpSource = player.hp || player.health || stats.hp;
+      const mpSource = player.mp || player.mana || stats.mp;
+
+      return {
+        hp: normaliseMeter(hpSource, stats.hp && stats.hp.max ? stats.hp.max : 0),
+        mp: normaliseMeter(mpSource, stats.mp && stats.mp.max ? stats.mp.max : 0),
+      };
+    },
+    chatExpanded() {
+      return this.layout.chat.isOpen || this.layout.chat.isPinned;
+    },
+    chatPreviewText() {
+      const preview = this.layout.chat.preview || '';
+      if (preview.length > 80) {
+        return `${preview.slice(0, 77)}...`;
+      }
+      return preview;
+    },
+    chatUnreadCount() {
+      return this.layout.chat.unreadCount;
+    },
+    chatToggleLabel() {
+      return this.chatExpanded ? 'Hide chat' : 'Show chat';
+    },
+    chatToggleClasses() {
+      return {
+        'chat-toggle--open': this.chatExpanded,
+        'chat-toggle--pinned': this.layout.chat.isPinned,
+        'chat-toggle--unread': this.chatUnreadCount > 0,
+      };
+    },
+    hasActivePane() {
+      return Boolean(this.layout.activePane);
+    },
+    activePaneComponent() {
+      const key = this.layout.activePane;
+      return key ? paneRegistry[key] || null : null;
+    },
+    paneTitle() {
+      const key = this.layout.activePane;
+      return key ? paneTitles[key] || '' : '';
+    },
+    panePosition() {
+      const key = this.layout.activePane;
+      return key ? panePositions[key] || 'right' : 'right';
+    },
+    paneShellClasses() {
+      const classes = [`mode-${this.layoutMode}`];
+      if (this.hasActivePane) {
+        classes.push('pane-active');
+        if (this.panePosition === 'right') {
+          classes.push('pane-shell--reverse');
+        }
+      } else {
+        classes.push('pane-inactive');
+      }
+      return classes;
+    },
+    shouldShowDesktopPane() {
+      return this.isDesktop && !!this.activePaneComponent;
+    },
+    shouldShowOverlayPane() {
+      return !this.isDesktop && !!this.activePaneComponent;
+    },
+  },
+  watch: {
+    shouldShowOverlayPane(isOverlay) {
+      if (typeof document === 'undefined') {
+        return;
+      }
+
+      if (isOverlay) {
+        if (!this.bodyOverflowBackup) {
+          this.bodyOverflowBackup = document.body.style.overflow;
+        }
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = this.bodyOverflowBackup || '';
+        this.bodyOverflowBackup = '';
+      }
+    },
   },
   /**
    * WebSocket event handler
@@ -170,7 +502,38 @@ export default {
     bus.$on('player:logout', this.logout);
     bus.$on('go:main', this.cancelLogin);
   },
+  mounted() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.onViewportResize, { passive: true });
+      window.addEventListener('keydown', this.handleGlobalKeydown);
+    }
+  },
   beforeDestroy() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', this.onViewportResize);
+      window.removeEventListener('keydown', this.handleGlobalKeydown);
+      if (this.viewportResizeRaf) {
+        window.cancelAnimationFrame(this.viewportResizeRaf);
+        this.viewportResizeRaf = null;
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = this.bodyOverflowBackup || '';
+      this.bodyOverflowBackup = '';
+    }
+
+    if (typeof window !== 'undefined') {
+      if (this.chatHideTimeout) {
+        window.clearTimeout(this.chatHideTimeout);
+        this.chatHideTimeout = null;
+      }
+      if (this.quickbarFlashTimeout) {
+        window.clearTimeout(this.quickbarFlashTimeout);
+        this.quickbarFlashTimeout = null;
+      }
+    }
+
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
       this.game.map.destroy();
     }
@@ -185,7 +548,8 @@ export default {
       }
       this.screen = 'login';
       this.game = { exit: true };
-      this.$refs.sidebarSlots.selected = 1;
+      this.layout.activePane = null;
+      this.resetChatState();
     },
 
     /**
@@ -194,6 +558,299 @@ export default {
 
     cancelLogin() {
       this.screen = 'main';
+      this.layout.activePane = null;
+      this.resetChatState();
+    },
+
+    resetChatState() {
+      this.cancelChatAutohide();
+      this.layout.chat.isOpen = false;
+      this.layout.chat.isPinned = false;
+      this.layout.chat.unreadCount = 0;
+      this.layout.chat.preview = DEFAULT_CHAT_PREVIEW;
+    },
+
+    onViewportResize() {
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      if (this.viewportResizeRaf) {
+        window.cancelAnimationFrame(this.viewportResizeRaf);
+      }
+
+      this.viewportResizeRaf = window.requestAnimationFrame(() => {
+        this.viewportResizeRaf = null;
+        this.viewportWidth = window.innerWidth;
+      });
+    },
+
+    handleQuickSlot(slot, index) {
+      if (!slot) {
+        return;
+      }
+
+      bus.$emit('quickbar:activate', {
+        slot,
+        index,
+        game: this.game,
+      });
+      this.flashQuickbarSlot(index);
+    },
+
+    requestPane(pane) {
+      if (!pane) {
+        return;
+      }
+      this.openPane(pane);
+    },
+
+    openPane(pane) {
+      bus.$emit('contextmenu:close');
+      if (this.layout.activePane === pane) {
+        this.closePane();
+        return;
+      }
+
+      this.layout.activePane = pane;
+      this.$nextTick(() => {
+        this.focusActivePane();
+      });
+    },
+
+    closePane() {
+      this.layout.activePane = null;
+    },
+
+    flashQuickbarSlot(index) {
+      if (typeof window === 'undefined') {
+        this.quickbarActiveIndex = index;
+        return;
+      }
+
+      this.quickbarActiveIndex = index;
+      if (this.quickbarFlashTimeout) {
+        window.clearTimeout(this.quickbarFlashTimeout);
+      }
+      this.quickbarFlashTimeout = window.setTimeout(() => {
+        this.quickbarActiveIndex = null;
+        this.quickbarFlashTimeout = null;
+      }, 200);
+    },
+
+    handleChatMessage(message = {}) {
+      const preview = this.formatChatPreview(message);
+      if (preview) {
+        this.layout.chat.preview = preview;
+      }
+
+      if (!this.chatExpanded) {
+        this.layout.chat.unreadCount += 1;
+      } else {
+        this.layout.chat.unreadCount = 0;
+        if (!this.layout.chat.isPinned) {
+          this.scheduleChatAutoHide();
+        }
+      }
+    },
+
+    formatChatPreview(message) {
+      if (!message || !message.text) {
+        return this.layout.chat.preview;
+      }
+
+      const text = String(message.text).trim();
+      if (!text) {
+        return this.layout.chat.preview;
+      }
+
+      if (message.type === 'chat' && message.username) {
+        return `${message.username}: ${text}`;
+      }
+
+      return text;
+    },
+
+    toggleChat() {
+      if (this.chatExpanded) {
+        this.closeChat();
+      } else {
+        this.openChat();
+      }
+    },
+
+    toggleChatPin() {
+      this.layout.chat.isPinned = !this.layout.chat.isPinned;
+      if (this.layout.chat.isPinned) {
+        if (!this.layout.chat.isOpen) {
+          this.openChat();
+        } else {
+          this.cancelChatAutohide();
+        }
+      } else if (this.layout.chat.isOpen) {
+        this.scheduleChatAutoHide();
+      }
+    },
+
+    openChat() {
+      this.layout.chat.isOpen = true;
+      this.layout.chat.unreadCount = 0;
+      this.cancelChatAutohide();
+      this.focusChatInput();
+      if (!this.layout.chat.isPinned) {
+        this.scheduleChatAutoHide();
+      }
+    },
+
+    closeChat() {
+      if (this.layout.chat.isPinned) {
+        return;
+      }
+      this.layout.chat.isOpen = false;
+      this.cancelChatAutohide();
+    },
+
+    scheduleChatAutoHide() {
+      if (typeof window === 'undefined') {
+        return;
+      }
+
+      if (!this.layout.chat.isOpen || this.layout.chat.isPinned) {
+        return;
+      }
+
+      this.cancelChatAutohide();
+      this.chatHideTimeout = window.setTimeout(() => {
+        this.layout.chat.isOpen = false;
+        this.chatHideTimeout = null;
+      }, 8000);
+    },
+
+    cancelChatAutohide() {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      if (this.chatHideTimeout) {
+        window.clearTimeout(this.chatHideTimeout);
+        this.chatHideTimeout = null;
+      }
+    },
+
+    focusChatInput() {
+      this.$nextTick(() => {
+        const chatComponent = this.$refs.chatbox;
+        if (!chatComponent) {
+          return;
+        }
+
+        const root = chatComponent.$el || chatComponent;
+        if (!root || typeof root.querySelector !== 'function') {
+          return;
+        }
+
+        const input = root.querySelector('input.typing');
+        if (input && typeof input.focus === 'function') {
+          input.focus();
+        }
+      });
+    },
+
+    activateQuickSlot(index) {
+      const slot = this.quickSlots[index];
+      if (!slot) {
+        return;
+      }
+      this.handleQuickSlot(slot, index);
+    },
+
+    shouldIgnoreHotkeys(event) {
+      const target = event && event.target;
+      if (!target) {
+        return false;
+      }
+
+      if (target.isContentEditable) {
+        return true;
+      }
+
+      const { tagName } = target;
+      return ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName);
+    },
+
+    focusActivePane() {
+      const focusTargets = [
+        this.$refs.desktopPane,
+        this.$refs.overlayPane,
+      ];
+
+      const selectors = [
+        'button',
+        '[href]',
+        'input',
+        'select',
+        'textarea',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(', ');
+
+      const getHostElement = (targetRef) => {
+        if (!targetRef) {
+          return null;
+        }
+        const candidate = Array.isArray(targetRef) ? targetRef[0] : targetRef;
+        if (candidate instanceof HTMLElement) {
+          return candidate;
+        }
+        if (candidate && candidate.$el instanceof HTMLElement) {
+          return candidate.$el;
+        }
+        return null;
+      };
+
+      for (let i = 0; i < focusTargets.length; i += 1) {
+        const element = getHostElement(focusTargets[i]);
+        if (element) {
+          const focusable = element.querySelector(selectors);
+          if (focusable && typeof focusable.focus === 'function') {
+            focusable.focus();
+            break;
+          }
+        }
+      }
+    },
+
+    handleGlobalKeydown(event) {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        if (this.layout.activePane) {
+          event.stopPropagation();
+          this.closePane();
+          return;
+        }
+
+        if (this.chatExpanded && !this.layout.chat.isPinned) {
+          event.stopPropagation();
+          this.closeChat();
+        }
+        return;
+      }
+
+      if (/^[1-8]$/.test(event.key)) {
+        if (this.shouldIgnoreHotkeys(event)) {
+          return;
+        }
+        const slotIndex = Number(event.key) - 1;
+        this.activateQuickSlot(slotIndex);
+        event.preventDefault();
+        return;
+      }
+
+      if (event.key === '/' && !this.shouldIgnoreHotkeys(event)) {
+        this.openChat();
+        event.preventDefault();
+      }
     },
 
     /**
@@ -340,6 +997,7 @@ export default {
 
       // Set screen to 'game' for chatbox reset
       this.screen = 'game';
+      this.resetChatState();
     },
     /**
      * A click-handler event that does nothing, really.
@@ -351,11 +1009,21 @@ export default {
       // rest of the game view.
       event.preventDefault();
     },
-    sidebarClicked() {
-      bus.$emit('contextmenu:close');
-    },
     showSidebar(selectedSlot) {
-      this.$refs.sidebarSlots.selected = selectedSlot;
+      const slotMap = {
+        0: 'stats',
+        1: 'inventory',
+        2: 'wear',
+        3: 'friendlist',
+        4: 'settings',
+        5: 'logout',
+        6: 'quests',
+      };
+
+      const pane = slotMap[selectedSlot];
+      if (pane) {
+        this.openPane(pane);
+      }
     },
   },
 };
@@ -426,73 +1094,433 @@ export default {
 
   div.game__wrapper {
     flex: 1 1 auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) clamp(16.25rem, 22vw, 22.5rem);
-    grid-template-rows: minmax(0, 1fr);
-    gap: clamp(1rem, 2vw, 1.5rem);
-    padding: clamp(0.5rem, 1vw, 1rem);
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    padding: clamp(1rem, 3vw, 2.5rem);
     width: 100%;
     height: 100%;
     min-height: 0;
-    align-items: stretch;
-    align-content: stretch;
-    align-self: stretch;
     box-sizing: border-box;
-    background-color: rgba(0, 0, 0, 0.25);
+    background: radial-gradient(circle at top, rgba(37, 29, 41, 0.95), rgba(18, 14, 20, 0.95));
+  }
+
+  div.game-stage {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1 1 auto;
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    min-height: 0;
+    width: 100%;
+  }
+
+  div.pane-shell {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+    width: 100%;
+    min-height: 0;
+  }
+
+  div.pane-shell.pane-shell--reverse {
+    flex-direction: row-reverse;
+  }
+
+  div.pane-shell.pane-inactive {
+    justify-content: center;
+  }
+
+  div.pane-shell.pane-active {
+    justify-content: center;
+  }
+
+  aside.side-pane {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: clamp(310px, 22vw, 360px);
+    max-height: 100%;
+    border-radius: 18px;
+    background: rgba(20, 20, 26, 0.95);
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    z-index: 3;
+  }
+
+  aside.side-pane.side-pane--right {
+    text-align: left;
+  }
+
+  .side-pane__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(12, 12, 16, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .side-pane__title {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 0;
+  }
+
+  .side-pane__close {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: color 120ms ease;
+
+    &:hover {
+      color: #fff;
+    }
+  }
+
+  .side-pane__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  div.world-region {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    min-height: 0;
+  }
+
+  div.world-rail {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    max-width: 1200px;
+  }
+
+  div.world-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-bottom: clamp(1.25rem, 2.5vw, 2.75rem);
+  }
+
+  div.world-shell {
+    position: relative;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(640px, 70vw, 960px);
+    min-width: 640px;
+    max-width: 960px;
+    aspect-ratio: 16 / 9;
+    border-radius: 18px;
+    background: rgba(12, 12, 16, 0.4);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+
+  div.world-shell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.15), transparent 40%, rgba(0, 0, 0, 0.45));
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  div.world-shell > :deep(.game) {
+    position: relative;
+    z-index: 0;
+  }
+
+  div.pane-shell.mode-desktop.pane-active div.world-shell {
+    width: clamp(640px, 60vw, 880px);
+  }
+
+  div.hud-layer {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: clamp(0.85rem, 1.8vw, 1.8rem);
+    transform: translateX(-50%);
+    width: min(100%, clamp(420px, 58vw, 680px));
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: clamp(0.55rem, 1.2vw, 1.25rem);
+    align-items: flex-end;
+    pointer-events: none;
+  }
+
+  div.hud-layer > * {
+    pointer-events: auto;
+  }
+
+  div.chat-layer {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    bottom: calc(clamp(0.85rem, 1.8vw, 1.8rem) + clamp(72px, 12vw, 92px));
+    transform: translateX(-50%);
+    width: min(100%, clamp(440px, 62vw, 720px));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: none;
+  }
+
+  .chat-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0.5rem 0.75rem;
+    border-radius: 16px;
+    background: rgba(16, 16, 20, 0.9);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.48);
+    pointer-events: auto;
+  }
+
+  .chat-toggle--open {
+    background: rgba(16, 16, 20, 0.95);
+  }
+
+  .chat-toggle--unread {
+    box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.65), 0 16px 28px rgba(0, 0, 0, 0.55);
+  }
+
+  .chat-toggle--pinned {
+    border: 1px solid rgba(255, 214, 102, 0.35);
+  }
+
+  .chat-toggle__button,
+  .chat-toggle__pin {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    color: #fff;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 140ms ease, transform 140ms ease;
+  }
+
+  .chat-toggle__button:hover,
+  .chat-toggle__pin:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+  }
+
+  .chat-toggle__preview {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .chat-toggle__text {
+    flex: 1 1 auto;
+    font-family: "ChatFont", sans-serif;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-toggle__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    background: rgba(255, 214, 102, 0.9);
+    color: #171313;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  .chat-overlay {
+    width: 100%;
+    pointer-events: auto;
+    background: rgba(18, 18, 24, 0.92);
+    border-radius: 18px;
+    box-shadow: 0 22px 40px rgba(0, 0, 0, 0.6);
+    padding: 0.75rem;
+  }
+
+  .chat-overlay :deep(.chatbox) {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .chat-overlay :deep(#chat) {
+    height: clamp(160px, 24vh, 220px);
+    background: rgba(236, 236, 240, 0.95);
     border-radius: 12px;
+  }
 
-    div.left {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-height: 0;
-      min-width: 0;
-      height: 100%;
-      align-items: stretch;
-      justify-content: flex-start;
-      overflow: auto;
-      width: 100%;
-    }
+  .chat-overlay :deep(input.typing) {
+    margin-top: 0.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(40, 40, 44, 0.25);
+  }
 
-    div.right {
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      justify-content: flex-end;
-      background-color: rgba(0, 0, 0, 0.35);
-      padding: 1rem;
-      border-radius: 8px;
-      overflow-y: auto;
-      min-height: 0;
-      max-height: 100%;
-      flex: 0 0 auto;
+  .chat-overlay :deep(input.typing:focus) {
+    border-color: rgba(255, 214, 102, 0.6);
+    box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.3);
+  }
 
-      div.content {
-        background-color: #c7c7c7;
-        height: 100px;
-        font-size: 12px;
-      }
+  .floating-pane {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(10, 8, 12, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 90;
+    padding: clamp(1rem, 4vw, 2.5rem);
+  }
+
+  .floating-pane__card {
+    width: min(640px, 92vw);
+    max-height: min(520px, 82vh);
+    background: rgba(24, 24, 30, 0.96);
+    border-radius: 24px 24px 12px 12px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.65);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .floating-pane__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .floating-pane__title {
+    margin: 0;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .floating-pane__close {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    color: #fff;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 140ms ease, transform 140ms ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
     }
   }
 
-  /* stylelint-disable media-feature-range-notation */
-  @media (width <= 1440px) {
+  .floating-pane__body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+  }
+
+  .pane-side-enter-active,
+  .pane-side-leave-active {
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+
+  .pane-side-enter-from,
+  .pane-side-leave-to {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  div.pane-shell.pane-shell--reverse .pane-side-enter-from,
+  div.pane-shell.pane-shell--reverse .pane-side-leave-to {
+    transform: translateX(16px);
+  }
+
+  .pane-overlay-enter-active,
+  .pane-overlay-leave-active {
+    transition: opacity 180ms ease;
+  }
+
+  .pane-overlay-enter-from,
+  .pane-overlay-leave-to {
+    opacity: 0;
+  }
+
+  .chat-overlay-enter-active,
+  .chat-overlay-leave-active {
+    transition: opacity 150ms ease, transform 150ms ease;
+  }
+
+  .chat-overlay-enter-from,
+  .chat-overlay-leave-to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  @media (width <= 1024px) {
+    div.world-shell {
+      width: clamp(640px, 80vw, 960px);
+    }
+
+    div.chat-layer {
+      width: min(100%, clamp(420px, 80vw, 680px));
+    }
+  }
+
+  @media (width <= 768px) {
     div.game__wrapper {
-      grid-template-columns: minmax(0, 1fr) clamp(15rem, 26vw, 20rem);
+      padding: clamp(0.75rem, 4vw, 1.5rem);
+    }
+
+    div.world-shell {
+      border-radius: 14px;
+    }
+
+    div.hud-layer {
+      width: min(100%, clamp(380px, 72vw, 600px));
+    }
+
+    .floating-pane {
+      align-items: center;
+    }
+
+    div.chat-layer {
+      position: fixed;
+      bottom: clamp(0.9rem, 6vw, 2rem);
+      width: min(94vw, 420px);
+    }
+
+    .chat-overlay :deep(#chat) {
+      height: clamp(220px, 40vh, 360px);
     }
   }
-
-  @media (width <= 1200px) {
-    div.game__wrapper {
-      grid-template-columns: minmax(0, 1fr);
-      grid-auto-rows: auto;
-
-      div.right {
-        order: 2;
-        margin-top: 1rem;
-      }
-    }
-  }
-  /* stylelint-enable media-feature-range-notation */
 }
 </style>

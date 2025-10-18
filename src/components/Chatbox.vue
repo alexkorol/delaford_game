@@ -111,18 +111,19 @@ export default {
      * @param {string} username The user sending the message
      */
     appendChat(type = 'chat', username = null) {
-      const typed = [
+      const message = {
+        type,
+        color: '#1D56F2',
+        text: this.said,
+        username,
+      };
+
+      this.chatbox = [
         ...this.chatbox,
-        {
-          type,
-          color: '#1D56F2',
-          text: this.said,
-          username,
-        },
+        message,
       ];
 
-      // Copy new messages to original object
-      Object.assign(this.chatbox, typed);
+      this.$emit('message-appended', { ...message });
 
       // Clear user input
       this.clearInput();
