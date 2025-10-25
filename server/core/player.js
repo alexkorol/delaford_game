@@ -2,7 +2,6 @@ import MapUtils from 'shared/map-utils';
 import PF from 'pathfinding';
 import Socket from '@server/socket';
 import UI from 'shared/ui';
-import WebSocket from 'ws';
 import axios from 'axios';
 import config from '@server/config';
 import * as emoji from 'node-emoji';
@@ -11,6 +10,14 @@ import { v4 as uuid } from 'uuid';
 import Inventory from './utilities/common/player/inventory';
 import { wearableItems } from './data/items';
 import world from './world';
+
+const BASE_MOVE_DURATION = 150; // ms per cardinal tile step (matches legacy timing)
+
+const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DURATION) => {
+  const diagonal = Math.abs(deltaX) === 1 && Math.abs(deltaY) === 1;
+  const multiplier = diagonal ? Math.SQRT2 : 1;
+  return Math.round(baseDuration * multiplier);
+};
 
 class Player {
   constructor(data, token, socketId) {
@@ -97,6 +104,18 @@ class Player {
     // Action queue
     this.queue = [];
 
+    this.movementStep = {
+      sequence: 0,
+      startedAt: Date.now(),
+      duration: 0,
+      walkId: 0,
+      stepIndex: 0,
+      steps: 0,
+      direction: null,
+      blocked: false,
+      interrupted: false,
+    };
+
     // Player inventory
     this.inventory = new Inventory(data.inventory, this.socket_id);
 
@@ -152,7 +171,17 @@ class Player {
    * @param {string} direction The direction which the player is moving
    * @param {boolean} pathfind Whether pathfinding is being used to move player
    */
-  move(direction, pathfind = false) {
+  move(direction, options = {}) {
+    const context = typeof options === 'boolean' ? { pathfind: options } : options;
+    const {
+      pathfind = false,
+      duration: durationOverride = null,
+      walkId = null,
+      stepIndex = null,
+      steps = null,
+      startedAt = Date.now(),
+    } = context || {};
+
     if (!pathfind) {
       this.cancelPathfinding();
     }
@@ -165,15 +194,65 @@ class Player {
 
     if (!delta) {
       console.log('Nothing happened');
-      return;
+      return false;
     }
 
+    const attemptedWalkId = pathfind ? walkId : null;
+    const duration = typeof durationOverride === 'number'
+      ? durationOverride
+      : computeStepDuration(delta.x, delta.y);
+
     if (this.isBlocked(direction, delta)) {
-      return;
+      this.registerMovementStep({
+        duration: 0,
+        walkId: attemptedWalkId,
+        stepIndex,
+        steps,
+        startedAt,
+        direction,
+        blocked: true,
+      });
+      return false;
     }
 
     this.x += delta.x;
     this.y += delta.y;
+
+    this.registerMovementStep({
+      duration,
+      walkId: attemptedWalkId,
+      stepIndex,
+      steps,
+      startedAt,
+      direction,
+      blocked: false,
+    });
+
+    return true;
+  }
+
+  registerMovementStep(step = {}) {
+    const currentSequence = this.movementStep && typeof this.movementStep.sequence === 'number'
+      ? this.movementStep.sequence
+      : 0;
+
+    const interruption = step.interrupted !== undefined
+      ? step.interrupted
+      : Boolean(this.path && this.path.current && this.path.current.interrupted);
+
+    this.movementStep = {
+      sequence: currentSequence + 1,
+      startedAt: typeof step.startedAt === 'number' ? step.startedAt : Date.now(),
+      duration: typeof step.duration === 'number' ? step.duration : 0,
+      walkId: step.walkId ?? null,
+      stepIndex: step.stepIndex ?? null,
+      steps: step.steps ?? null,
+      direction: step.direction || null,
+      blocked: Boolean(step.blocked),
+      interrupted: interruption,
+    };
+
+    return this.movementStep;
   }
 
   cancelPathfinding() {
@@ -245,7 +324,7 @@ class Player {
   walkPath(playerIndex) {
     const player = world.players[playerIndex];
     const { path } = player;
-    const baseSpeed = 150; // Base delay per cardinal step in ms
+    const baseSpeed = BASE_MOVE_DURATION; // Base delay per cardinal step in ms
 
     if (!path || !path.current || !Array.isArray(path.current.path.walking)) {
       return;
@@ -309,21 +388,27 @@ class Player {
 
       const deltaX = Math.abs(nextCoordinates.x - currentCoordinates.x);
       const deltaY = Math.abs(nextCoordinates.y - currentCoordinates.y);
-      const stepDuration = Math.round(baseSpeed * (deltaX && deltaY ? Math.SQRT2 : 1));
+      const stepDuration = computeStepDuration(deltaX, deltaY, baseSpeed);
+      const totalSteps = Math.max(0, path.current.path.walking.length - 1);
 
       setTimeout(() => {
         if (path.current.walkId !== activeWalkId) {
           return;
         }
 
-        this.move(movement, true);
+        const stepStartedAt = Date.now();
+        this.move(movement, {
+          pathfind: true,
+          duration: stepDuration,
+          walkId: activeWalkId,
+          stepIndex: currentIndex + 1,
+          steps: totalSteps,
+          startedAt: stepStartedAt,
+          direction: movement,
+        });
 
         const playerChanging = world.players[playerIndex];
-        world.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            Socket.broadcast('player:movement', playerChanging);
-          }
-        });
+        Player.broadcastMovement(playerChanging);
 
         path.current.step += 1;
         scheduleNextStep();
@@ -341,6 +426,15 @@ class Player {
   stopMovement(data) {
     Socket.emit('player:stopped', { player: data.player });
     this.moving = false;
+  }
+
+  static broadcastMovement(player, players = null) {
+    if (!player) {
+      return;
+    }
+
+    const meta = player.movementStep ? { movementStep: player.movementStep } : {};
+    Socket.broadcast('player:movement', player, players, { meta });
   }
 
   /**

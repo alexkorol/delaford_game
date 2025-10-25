@@ -13,6 +13,24 @@ const centerOfTile = (tileX, tileY, tileSize = TILE_SIZE) => ({
   y: (tileY + 0.5) * tileSize,
 });
 
+const computeDurationFromDelta = (deltaX, deltaY, baseDuration) => {
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+
+  if (absX === 0 && absY === 0) {
+    return 0;
+  }
+
+  if (absX <= 1 && absY <= 1) {
+    const diagonal = absX === 1 && absY === 1;
+    const multiplier = diagonal ? Math.SQRT2 : 1;
+    return Math.round(baseDuration * multiplier);
+  }
+
+  const steps = Math.max(absX, absY);
+  return Math.round(baseDuration * steps);
+};
+
 /**
  * Tracks interpolated positions for any map entity.
  * Rendering code will read {@link render} and {@link getPosition}
@@ -36,6 +54,9 @@ class MovementController {
     this.next = { x: 0, y: 0 };
     this.lastUpdate = 0;
     this.eta = 0;
+    this.sequence = 0;
+    this.walkId = null;
+    this.lastServerStep = null;
   }
 
   /**
@@ -49,6 +70,9 @@ class MovementController {
     this.next = clonePoint(center);
     this.lastUpdate = timestamp;
     this.eta = 0;
+    this.sequence = 0;
+    this.walkId = null;
+    this.lastServerStep = null;
     return this;
   }
 
@@ -132,6 +156,91 @@ class MovementController {
       return false;
     }
     return timestamp < this.lastUpdate + this.eta;
+  }
+
+  shouldAcceptStep(step = {}) {
+    if (!step || typeof step.sequence !== 'number') {
+      return true;
+    }
+
+    if (typeof this.sequence === 'number' && step.sequence <= this.sequence) {
+      return false;
+    }
+
+    if (
+      this.lastServerStep
+      && typeof this.lastServerStep.walkId === 'number'
+      && step.walkId !== undefined
+      && step.walkId !== null
+      && step.walkId === this.lastServerStep.walkId
+      && typeof this.lastServerStep.stepIndex === 'number'
+      && typeof step.stepIndex === 'number'
+    ) {
+      return step.stepIndex > this.lastServerStep.stepIndex;
+    }
+
+    return true;
+  }
+
+  applyServerStep(tileX, tileY, step = {}, meta = {}) {
+    const receivedAt = typeof meta.receivedAt === 'number' ? meta.receivedAt : now();
+
+    if (!this.shouldAcceptStep(step)) {
+      return false;
+    }
+
+    const currentTile = this.tile || { x: tileX, y: tileY };
+    const fallbackDuration = computeDurationFromDelta(
+      tileX - currentTile.x,
+      tileY - currentTile.y,
+      this.moveDuration,
+    );
+
+    const rawDuration = (step && typeof step.duration === 'number' && step.duration >= 0)
+      ? step.duration
+      : fallbackDuration;
+    const duration = Number.isFinite(rawDuration) ? rawDuration : fallbackDuration;
+
+    const startedAt = step && typeof step.startedAt === 'number' ? step.startedAt : null;
+    const sentAt = meta && typeof meta.sentAt === 'number' ? meta.sentAt : null;
+
+    let timestamp = receivedAt;
+
+    if (duration > MOVEMENT_EPSILON) {
+      let elapsed = null;
+      if (startedAt !== null && sentAt !== null) {
+        elapsed = Math.max(0, Math.min(duration, sentAt - startedAt));
+      } else if (startedAt !== null) {
+        elapsed = Math.max(0, Math.min(duration, receivedAt - startedAt));
+      }
+
+      if (elapsed !== null) {
+        timestamp = receivedAt - elapsed;
+      }
+    }
+
+    if (duration <= MOVEMENT_EPSILON || (step && step.blocked)) {
+      this.hardSync(tileX, tileY, receivedAt);
+      if (step && typeof step.sequence === 'number') {
+        this.sequence = step.sequence;
+      }
+      if (step && step.walkId !== undefined) {
+        this.walkId = step.walkId;
+      }
+      this.lastServerStep = step || null;
+      return true;
+    }
+
+    if (step && typeof step.sequence === 'number') {
+      this.sequence = step.sequence;
+    }
+    if (step && step.walkId !== undefined) {
+      this.walkId = step.walkId;
+    }
+    this.lastServerStep = step || null;
+
+    this.startMove(tileX, tileY, { duration, timestamp });
+    return true;
   }
 
   complete() {

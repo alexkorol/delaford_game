@@ -10,14 +10,9 @@ class Authentication {
    * @returns {object} Their player profile and token
    */
   static async login(data) {
-    return new Promise(async (resolve, reject) => {
-      const token = await Authentication.getToken(data.data).catch((error) => {
-        reject(error);
-      });
-      const player = await Authentication.getProfile(token);
-
-      resolve({ player, token });
-    });
+    const token = await Authentication.getToken(data.data);
+    const player = await Authentication.getProfile(token);
+    return { player, token };
   }
 
   /**
@@ -112,7 +107,14 @@ class Authentication {
     Socket.emit('player:login', block);
 
     // Tell the world someone logged in
-    Socket.broadcast('player:joined', world.players);
+    const meta = {
+      players: world.players.map((p) => ({
+        uuid: p.uuid,
+        movementStep: p.movementStep,
+      })),
+    };
+
+    Socket.broadcast('player:joined', world.players, null, { meta });
   }
 }
 

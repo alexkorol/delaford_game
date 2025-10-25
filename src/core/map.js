@@ -5,6 +5,7 @@ import blockedMouse from '@/assets/graphics/ui/mouse/blocked.png';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
 import bus from './utilities/bus';
 import MovementController, { centerOfTile } from './utilities/movement-controller';
+import { now } from './config/movement';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
@@ -148,8 +149,27 @@ class Map {
    *
    * @param {object} player The player themselves
    */
-  setPlayer(player) {
-    this.player = player;
+  setPlayer(player, meta = {}) {
+    const existing = this.player || null;
+    const controller = existing && existing.movement
+      ? existing.movement
+      : new MovementController().initialise(player.x, player.y);
+
+    const step = player.movementStep || null;
+    if (step) {
+      controller.applyServerStep(player.x, player.y, step, {
+        sentAt: meta.sentAt || null,
+        receivedAt: now(),
+      });
+    } else {
+      controller.hardSync(player.x, player.y);
+    }
+
+    this.player = {
+      ...(existing || {}),
+      ...player,
+      movement: controller,
+    };
   }
 
   /**
@@ -157,7 +177,7 @@ class Map {
    *
    * @param {object} npcs The world NPCS
    */
-  setNPCs(npcs) {
+  setNPCs(npcs, meta = {}) {
     const existing = new window.Map(
       this.npcs
         .map((npc) => {
@@ -170,6 +190,19 @@ class Map {
         .filter((entry) => entry !== null),
     );
 
+    const movementEntries = Array.isArray(meta.movements) ? meta.movements : [];
+    const movementLookup = new window.Map(
+      movementEntries
+        .map((entry) => {
+          const key = entry && (entry.uuid || entry.id);
+          if (!key) {
+            return null;
+          }
+          return [key, entry.movementStep || null];
+        })
+        .filter((entry) => entry !== null),
+    );
+
     this.npcs = (npcs || []).map((npc) => {
       const key = npc && (npc.uuid || npc.id);
       const previous = key ? existing.get(key) : null;
@@ -177,7 +210,16 @@ class Map {
         ? previous.movement
         : new MovementController().initialise(npc.x, npc.y);
 
-      controller.hardSync(npc.x, npc.y);
+      const step = npc.movementStep || movementLookup.get(key) || null;
+
+      if (step) {
+        controller.applyServerStep(npc.x, npc.y, step, {
+          sentAt: meta.sentAt || null,
+          receivedAt: now(),
+        });
+      } else {
+        controller.hardSync(npc.x, npc.y);
+      }
 
       return {
         ...npc,
