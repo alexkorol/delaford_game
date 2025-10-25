@@ -12,8 +12,33 @@ import bus from './utilities/bus';
 
 import Socket from './utilities/socket';
 import MovementController from './utilities/movement-controller';
+import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement';
 
 import Map from './map';
+
+const directionDeltas = {
+  right: { x: 1, y: 0 },
+  left: { x: -1, y: 0 },
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  'up-right': { x: 1, y: -1 },
+  'down-right': { x: 1, y: 1 },
+  'up-left': { x: -1, y: -1 },
+  'down-left': { x: -1, y: 1 },
+};
+
+const computeDurationFromDelta = (deltaX, deltaY) => {
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+
+  if (absX === 0 && absY === 0) {
+    return 0;
+  }
+
+  const diagonal = absX === 1 && absY === 1;
+  const multiplier = diagonal ? Math.SQRT2 : 1;
+  return Math.round(DEFAULT_MOVE_DURATION_MS * multiplier);
+};
 
 class Client {
   constructor(data) {
@@ -110,13 +135,152 @@ class Client {
     return asset;
   }
 
-  /**
-   * Move the player one tile
-   *
-   * @param {string} direction The direction the player moved
-   */
-  static move(data) {
-    Socket.emit('player:move', data);
+  getOptimisticActor() {
+    if (this.map && this.map.player) {
+      return this.map.player;
+    }
+    return this.player;
+  }
+
+  move(direction, options = {}) {
+    if (!direction || !this.player) {
+      return;
+    }
+
+    const payload = {
+      id: this.player.uuid,
+      direction,
+    };
+
+    Socket.emit('player:move', payload);
+
+    if (options.optimistic === false) {
+      return;
+    }
+
+    this.applyOptimisticMovement(direction);
+  }
+
+  applyOptimisticMovement(direction) {
+    const delta = directionDeltas[direction];
+    if (!delta) {
+      return;
+    }
+
+    const actor = this.getOptimisticActor();
+    if (!actor) {
+      return;
+    }
+
+    if (!actor.movement) {
+      actor.movement = new MovementController().initialise(actor.x, actor.y);
+      if (this.map && this.map.player === actor) {
+        this.map.player.movement = actor.movement;
+      }
+    }
+
+    if (!Array.isArray(actor.optimisticQueue)) {
+      actor.optimisticQueue = [];
+    }
+
+    const basePosition = actor.optimisticQueue.length > 0
+      ? actor.optimisticQueue[actor.optimisticQueue.length - 1]
+      : actor.optimisticPosition || { x: actor.x, y: actor.y };
+
+    const baseX = typeof basePosition.x === 'number' ? basePosition.x : actor.x;
+    const baseY = typeof basePosition.y === 'number' ? basePosition.y : actor.y;
+
+    const targetX = baseX + delta.x;
+    const targetY = baseY + delta.y;
+
+    const step = {
+      x: targetX,
+      y: targetY,
+      direction,
+      duration: computeDurationFromDelta(delta.x, delta.y),
+      issuedAt: now(),
+      started: false,
+    };
+
+    actor.optimisticQueue.push(step);
+    actor.optimisticPosition = { x: targetX, y: targetY };
+    actor.optimisticTarget = { x: targetX, y: targetY };
+
+    this.startNextOptimisticStep(actor);
+  }
+
+  startNextOptimisticStep(actor = this.getOptimisticActor()) {
+    const subject = actor;
+
+    if (!subject || !subject.movement) {
+      return;
+    }
+
+    if (!Array.isArray(subject.optimisticQueue) || subject.optimisticQueue.length === 0) {
+      return;
+    }
+
+    const controller = subject.movement;
+    if (controller.isMoving()) {
+      return;
+    }
+
+    const step = subject.optimisticQueue[0];
+    if (step.started) {
+      return;
+    }
+    controller.startMove(step.x, step.y, { duration: step.duration });
+    step.started = true;
+  }
+
+  advanceOptimisticMovement() {
+    const actor = this.getOptimisticActor();
+    if (!actor || !actor.movement) {
+      return;
+    }
+
+    if (actor.optimisticScheduler) {
+      clearTimeout(actor.optimisticScheduler);
+      actor.optimisticScheduler = null;
+    }
+
+    if (!Array.isArray(actor.optimisticQueue) || actor.optimisticQueue.length === 0) {
+      return;
+    }
+
+    const controller = actor.movement;
+
+    if (!controller.isMoving()) {
+      this.startNextOptimisticStep(actor);
+    }
+
+    const activeStep = actor.optimisticQueue[0];
+    if (activeStep && !activeStep.started && !controller.isMoving()) {
+      this.startNextOptimisticStep(actor);
+    }
+
+    if (controller.isMoving() && activeStep && activeStep.started) {
+      const delay = Math.max(16, Math.max(0, (controller.lastUpdate + controller.eta) - now()));
+      actor.optimisticScheduler = setTimeout(() => {
+        actor.optimisticScheduler = null;
+        this.advanceOptimisticMovement();
+      }, delay);
+    }
+  }
+
+  resetOptimisticMovement() {
+    const actor = this.getOptimisticActor();
+    if (!actor) {
+      return;
+    }
+
+    if (actor.optimisticScheduler) {
+      clearTimeout(actor.optimisticScheduler);
+      actor.optimisticScheduler = null;
+    }
+
+    actor.optimisticPosition = { x: actor.x, y: actor.y };
+    actor.optimisticTarget = null;
   }
 }
 

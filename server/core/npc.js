@@ -4,6 +4,22 @@ import * as emoji from 'node-emoji';
 import npcs from './data/npcs';
 import world from './world';
 
+const BASE_MOVE_DURATION = 150;
+
+const directionVectors = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+};
+
+const computeStepDuration = (direction) => {
+  const delta = directionVectors[direction] || { x: 0, y: 0 };
+  const diagonal = Math.abs(delta.x) === 1 && Math.abs(delta.y) === 1;
+  const multiplier = diagonal ? Math.SQRT2 : 1;
+  return Math.round(BASE_MOVE_DURATION * multiplier);
+};
+
 class NPC {
   constructor(data) {
     this.id = data.id;
@@ -33,6 +49,14 @@ class NPC {
 
     // What column they are on in tileset
     this.column = data.graphic.column;
+
+    this.movementStep = {
+      sequence: 0,
+      startedAt: Date.now(),
+      duration: 0,
+      direction: null,
+      blocked: false,
+    };
   }
 
   /**
@@ -61,10 +85,15 @@ class NPC {
         const action = UI.getRandomInt(1, 2) === 1 ? 'move' : 'nothing';
 
         // NPCs going to move during this loop?
+        let moved = false;
+        let directionTaken = null;
+        let blockedAttempt = false;
+
         if (action === 'move') {
           // Which way?
           const direction = ['up', 'down', 'left', 'right'];
           const going = direction[UI.getRandomInt(0, 3)];
+          directionTaken = going;
 
           // What tile will they be stepping on?
           const tile = {
@@ -85,35 +114,69 @@ class NPC {
           case 'up':
             if ((npc.y - 1) >= (npc.spawn.y - npc.range) && canWalkThrough) {
               npc.y -= 1;
+              moved = true;
+            } else {
+              blockedAttempt = true;
             }
             break;
           case 'down':
             if ((npc.y + 1) <= (npc.spawn.y + npc.range) && canWalkThrough) {
               npc.y += 1;
+              moved = true;
+            } else {
+              blockedAttempt = true;
             }
             break;
           case 'left':
             if ((npc.x - 1) >= (npc.spawn.x - npc.range) && canWalkThrough) {
               npc.x -= 1;
+              moved = true;
+            } else {
+              blockedAttempt = true;
             }
             break;
           case 'right':
             if ((npc.x + 1) <= (npc.spawn.x + npc.range) && canWalkThrough) {
               npc.x += 1;
+              moved = true;
+            } else {
+              blockedAttempt = true;
             }
             break;
           }
         }
 
+        const sequence = npc.movementStep && typeof npc.movementStep.sequence === 'number'
+          ? npc.movementStep.sequence + 1
+          : 1;
+        const startedAt = Date.now();
+        const duration = moved && directionTaken ? computeStepDuration(directionTaken) : 0;
+
+        npc.movementStep = {
+          sequence,
+          startedAt,
+          duration,
+          direction: moved ? directionTaken : null,
+          blocked: action === 'move' && blockedAttempt && !moved,
+        };
+
         // Register their last action
-        npc.lastAction = Date.now();
+        npc.lastAction = startedAt;
       }
 
       return npc;
     });
 
+    const meta = {
+      movements: world.npcs.map((npc) => ({
+        id: npc.id,
+        uuid: npc.uuid || null,
+        movementStep: npc.movementStep,
+      })),
+    };
+
     // Tell the clients of the new NPCs
-    Socket.broadcast('npc:movement', world.npcs);
+    Socket.broadcast('npc:movement', world.npcs, null, { meta });
   }
 }
 

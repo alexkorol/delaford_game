@@ -35,7 +35,6 @@
 <script>
 import UI from 'shared/ui';
 import config from 'root/config';
-import Client from '../core/client';
 import ClientUI from '../core/utilities/client-ui';
 import bus from '../core/utilities/bus';
 import Socket from '../core/utilities/socket';
@@ -404,10 +403,12 @@ export default {
         return;
       }
 
-      Client.move({
-        id: this.game.player.uuid,
-        direction,
-      });
+      if (Array.isArray(this.game.player.optimisticQueue)
+        && this.game.player.optimisticQueue.length >= 6) {
+        return;
+      }
+
+      this.game.move(direction);
     },
     ensureMovementRepeat() {
       if (this.movementRepeatId !== null) {

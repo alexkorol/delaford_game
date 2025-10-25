@@ -2,6 +2,7 @@
 
 import bus from '../../utilities/bus';
 import MovementController from '../../utilities/movement-controller';
+import { now } from '../../config/movement';
 
 export default {
   /**
@@ -21,9 +22,19 @@ export default {
   /**
    * When a player moves.
    */
-  'player:movement': (data, context) => {
-    data.data.inventory = data.data.inventory.slots;
-    context.playerMovement(data.data);
+  'player:movement': (message, context) => {
+    const eventData = message.data || {};
+    const meta = message.meta || {};
+
+    if (eventData.inventory && eventData.inventory.slots) {
+      eventData.inventory = eventData.inventory.slots;
+    }
+
+    if (!eventData.movementStep && meta.movementStep) {
+      eventData.movementStep = meta.movementStep;
+    }
+
+    context.playerMovement(eventData, meta);
   },
   /**
    * A player saying something
@@ -42,6 +53,26 @@ export default {
           (context.game.map.players || []).map((player) => [player.uuid, player]),
         );
 
+        const meta = data.meta || {};
+        let movementEntries = [];
+        if (Array.isArray(meta.players)) {
+          movementEntries = meta.players;
+        } else if (Array.isArray(meta.movements)) {
+          movementEntries = meta.movements;
+        }
+
+        const movementLookup = new Map(
+          movementEntries
+            .map((entry) => {
+              const key = entry && (entry.uuid || entry.id);
+              if (!key) {
+                return null;
+              }
+              return [key, entry.movementStep || null];
+            })
+            .filter((entry) => entry !== null),
+        );
+
         context.game.map.players = data.data
           .filter((p) => p.socket_id !== context.game.player.socket_id)
           .map((player) => {
@@ -49,8 +80,18 @@ export default {
             const controller = existing && existing.movement
               ? existing.movement
               : new MovementController().initialise(player.x, player.y);
+            const step = player.movementStep
+              || movementLookup.get(player.uuid)
+              || null;
 
-            controller.hardSync(player.x, player.y);
+            if (step) {
+              controller.applyServerStep(player.x, player.y, step, {
+                sentAt: meta.sentAt || null,
+                receivedAt: now(),
+              });
+            } else {
+              controller.hardSync(player.x, player.y);
+            }
 
             return {
               ...player,

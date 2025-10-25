@@ -18,7 +18,7 @@ class Socket {
    * @param {string} event The type of event being emitted
    * @param {object} data The data associated with the event
    */
-  static emit(event, data) {
+  static emit(event, data, options = {}) {
     if (!data.player.socket_id) {
       console.log(event, 'No player socket ID connected.');
     }
@@ -27,10 +27,21 @@ class Socket {
     const player = world.clients.find(p => p.id === data.player.socket_id);
 
     // Send the player back their needed data
-    player.send(JSON.stringify({
+    const payload = {
       event,
       data,
-    }));
+    };
+
+    if (options.meta || options.includeTimestamp) {
+      const meta = {
+        sentAt: Date.now(),
+        ...(options.meta || {}),
+      };
+
+      payload.meta = meta;
+    }
+
+    player.send(JSON.stringify(payload));
   }
 
   /**
@@ -39,10 +50,16 @@ class Socket {
    * @param {string} event The type of event I am broadcasting
    * @param {object} data Data associated with the event
    */
-  static broadcast(event, data, players) {
+  static broadcast(event, data, players, options = {}) {
+    const meta = {
+      sentAt: Date.now(),
+      ...(options.meta || {}),
+    };
+
     const obj = {
       event,
       data,
+      meta,
     };
 
     world.clients.forEach((client, index) => {

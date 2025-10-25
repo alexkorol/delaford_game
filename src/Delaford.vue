@@ -260,7 +260,7 @@ import Engine from './core/engine';
 import bus from './core/utilities/bus';
 import Event from './core/player/events';
 import MovementController from './core/utilities/movement-controller';
-import { DEFAULT_MOVE_DURATION_MS } from './core/config/movement';
+import { now } from './core/config/movement';
 
 const createDefaultQuickSlots = () => Array.from(
   { length: 8 },
@@ -878,7 +878,7 @@ export default {
     /**
      * Player movement, do something
      */
-    playerMovement(data) {
+    playerMovement(data, meta = {}) {
       if (!this.game || !this.game.player) {
         return;
       }
@@ -891,33 +891,86 @@ export default {
       const { player } = this.game;
       const isLocalPlayer = player.uuid === payload.uuid;
 
+      const step = payload.movementStep || null;
+      const stepSequence = step && typeof step.sequence === 'number' ? step.sequence : null;
+
+      const messageMeta = {
+        sentAt: typeof meta.sentAt === 'number' ? meta.sentAt : null,
+        receivedAt: now(),
+      };
+
+      const processEntity = (entity, controller) => {
+        const lastSequence = typeof entity.lastMovementSequence === 'number'
+          ? entity.lastMovementSequence
+          : null;
+
+        if (lastSequence !== null && stepSequence !== null && stepSequence <= lastSequence) {
+          return { controller, accepted: false };
+        }
+
+        const applied = controller.applyServerStep(payload.x, payload.y, step, messageMeta);
+
+        if (stepSequence !== null) {
+          entity.lastMovementSequence = stepSequence;
+        }
+
+        return { controller, accepted: applied !== false };
+      };
+
       if (isLocalPlayer) {
         if (!player.movement) {
           player.movement = new MovementController().initialise(player.x, player.y);
         }
 
-        const previousX = player.x;
-        const previousY = player.y;
-        const moved = previousX !== payload.x || previousY !== payload.y;
+        const { controller, accepted } = processEntity(player, player.movement);
 
-        if (moved) {
-          const distance = Math.hypot(payload.x - previousX, payload.y - previousY) || 1;
-          player.movement.startMove(payload.x, payload.y, {
-            duration: DEFAULT_MOVE_DURATION_MS * distance,
-          });
-        } else {
-          player.movement.hardSync(payload.x, payload.y);
+        if (!accepted) {
+          return;
         }
 
-        Object.assign(player, payload);
+        if (accepted) {
+          if (!Array.isArray(player.optimisticQueue)) {
+            player.optimisticQueue = [];
+          }
+
+          if (player.optimisticQueue.length) {
+            const matchIndex = player.optimisticQueue.findIndex((entry) => (
+              entry.x === payload.x && entry.y === payload.y
+            ));
+
+            if (matchIndex !== -1) {
+              player.optimisticQueue.splice(0, matchIndex + 1);
+            } else if (step && step.blocked) {
+              player.optimisticQueue = [];
+              if (typeof this.game.resetOptimisticMovement === 'function') {
+                this.game.resetOptimisticMovement();
+              }
+            }
+          }
+
+          player.optimisticTarget = null;
+          player.optimisticPosition = { x: payload.x, y: payload.y };
+
+          if (typeof this.game.advanceOptimisticMovement === 'function') {
+            this.game.advanceOptimisticMovement();
+          }
+        }
+
+        Object.assign(player, payload, {
+          movement: controller,
+        });
         this.game.map.player = player;
       } else {
         const playerIndex = this.game.map.players.findIndex((p) => p.uuid === payload.uuid);
 
         if (playerIndex === -1) {
+          const newcomerController = new MovementController().initialise(payload.x, payload.y);
+          newcomerController.applyServerStep(payload.x, payload.y, step, messageMeta);
+
           const newcomer = {
             ...payload,
-            movement: new MovementController().initialise(payload.x, payload.y),
+            movement: newcomerController,
+            lastMovementSequence: stepSequence,
           };
           this.game.map.players.push(newcomer);
           return;
@@ -926,21 +979,20 @@ export default {
         const existing = this.game.map.players[playerIndex] || {};
         const controller = existing.movement
           || new MovementController().initialise(payload.x, payload.y);
+        const { accepted } = processEntity(existing, controller);
 
-        const previousX = typeof existing.x === 'number' ? existing.x : payload.x;
-        const previousY = typeof existing.y === 'number' ? existing.y : payload.y;
-        const moved = previousX !== payload.x || previousY !== payload.y;
-
-        if (moved) {
-          const distance = Math.hypot(payload.x - previousX, payload.y - previousY) || 1;
-          controller.startMove(payload.x, payload.y, {
-            duration: DEFAULT_MOVE_DURATION_MS * distance,
-          });
-        } else {
-          controller.hardSync(payload.x, payload.y);
+        if (!accepted) {
+          return;
         }
 
-        const updated = { ...existing, ...payload, movement: controller };
+        const updated = {
+          ...existing,
+          ...payload,
+          movement: controller,
+          lastMovementSequence: stepSequence !== null
+            ? stepSequence
+            : existing.lastMovementSequence,
+        };
         this.$set(this.game.map.players, playerIndex, updated);
       }
     },
@@ -948,7 +1000,7 @@ export default {
     /**
      * On NPC movement, update NPCs
      */
-    npcMovement(data) {
+    npcMovement(data, meta = {}) {
       if (!this.game || !this.game.map) {
         return;
       }
@@ -960,6 +1012,24 @@ export default {
         }),
       );
 
+      const movementEntries = Array.isArray(meta.movements) ? meta.movements : [];
+      const movementLookup = new Map(
+        movementEntries
+          .map((entry) => {
+            const key = entry && (entry.uuid || entry.id);
+            if (!key) {
+              return null;
+            }
+            return [key, entry.movementStep || null];
+          })
+          .filter((entry) => entry !== null),
+      );
+
+      const messageMeta = {
+        sentAt: typeof meta.sentAt === 'number' ? meta.sentAt : null,
+        receivedAt: now(),
+      };
+
       const updated = (data || []).map((npc, index) => {
         const key = npc && (npc.uuid || `${npc.id}-${index}`);
         const previous = existing.get(key);
@@ -968,15 +1038,10 @@ export default {
           ? previous.movement
           : new MovementController().initialise(npc.x, npc.y);
 
-        const previousX = previous ? previous.x : npc.x;
-        const previousY = previous ? previous.y : npc.y;
-        const moved = previous && (previousX !== npc.x || previousY !== npc.y);
+        const step = npc.movementStep || movementLookup.get(key) || null;
 
-        if (moved) {
-          const distance = Math.hypot(npc.x - previousX, npc.y - previousY) || 1;
-          controller.startMove(npc.x, npc.y, {
-            duration: DEFAULT_MOVE_DURATION_MS * distance,
-          });
+        if (step) {
+          controller.applyServerStep(npc.x, npc.y, step, messageMeta);
         } else {
           controller.hardSync(npc.x, npc.y);
         }
@@ -984,6 +1049,9 @@ export default {
         return {
           ...npc,
           movement: controller,
+          lastMovementSequence: step && typeof step.sequence === 'number'
+            ? step.sequence
+            : previous && previous.lastMovementSequence,
         };
       });
 

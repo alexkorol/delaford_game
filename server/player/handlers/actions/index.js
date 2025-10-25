@@ -12,6 +12,7 @@ import ContextMenu from '@server/core/context-menu';
 import Handler from '@server/player/handler';
 import Item from '@server/core/item';
 import Map from '@server/core/map';
+import Player from '@server/core/player';
 import Mining from '@server/core/skills/mining';
 import Smithing from '@server/core/skills/smithing';
 import Query from '@server/core/data/query';
@@ -185,7 +186,7 @@ export default {
     world.players[playerIndex].inventory.slots = world.players[
       playerIndex
     ].inventory.slots.filter(v => v.slot !== data.data.miscData.slot);
-    Socket.broadcast('player:movement', world.players[playerIndex]);
+    Player.broadcastMovement(world.players[playerIndex]);
 
     // Add item back to the world
     // from the grasp of the player!

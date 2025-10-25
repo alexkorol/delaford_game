@@ -78,10 +78,11 @@ export default {
    */
   'player:move': (data) => {
     const playerIndex = world.players.findIndex(player => player.uuid === data.data.id);
-    world.players[playerIndex].move(data.data.direction);
+    const player = world.players[playerIndex];
+    const startedAt = Date.now();
+    player.move(data.data.direction, { startedAt, direction: data.data.direction });
 
-    const playerChanging = world.players[playerIndex];
-    Socket.broadcast('player:movement', playerChanging);
+    Player.broadcastMovement(player);
   },
 
   /**
