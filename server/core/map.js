@@ -4,7 +4,7 @@ import MapUtils from 'shared/map-utils';
 import PF from 'pathfinding';
 import config from '@server/config';
 import surfaceMap from '@server/maps/layers/surface.json';
-import { v4 as uuid } from 'uuid';
+import ItemFactory from './items/factory';
 import { Shop } from './functions';
 import world from './world';
 
@@ -124,10 +124,10 @@ class Map {
 
     // Set the respawns accordingly
     world.respawns = {
-      items: itemsOnMap.map((i) => {
-        i.pickedUp = false;
-        return i;
-      }),
+      items: itemsOnMap.map((item) => ({
+        ...item,
+        pickedUp: false,
+      })),
       monsters: [],
       resources: [],
     };
@@ -149,10 +149,22 @@ class Map {
    * @returns {array}
    */
   static readyItems(items) {
-    return items.map((i) => {
-      i.uuid = uuid();
-      i.respawn = true;
-      return i;
+    return items.map((definition) => {
+      const location = { x: definition.x, y: definition.y };
+      const baseItem = ItemFactory.createById(definition.id);
+
+      if (!baseItem) {
+        return ItemFactory.toWorldInstance({ id: definition.id }, location, {
+          respawn: true,
+        });
+      }
+
+      const worldItem = ItemFactory.toWorldInstance(baseItem, location, {
+        respawn: true,
+      });
+
+      worldItem.respawnIn = definition.respawnIn;
+      return worldItem;
     });
   }
 

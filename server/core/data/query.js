@@ -28,8 +28,9 @@ class Query {
     const allItems = [...wearableItems, ...general, ...smithing];
     return allItems
       .map((t) => {
-        t.context = 'item';
-        return t;
+        const clone = JSON.parse(JSON.stringify(t));
+        clone.context = 'item';
+        return clone;
       })
       .find(item => item.id === id);
   }

@@ -9,8 +9,17 @@ class Wear {
    * @returns {integer}
    */
   static getAttack(item) {
+    if (item && item.stats && item.stats.attack) {
+      return item.stats.attack;
+    }
+
     const fullItem = wearableItems.find(i => i.id === item.id);
-    return fullItem.stats.attack;
+    return fullItem && fullItem.stats ? fullItem.stats.attack : {
+      stab: 0,
+      slash: 0,
+      crush: 0,
+      range: 0,
+    };
   }
 
   /**
@@ -20,14 +29,23 @@ class Wear {
    * @returns {integer}
    */
   static getDefense(item) {
+    if (item && item.stats && item.stats.defense) {
+      return item.stats.defense;
+    }
+
     const fullItem = wearableItems.find(i => i.id === item.id);
-    return fullItem.stats.defense;
+    return fullItem && fullItem.stats ? fullItem.stats.defense : {
+      stab: 0,
+      slash: 0,
+      crush: 0,
+      range: 0,
+    };
   }
 
   /**
    * Update a player's combat attack and defense
    */
-  static updateCombat(playerIndex, unequipping = false) {
+  static updateCombat(playerIndex) {
     const stats = {
       attack: {
         stab: 0,
@@ -47,41 +65,18 @@ class Wear {
     Object.keys(world.players[playerIndex].wear).forEach((key) => {
       const val = world.players[playerIndex].wear[key];
       if (val !== null && val.uuid && val.id) {
-        const {
-          crush,
-          range,
-          slash,
-          stab,
-        } = this.getAttack({ id: val.id });
+        const attack = this.getAttack(val);
+        const defense = this.getDefense(val);
 
-        const {
-          crush: defCrush,
-          range: defRange,
-          slash: defSlash,
-          stab: defStab,
-        } = this.getDefense({ id: val.id });
+        stats.attack.stab += attack.stab || 0;
+        stats.attack.slash += attack.slash || 0;
+        stats.attack.crush += attack.crush || 0;
+        stats.attack.range += attack.range || 0;
 
-        if (unequipping) {
-          stats.attack.stab -= stab;
-          stats.attack.slash -= slash;
-          stats.attack.crush -= crush;
-          stats.attack.range -= range;
-
-          stats.defense.stab -= defStab;
-          stats.defense.slash -= defSlash;
-          stats.defense.crush -= defCrush;
-          stats.defense.range -= defRange;
-        } else {
-          stats.attack.stab += stab;
-          stats.attack.slash += slash;
-          stats.attack.crush += crush;
-          stats.attack.range += range;
-
-          stats.defense.stab += defStab;
-          stats.defense.slash += defSlash;
-          stats.defense.crush += defCrush;
-          stats.defense.range += defRange;
-        }
+        stats.defense.stab += defense.stab || 0;
+        stats.defense.slash += defense.slash || 0;
+        stats.defense.crush += defense.crush || 0;
+        stats.defense.range += defense.range || 0;
       }
     });
 

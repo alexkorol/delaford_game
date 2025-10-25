@@ -19,7 +19,7 @@ import Query from '@server/core/data/query';
 import Socket from '@server/socket';
 import UI from 'shared/ui';
 import pipe from '@server/player/pipeline';
-import { v4 as uuid } from 'uuid';
+import ItemFactory from '@server/core/items/factory';
 import world from '@server/core/world';
 
 export default {
@@ -180,24 +180,21 @@ export default {
       s => s.slot === data.data.miscData.slot,
     );
 
-    const itemUuid = itemInventory.uuid;
-
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+    const player = world.players[playerIndex];
     world.players[playerIndex].inventory.slots = world.players[
       playerIndex
     ].inventory.slots.filter(v => v.slot !== data.data.miscData.slot);
-    Player.broadcastMovement(world.players[playerIndex]);
+    Player.broadcastMovement(player);
 
-    // Add item back to the world
-    // from the grasp of the player!
-    world.items.push({
-      id: data.item.id,
-      uuid: itemUuid,
-      qty: itemInventory.qty || null,
-      x: world.players[playerIndex].x,
-      y: world.players[playerIndex].y,
+    const dropped = ItemFactory.toWorldInstance(itemInventory, {
+      x: player.x,
+      y: player.y,
+    }, {
       timestamp: Date.now(),
     });
+
+    world.items.push(dropped);
 
     console.log(
       `Dropping: ${data.item.id} (${itemInventory.qty || 0}) at ${
@@ -435,13 +432,13 @@ export default {
 
     const { id } = UI.randomElementFromArray(wearableItems);
 
-    world.items.push({
-      id,
-      uuid: uuid(),
-      x: 20,
-      y: 108,
-      timestamp: Date.now(),
-    });
+    const spawned = ItemFactory.toWorldInstance(
+      ItemFactory.createById(id),
+      { x: 20, y: 108 },
+      { timestamp: Date.now() },
+    );
+
+    world.items.push(spawned);
 
     Socket.broadcast('world:itemDropped', world.items);
 
@@ -460,6 +457,15 @@ export default {
     );
     const worldItem = world.items[itemToTake];
     if (worldItem) {
+      const player = world.players[playerIndex];
+      if (worldItem.boundTo && player && worldItem.boundTo !== player.uuid) {
+        Socket.sendMessageToPlayer(
+          playerIndex,
+          'That item is bound to another adventurer.',
+        );
+        return;
+      }
+
       // If qty not specified, we are picking up 1 item.
       const quantity = worldItem.qty || 1;
       world.items.splice(itemToTake, 1);
@@ -470,7 +476,10 @@ export default {
         `Picking up: ${todo.item.id} (${todo.item.uuid.substr(0, 5)}...)`,
       );
 
-      world.players[playerIndex].inventory.add(id, quantity, todo.item.uuid);
+      world.players[playerIndex].inventory.add(id, quantity, {
+        uuid: todo.item.uuid,
+        existingItem: worldItem,
+      });
 
       // Add respawn timer on item (if is a respawn)
       const resetItemIndex = world.respawns.items.findIndex(
