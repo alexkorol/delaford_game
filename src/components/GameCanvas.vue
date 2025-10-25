@@ -38,6 +38,7 @@ import config from 'root/config';
 import ClientUI from '../core/utilities/client-ui';
 import bus from '../core/utilities/bus';
 import Socket from '../core/utilities/socket';
+import InputController from '../core/utilities/input-controller';
 
 export default {
   name: 'Game',
@@ -56,9 +57,7 @@ export default {
       tileX: 0,
       tileY: 0,
       event: false,
-      lastDirection: null,
-      movementRepeatId: null,
-      movementRepeatDelay: 175,
+      inputController: null,
     };
   },
   computed: {
@@ -92,17 +91,58 @@ export default {
     },
   },
   created() {
-    this.keyState = new Set();
     bus.$on('canvas:getMouse', () => this.mouseSelection());
     bus.$on('open:screen', this.openScreen);
     bus.$on('screen:close', this.closePane);
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
     bus.$on('canvas:reset-context-menu', () => this.mouseSelection());
   },
+  mounted() {
+    this.initialiseInputController();
+  },
   beforeDestroy() {
-    this.clearMovementRepeat();
+    if (this.inputController) {
+      this.inputController.destroy();
+      this.inputController = null;
+    }
   },
   methods: {
+    initialiseInputController() {
+      if (this.inputController) {
+        this.inputController.destroy();
+      }
+
+      this.inputController = new InputController({
+        onMove: (direction) => this.onMoveIntent(direction),
+        onStop: () => this.onMoveStop(),
+        onSkill: (payload) => this.onSkillIntent(payload),
+      });
+    },
+    onMoveIntent(direction) {
+      if (!direction) {
+        return;
+      }
+
+      this.dispatchMovement(direction);
+    },
+    onMoveStop() {
+      if (this.game && typeof this.game.setLocalIdle === 'function') {
+        this.game.setLocalIdle();
+      }
+    },
+    onSkillIntent(payload = {}) {
+      const { skillId, phase } = payload;
+      if (!skillId) {
+        return;
+      }
+
+      if (phase === 'end') {
+        this.dispatchSkill(skillId, { phase });
+        return;
+      }
+
+      this.dispatchSkill(skillId);
+    },
     getViewportSnapshot() {
       const fallbackViewport = {
         x: config.map.viewport.x,
@@ -319,84 +359,14 @@ export default {
     },
 
     handleKeyDown(event) {
-      const key = this.normalizeKey(event.key);
-      if (!this.isMovementKey(key)) {
-        return;
-      }
-
-      if (!this.keyState.has(key)) {
-        this.keyState.add(key);
-        this.sendMovementFromKeys();
+      if (this.inputController && this.inputController.handleKeyDown(event)) {
+        event.preventDefault();
       }
     },
     handleKeyUp(event) {
-      const key = this.normalizeKey(event.key);
-      if (!this.isMovementKey(key)) {
-        return;
+      if (this.inputController && this.inputController.handleKeyUp(event)) {
+        event.preventDefault();
       }
-
-      if (this.keyState.has(key)) {
-        this.keyState.delete(key);
-        this.sendMovementFromKeys();
-      }
-    },
-    normalizeKey(key) {
-      if (key.length === 1) {
-        return key.toLowerCase();
-      }
-      return key;
-    },
-    isMovementKey(key) {
-      return [
-        'arrowup',
-        'arrowdown',
-        'arrowleft',
-        'arrowright',
-        'w',
-        'a',
-        's',
-        'd',
-      ].includes(key);
-    },
-    sendMovementFromKeys() {
-      const direction = this.getDirectionFromKeys();
-      if (!direction) {
-        this.lastDirection = null;
-        this.clearMovementRepeat();
-        return;
-      }
-
-      if (direction === this.lastDirection) {
-        this.ensureMovementRepeat();
-        return;
-      }
-
-      this.lastDirection = direction;
-      this.dispatchMovement(direction);
-      this.ensureMovementRepeat();
-    },
-    getDirectionFromKeys() {
-      const keySet = this.keyState;
-      const has = (keys) => keys.some((key) => keySet.has(key));
-
-      const up = has(['arrowup', 'w']);
-      const down = has(['arrowdown', 's']);
-      const left = has(['arrowleft', 'a']);
-      const right = has(['arrowright', 'd']);
-
-      if (up && down) return null;
-      if (left && right) return null;
-
-      if (up && right) return 'up-right';
-      if (down && right) return 'down-right';
-      if (up && left) return 'up-left';
-      if (down && left) return 'down-left';
-      if (up) return 'up';
-      if (down) return 'down';
-      if (left) return 'left';
-      if (right) return 'right';
-
-      return null;
     },
     dispatchMovement(direction) {
       if (!this.game || !this.game.player || !direction) {
@@ -410,25 +380,37 @@ export default {
 
       this.game.move(direction);
     },
-    ensureMovementRepeat() {
-      if (this.movementRepeatId !== null) {
+    dispatchSkill(skillId, options = {}) {
+      if (!this.game || !this.game.player || !skillId) {
         return;
       }
 
-      this.movementRepeatId = setInterval(() => {
-        const direction = this.getDirectionFromKeys();
-        if (!direction) {
-          this.clearMovementRepeat();
-          return;
-        }
+      if (options.phase === 'end') {
+        return;
+      }
 
-        this.dispatchMovement(direction);
-      }, this.movementRepeatDelay);
-    },
-    clearMovementRepeat() {
-      if (this.movementRepeatId !== null) {
-        clearInterval(this.movementRepeatId);
-        this.movementRepeatId = null;
+      const facing = options.direction
+        || (typeof this.game.getFacingDirection === 'function'
+          ? this.game.getFacingDirection()
+          : (this.game.player.animation && this.game.player.animation.direction) || 'down');
+
+      const payload = {
+        id: this.game.player.uuid,
+        skillId,
+        direction: facing,
+        issuedAt: Date.now(),
+        modifiers: options.modifiers || {},
+        phase: options.phase || 'start',
+      };
+
+      Socket.emit('player:skill:trigger', payload);
+
+      if (typeof this.game.setLocalAnimation === 'function' && payload.phase !== 'end') {
+        this.game.setLocalAnimation(options.animationState || 'attack', {
+          direction: facing,
+          skillId,
+          duration: options.duration,
+        });
       }
     },
   },

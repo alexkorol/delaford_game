@@ -12,6 +12,9 @@ import bus from './utilities/bus';
 
 import Socket from './utilities/socket';
 import MovementController from './utilities/movement-controller';
+import SpriteAnimator from './utilities/sprite-animator';
+import { PLAYER_SPRITE_CONFIG } from './config/animation';
+import { DEFAULT_FACING_DIRECTION } from 'shared/combat';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement';
 
 import Map from './map';
@@ -25,6 +28,26 @@ const directionDeltas = {
   'down-right': { x: 1, y: 1 },
   'up-left': { x: -1, y: -1 },
   'down-left': { x: -1, y: 1 },
+};
+
+const resolveFacingDirection = (direction, fallback = DEFAULT_FACING_DIRECTION) => {
+  if (!direction) {
+    return fallback;
+  }
+
+  const mapping = {
+    'up-right': 'right',
+    'down-right': 'right',
+    'up-left': 'left',
+    'down-left': 'left',
+  };
+
+  const normalised = mapping[direction] || direction;
+  if (['up', 'down', 'left', 'right'].includes(normalised)) {
+    return normalised;
+  }
+
+  return fallback;
 };
 
 const computeDurationFromDelta = (deltaX, deltaY) => {
@@ -51,6 +74,14 @@ class Client {
     const playerData = { ...data.player };
     playerData.inventory = playerData.inventory.slots;
     playerData.movement = new MovementController().initialise(playerData.x, playerData.y);
+    playerData.animation = playerData.animation
+      || this.createInitialAnimation({
+        direction: resolveFacingDirection(
+          playerData.animation && playerData.animation.direction,
+        ),
+      });
+    playerData.animationController = new SpriteAnimator(PLAYER_SPRITE_CONFIG);
+    playerData.animationController.applyServerState(playerData.animation);
 
     this.player = playerData;
     this.players = [];
@@ -135,6 +166,113 @@ class Client {
     return asset;
   }
 
+  createInitialAnimation(overrides = {}) {
+    const defaultDirection = PLAYER_SPRITE_CONFIG.defaultDirection || DEFAULT_FACING_DIRECTION;
+    return {
+      state: overrides.state || PLAYER_SPRITE_CONFIG.defaultState || 'idle',
+      direction: resolveFacingDirection(overrides.direction, defaultDirection),
+      sequence: Number.isFinite(overrides.sequence) ? overrides.sequence : 0,
+      startedAt: Number.isFinite(overrides.startedAt) ? overrides.startedAt : now(),
+      duration: Number.isFinite(overrides.duration) ? overrides.duration : 0,
+      speed: Number.isFinite(overrides.speed) ? overrides.speed : 1,
+      skillId: overrides.skillId || null,
+      holdState: overrides.holdState || null,
+    };
+  }
+
+  ensureAnimationController(actor) {
+    if (!actor) {
+      return null;
+    }
+
+    if (!actor.animation) {
+      actor.animation = this.createInitialAnimation();
+    }
+
+    if (!actor.animationController || !(actor.animationController instanceof SpriteAnimator)) {
+      actor.animationController = new SpriteAnimator(PLAYER_SPRITE_CONFIG);
+    }
+
+    actor.animationController.applyServerState(actor.animation);
+    return actor.animationController;
+  }
+
+  resolveFacing(direction, fallback = DEFAULT_FACING_DIRECTION) {
+    return resolveFacingDirection(direction, fallback);
+  }
+
+  updateActorAnimation(actor, animation, options = {}) {
+    if (!actor) {
+      return;
+    }
+
+    const controller = this.ensureAnimationController(actor);
+    if (!controller) {
+      return;
+    }
+
+    if (!animation) {
+      if (options.forceSync) {
+        actor.animation = { ...controller.toJSON() };
+      }
+      return;
+    }
+
+    const payload = { ...animation };
+    payload.direction = this.resolveFacing(
+      payload.direction || (actor.animation && actor.animation.direction),
+      this.resolveFacing(null),
+    );
+
+    const applied = controller.applyServerState(payload);
+    if (applied !== false || options.forceSync) {
+      actor.animation = { ...controller.toJSON() };
+    }
+  }
+
+  setLocalAnimation(state, options = {}) {
+    const actor = options.actor || this.getOptimisticActor();
+    if (!actor) {
+      return;
+    }
+
+    const controller = this.ensureAnimationController(actor);
+    if (!controller) {
+      return;
+    }
+
+    const direction = this.resolveFacing(
+      options.direction || (actor.animation && actor.animation.direction),
+    );
+
+    controller.setState(state, {
+      direction,
+      duration: options.duration,
+      speed: options.speed,
+      skillId: options.skillId,
+      local: true,
+    });
+
+    actor.animation = { ...controller.toJSON() };
+  }
+
+  setLocalIdle(direction = null) {
+    const actor = this.getOptimisticActor();
+    if (!actor) {
+      return;
+    }
+
+    const facing = this.resolveFacing(direction || (actor.animation && actor.animation.direction));
+    this.setLocalAnimation('idle', { actor, direction: facing });
+  }
+
+  getFacingDirection(actor = this.getOptimisticActor()) {
+    if (actor && actor.animation && actor.animation.direction) {
+      return actor.animation.direction;
+    }
+    return this.resolveFacing(null);
+  }
+
   getOptimisticActor() {
     if (this.map && this.map.player) {
       return this.map.player;
@@ -193,6 +331,8 @@ class Client {
     const targetX = baseX + delta.x;
     const targetY = baseY + delta.y;
 
+    const facing = this.resolveFacing(direction, this.getFacingDirection(actor));
+
     const step = {
       x: targetX,
       y: targetY,
@@ -205,6 +345,9 @@ class Client {
     actor.optimisticQueue.push(step);
     actor.optimisticPosition = { x: targetX, y: targetY };
     actor.optimisticTarget = { x: targetX, y: targetY };
+    actor.optimisticFacing = facing;
+
+    this.setLocalAnimation('run', { actor, direction: facing, duration: step.duration });
 
     this.startNextOptimisticStep(actor);
   }
@@ -245,6 +388,7 @@ class Client {
     }
 
     if (!Array.isArray(actor.optimisticQueue) || actor.optimisticQueue.length === 0) {
+      this.setLocalIdle();
       return;
     }
 
@@ -265,6 +409,8 @@ class Client {
         actor.optimisticScheduler = null;
         this.advanceOptimisticMovement();
       }, delay);
+    } else if (!controller.isMoving()) {
+      this.setLocalIdle(actor.optimisticFacing || this.getFacingDirection(actor));
     }
   }
 
@@ -281,6 +427,7 @@ class Client {
 
     actor.optimisticPosition = { x: actor.x, y: actor.y };
     actor.optimisticTarget = null;
+    this.setLocalIdle();
   }
 }
 

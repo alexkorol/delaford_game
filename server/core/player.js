@@ -10,6 +10,12 @@ import { v4 as uuid } from 'uuid';
 import Inventory from './utilities/common/player/inventory';
 import { wearableItems } from './data/items';
 import world from './world';
+import {
+  DEFAULT_FACING_DIRECTION,
+  DEFAULT_ANIMATION_DURATIONS,
+  DEFAULT_ANIMATION_HOLDS,
+  GLOBAL_COOLDOWN_MS,
+} from 'shared/combat';
 
 const BASE_MOVE_DURATION = 150; // ms per cardinal tile step (matches legacy timing)
 
@@ -49,6 +55,11 @@ class Player {
         crush: 0,
         range: 0,
       },
+      stance: 'neutral',
+      globalCooldown: 0,
+      sequence: 0,
+      lastSkill: null,
+      inputHistory: [],
     };
 
     // Authentication
@@ -119,6 +130,15 @@ class Player {
     // Player inventory
     this.inventory = new Inventory(data.inventory, this.socket_id);
 
+    this.facing = DEFAULT_FACING_DIRECTION;
+    this.animation = this.createInitialAnimation();
+    Object.defineProperty(this, 'animationTimer', {
+      value: null,
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+
     // Fix Skill Levels according to XP on Player constructor
     const skillsName = ['attack', 'defence', 'mining', 'smithing', 'fishing', 'cooking'];
     skillsName.forEach((skillName) => {
@@ -165,6 +185,150 @@ class Player {
     return data;
   }
 
+  createInitialAnimation(overrides = {}) {
+    const direction = this.resolveFacing(overrides.direction, DEFAULT_FACING_DIRECTION);
+    return {
+      state: overrides.state || 'idle',
+      direction,
+      sequence: Number.isFinite(overrides.sequence) ? overrides.sequence : 0,
+      startedAt: Number.isFinite(overrides.startedAt) ? overrides.startedAt : Date.now(),
+      duration: Number.isFinite(overrides.duration) ? overrides.duration : 0,
+      speed: Number.isFinite(overrides.speed) ? overrides.speed : 1,
+      skillId: overrides.skillId || null,
+      holdState: overrides.holdState || null,
+    };
+  }
+
+  resolveFacing(direction, fallback = DEFAULT_FACING_DIRECTION) {
+    if (!direction) {
+      return fallback;
+    }
+
+    const mapping = {
+      'up-right': 'right',
+      'down-right': 'right',
+      'up-left': 'left',
+      'down-left': 'left',
+    };
+
+    const candidate = mapping[direction] || direction;
+    if (['up', 'down', 'left', 'right'].includes(candidate)) {
+      return candidate;
+    }
+
+    return fallback;
+  }
+
+  setFacing(direction) {
+    this.facing = this.resolveFacing(direction, this.facing || DEFAULT_FACING_DIRECTION);
+    return this.facing;
+  }
+
+  clearAnimationTimer() {
+    if (this.animationTimer) {
+      clearTimeout(this.animationTimer);
+      this.animationTimer = null;
+    }
+  }
+
+  setAnimationState(state, options = {}) {
+    const resolvedState = state || 'idle';
+    const direction = this.resolveFacing(options.direction, this.facing || DEFAULT_FACING_DIRECTION);
+    const nowTs = Number.isFinite(options.startedAt) ? options.startedAt : Date.now();
+    const previousSequence = this.animation && typeof this.animation.sequence === 'number'
+      ? this.animation.sequence
+      : 0;
+    const sequence = Number.isFinite(options.sequence) ? options.sequence : previousSequence + 1;
+    const duration = Number.isFinite(options.duration)
+      ? options.duration
+      : (DEFAULT_ANIMATION_DURATIONS[resolvedState] || 0);
+    const holdState = options.holdState !== undefined
+      ? options.holdState
+      : (DEFAULT_ANIMATION_HOLDS[resolvedState] || null);
+
+    this.animation = {
+      state: resolvedState,
+      direction,
+      sequence,
+      startedAt: nowTs,
+      duration,
+      speed: Number.isFinite(options.speed) ? options.speed : 1,
+      skillId: options.skillId || null,
+      holdState,
+    };
+
+    this.clearAnimationTimer();
+
+    if (holdState && duration > 0 && options.autoHold !== false) {
+      this.animationTimer = setTimeout(() => {
+        if (!this.animation || this.animation.sequence !== sequence) {
+          return;
+        }
+
+        this.setAnimationState(holdState, {
+          direction,
+          sequence: sequence + 0.1,
+          startedAt: Date.now(),
+          duration: DEFAULT_ANIMATION_DURATIONS[holdState] || 0,
+          holdState: DEFAULT_ANIMATION_HOLDS[holdState] || null,
+          autoHold: false,
+        });
+        Player.broadcastAnimation(this);
+      }, duration);
+    }
+
+    return this.animation;
+  }
+
+  recordSkillInput(skillId, data = {}) {
+    if (!skillId) {
+      return false;
+    }
+
+    const nowTs = Date.now();
+    if (this.combat.globalCooldown && this.combat.globalCooldown > nowTs) {
+      return false;
+    }
+
+    const direction = this.resolveFacing(data.direction, this.facing);
+    this.setFacing(direction);
+
+    const currentSequence = Number.isFinite(this.combat.sequence) ? this.combat.sequence : 0;
+    this.combat.sequence = currentSequence + 1;
+    this.combat.globalCooldown = nowTs + GLOBAL_COOLDOWN_MS;
+    this.combat.lastSkill = {
+      id: skillId,
+      usedAt: nowTs,
+      direction,
+      modifiers: data.modifiers || {},
+      sequence: this.combat.sequence,
+    };
+
+    const windowStart = nowTs - 3000;
+    const history = Array.isArray(this.combat.inputHistory) ? this.combat.inputHistory : [];
+    this.combat.inputHistory = [
+      ...history.filter((entry) => entry && entry.usedAt && entry.usedAt >= windowStart),
+      this.combat.lastSkill,
+    ];
+
+    const animationState = data.animationState || 'attack';
+    const duration = data.duration !== undefined
+      ? data.duration
+      : (DEFAULT_ANIMATION_DURATIONS[animationState] || DEFAULT_ANIMATION_DURATIONS.attack);
+    const holdState = data.holdState !== undefined
+      ? data.holdState
+      : (DEFAULT_ANIMATION_HOLDS[animationState] || DEFAULT_ANIMATION_HOLDS.attack);
+
+    this.setAnimationState(animationState, {
+      direction,
+      duration,
+      skillId,
+      holdState,
+    });
+
+    return true;
+  }
+
   /**
    * Move the player in a direction per a tile
    *
@@ -191,6 +355,7 @@ class Player {
     }
 
     const delta = Player.directionDelta(direction);
+    const facing = this.setFacing(direction);
 
     if (!delta) {
       console.log('Nothing happened');
@@ -212,6 +377,7 @@ class Player {
         direction,
         blocked: true,
       });
+      this.setAnimationState('idle', { direction: facing });
       return false;
     }
 
@@ -227,6 +393,7 @@ class Player {
       direction,
       blocked: false,
     });
+    this.setAnimationState('run', { direction: facing, duration });
 
     return true;
   }
@@ -277,6 +444,7 @@ class Player {
     this.moving = false;
     this.queue = [];
     this.action = false;
+    this.setAnimationState('idle', { direction: this.facing });
   }
 
   static directionDelta(direction) {
@@ -426,6 +594,8 @@ class Player {
   stopMovement(data) {
     Socket.emit('player:stopped', { player: data.player });
     this.moving = false;
+    this.setAnimationState('idle', { direction: this.facing });
+    Player.broadcastAnimation(this);
   }
 
   static broadcastMovement(player, players = null) {
@@ -433,8 +603,25 @@ class Player {
       return;
     }
 
-    const meta = player.movementStep ? { movementStep: player.movementStep } : {};
+    const meta = {};
+    if (player.movementStep) {
+      meta.movementStep = player.movementStep;
+    }
+    if (player.animation) {
+      meta.animation = player.animation;
+    }
     Socket.broadcast('player:movement', player, players, { meta });
+  }
+
+  static broadcastAnimation(player, players = null) {
+    if (!player || !player.animation) {
+      return;
+    }
+
+    Socket.broadcast('player:animation', {
+      playerId: player.uuid,
+      animation: player.animation,
+    }, players);
   }
 
   /**

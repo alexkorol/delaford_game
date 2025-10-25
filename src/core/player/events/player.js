@@ -93,10 +93,17 @@ export default {
               controller.hardSync(player.x, player.y);
             }
 
-            return {
+            const newcomer = {
               ...player,
               movement: controller,
+              animationController: existing && existing.animationController,
             };
+
+            if (context.game && typeof context.game.updateActorAnimation === 'function') {
+              context.game.updateActorAnimation(newcomer, player.animation || null);
+            }
+
+            return newcomer;
           });
       }
     }, 1000);
@@ -136,6 +143,73 @@ export default {
       context.game.player.inventory = data.data.inventory.slots;
       context.game.player.wear = data.data.wear;
       context.game.player.combat = data.data.combat;
+    }
+  },
+  'player:animation': (message, context) => {
+    if (!context.game || !context.game.player) {
+      return;
+    }
+
+    const payload = message.data || {};
+    const playerId = payload.playerId || payload.uuid;
+    const animation = payload.animation || null;
+
+    if (!playerId || !animation) {
+      return;
+    }
+
+    if (context.game.player.uuid === playerId) {
+      context.game.updateActorAnimation(context.game.player, animation, { forceSync: true });
+      if (context.game.map && context.game.map.player) {
+        context.game.map.player.animation = { ...context.game.player.animation };
+        context.game.map.player.animationController = context.game.player.animationController;
+      }
+      return;
+    }
+
+    const index = (context.game.map.players || []).findIndex((p) => p.uuid === playerId);
+    if (index !== -1) {
+      const actor = context.game.map.players[index];
+      context.game.updateActorAnimation(actor, animation, { forceSync: true });
+      context.game.map.players.splice(index, 1, actor);
+    }
+  },
+  'player:combat:update': (message, context) => {
+    if (!context.game || !context.game.player) {
+      return;
+    }
+
+    const payload = message.data || {};
+    const playerId = payload.playerId || payload.uuid;
+    const combat = payload.combat || null;
+    const animation = payload.animation || null;
+
+    if (!playerId) {
+      return;
+    }
+
+    if (context.game.player.uuid === playerId) {
+      if (combat) {
+        context.game.player.combat = combat;
+      }
+      if (animation) {
+        context.game.updateActorAnimation(context.game.player, animation, { forceSync: true });
+      }
+      return;
+    }
+
+    const index = (context.game.map.players || []).findIndex((p) => p.uuid === playerId);
+    if (index !== -1) {
+      const actor = context.game.map.players[index];
+      if (combat) {
+        actor.combat = combat;
+      }
+      if (animation) {
+        context.game.updateActorAnimation(actor, animation, { forceSync: true });
+      } else {
+        context.game.ensureAnimationController(actor);
+      }
+      context.game.map.players.splice(index, 1, actor);
     }
   },
 };

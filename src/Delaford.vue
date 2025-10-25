@@ -893,6 +893,7 @@ export default {
 
       const step = payload.movementStep || null;
       const stepSequence = step && typeof step.sequence === 'number' ? step.sequence : null;
+      const animationMeta = meta.animation || payload.animation || null;
 
       const messageMeta = {
         sentAt: typeof meta.sentAt === 'number' ? meta.sentAt : null,
@@ -959,6 +960,11 @@ export default {
         Object.assign(player, payload, {
           movement: controller,
         });
+        if (animationMeta) {
+          this.game.updateActorAnimation(player, animationMeta);
+        } else {
+          this.game.ensureAnimationController(player);
+        }
         this.game.map.player = player;
       } else {
         const playerIndex = this.game.map.players.findIndex((p) => p.uuid === payload.uuid);
@@ -972,6 +978,7 @@ export default {
             movement: newcomerController,
             lastMovementSequence: stepSequence,
           };
+          this.game.updateActorAnimation(newcomer, animationMeta || payload.animation);
           this.game.map.players.push(newcomer);
           return;
         }
@@ -992,7 +999,13 @@ export default {
           lastMovementSequence: stepSequence !== null
             ? stepSequence
             : existing.lastMovementSequence,
+          animationController: existing.animationController,
         };
+        if (animationMeta) {
+          this.game.updateActorAnimation(updated, animationMeta);
+        } else {
+          this.game.ensureAnimationController(updated);
+        }
         this.$set(this.game.map.players, playerIndex, updated);
       }
     },
@@ -1005,58 +1018,8 @@ export default {
         return;
       }
 
-      const existing = new Map(
-        (this.game.map.npcs || []).map((npc, index) => {
-          const key = npc && (npc.uuid || `${npc.id}-${index}`);
-          return [key, npc];
-        }),
-      );
-
-      const movementEntries = Array.isArray(meta.movements) ? meta.movements : [];
-      const movementLookup = new Map(
-        movementEntries
-          .map((entry) => {
-            const key = entry && (entry.uuid || entry.id);
-            if (!key) {
-              return null;
-            }
-            return [key, entry.movementStep || null];
-          })
-          .filter((entry) => entry !== null),
-      );
-
-      const messageMeta = {
-        sentAt: typeof meta.sentAt === 'number' ? meta.sentAt : null,
-        receivedAt: now(),
-      };
-
-      const updated = (data || []).map((npc, index) => {
-        const key = npc && (npc.uuid || `${npc.id}-${index}`);
-        const previous = existing.get(key);
-
-        const controller = previous && previous.movement
-          ? previous.movement
-          : new MovementController().initialise(npc.x, npc.y);
-
-        const step = npc.movementStep || movementLookup.get(key) || null;
-
-        if (step) {
-          controller.applyServerStep(npc.x, npc.y, step, messageMeta);
-        } else {
-          controller.hardSync(npc.x, npc.y);
-        }
-
-        return {
-          ...npc,
-          movement: controller,
-          lastMovementSequence: step && typeof step.sequence === 'number'
-            ? step.sequence
-            : previous && previous.lastMovementSequence,
-        };
-      });
-
-      this.game.map.npcs = updated;
-      this.game.npcs = updated;
+      this.game.map.setNPCs(data, meta);
+      this.game.npcs = this.game.map.npcs;
     },
 
     /**
