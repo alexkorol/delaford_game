@@ -1,17 +1,36 @@
 <template>
-  <item-grid
+  <div
     v-if="loaded"
-    :images="game.map.images"
-    :items="items"
-    :slots="24"
-    screen="inventory"
-  />
+    class="inventory-pane"
+  >
+    <EquipmentRagdoll
+      :game="game"
+      class="inventory-pane__ragdoll"
+    />
+
+    <div class="inventory-pane__grid">
+      <item-grid
+        :images="game.map.images"
+        :items="items"
+        :slots="totalSlots"
+        screen="inventory"
+      />
+    </div>
+  </div>
 </template>
 
 <script>
 import bus from '../../core/utilities/bus';
+import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
+
+const INVENTORY_COLUMNS = 12;
+const INVENTORY_ROWS = 7;
 
 export default {
+  name: 'InventoryPane',
+  components: {
+    EquipmentRagdoll,
+  },
   props: {
     game: {
       type: Object,
@@ -24,11 +43,11 @@ export default {
     };
   },
   computed: {
-    images() {
-      return this.game.map.images;
-    },
     items() {
       return this.game.player.inventory;
+    },
+    totalSlots() {
+      return INVENTORY_COLUMNS * INVENTORY_ROWS;
     },
   },
   created() {
@@ -49,20 +68,24 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-div.inventory_slot {
+.inventory-pane {
   display: grid;
-  height: 100%;
-  grid-template-columns: repeat(4, 35px);
-  grid-template-rows: repeat(6, 35px);
-  grid-gap: 5px;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
 
-  div.slot {
-    cursor: pointer;
-    width: 32px;
-    height: 32px;
-    margin: 1px 0 0 1px;
-    text-align: center;
-    background-color: transparent;
+  &__ragdoll {
+    min-width: 190px;
+  }
+
+  &__grid {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.65);
   }
 }
 </style>

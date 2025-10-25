@@ -51,7 +51,7 @@ const config = {
   },
   player: {
     slots: {
-      inventory: 24,
+      inventory: 84,
       bank: 200,
       trade: 16,
     },

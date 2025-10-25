@@ -189,9 +189,14 @@ div.slots {
 
   div.pane {
     background: $main_bg_color;
-    height: 235px;
-    width: 155px;
-    padding: 5px;
+    min-height: 260px;
+    width: max-content;
+    max-width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
   }
 }
 </style>

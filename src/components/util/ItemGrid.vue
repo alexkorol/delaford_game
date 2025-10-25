@@ -7,6 +7,7 @@
     <div
       v-for="(n, i) in (0, slots)"
       :key="i"
+      class="grid_cell"
     >
       <div
         v-if="slotHasItem(i)"
@@ -26,6 +27,10 @@
           v-text="getItemFromSlot(i).qty"
         />
       </div>
+      <div
+        v-else
+        :class="`slot empty ${gridData(screen).classId}`"
+      />
     </div>
   </div>
 </template>
@@ -65,9 +70,10 @@ export default {
       return document.querySelector('.bankSlot');
     },
     slotColumnRows() {
+      const grid = this.gridData(this.screen);
       return {
-        'grid-template-columns': '35px '.repeat(this.gridData(this.screen).columns),
-        'grid-template-rows': '35px '.repeat(this.gridData(this.screen).rows),
+        'grid-template-columns': `repeat(${grid.columns}, 35px)`,
+        'grid-template-rows': `repeat(${grid.rows}, 35px)`,
       };
     },
   },
@@ -171,8 +177,8 @@ export default {
           classId: 'anvilSlot',
         },
         inventory: {
-          columns: 4,
-          rows: 6,
+          columns: 12,
+          rows: 7,
           classId: 'inventorySlot',
         },
         bank: {
@@ -287,13 +293,18 @@ $default_color: #383838;
 
 div.grid_container {
   display: grid;
-  height: 275px;
+  height: auto;
+  max-height: 320px;
   overflow-y: auto;
   box-sizing: border-box;
   font-family: "GameFont", serif;
-  grid-template-rows: repeat(6, 35px);
   grid-gap: 5px;
   overflow-x: hidden;
+
+  .grid_cell {
+    width: 35px;
+    height: 35px;
+  }
 
   &::-webkit-scrollbar-track {
     background-color: transparent;
@@ -318,6 +329,11 @@ div.grid_container {
     margin: 1px 0 0 1px;
     text-align: center;
     background-color: transparent;
+
+    &.empty {
+      background: rgba(0, 0, 0, 0.15);
+      border: 1px dashed rgba(255, 255, 255, 0.05);
+    }
 
     .qty {
       font-size: 10px;
