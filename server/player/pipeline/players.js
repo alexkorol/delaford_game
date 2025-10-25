@@ -27,7 +27,12 @@ export default {
     const getRealPlacement = world.players[playerIndex].inventory.slots.findIndex(i => item.uuid === i.uuid);
     world.players[playerIndex].inventory.slots.splice(getRealPlacement, 1);
 
-    world.players[playerIndex].combat = Wear.updateCombat(playerIndex);
+    const combatStats = Wear.updateCombat(playerIndex);
+    world.players[playerIndex].combat = {
+      ...world.players[playerIndex].combat,
+      attack: combatStats.attack,
+      defense: combatStats.defense,
+    };
     Socket.broadcast('player:equippedAnItem', world.players[playerIndex]);
   },
 
@@ -63,7 +68,12 @@ export default {
 
       world.players[playerIndex].wear[getItem.slot] = null;
 
-      world.players[playerIndex].combat = Wear.updateCombat(playerIndex, true);
+      const combatStats = Wear.updateCombat(playerIndex, true);
+      world.players[playerIndex].combat = {
+        ...world.players[playerIndex].combat,
+        attack: combatStats.attack,
+        defense: combatStats.defense,
+      };
 
       Socket.broadcast('player:unequippedAnItem', world.players[playerIndex]);
       resolve(200);

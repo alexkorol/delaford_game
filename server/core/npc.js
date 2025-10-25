@@ -1,6 +1,11 @@
 import Socket from '@server/socket';
 import UI from 'shared/ui';
 import * as emoji from 'node-emoji';
+import {
+  DEFAULT_FACING_DIRECTION,
+  DEFAULT_ANIMATION_DURATIONS,
+  DEFAULT_ANIMATION_HOLDS,
+} from 'shared/combat';
 import npcs from './data/npcs';
 import world from './world';
 
@@ -57,6 +62,77 @@ class NPC {
       direction: null,
       blocked: false,
     };
+
+    this.facing = DEFAULT_FACING_DIRECTION;
+    this.animation = this.createInitialAnimation();
+  }
+
+  resolveFacing(direction, fallback = DEFAULT_FACING_DIRECTION) {
+    if (!direction) {
+      return fallback;
+    }
+
+    const mapping = {
+      'up-right': 'right',
+      'down-right': 'right',
+      'up-left': 'left',
+      'down-left': 'left',
+    };
+
+    const candidate = mapping[direction] || direction;
+    if (['up', 'down', 'left', 'right'].includes(candidate)) {
+      return candidate;
+    }
+
+    return fallback;
+  }
+
+  setFacing(direction) {
+    this.facing = this.resolveFacing(direction, this.facing || DEFAULT_FACING_DIRECTION);
+    return this.facing;
+  }
+
+  createInitialAnimation(overrides = {}) {
+    const direction = this.resolveFacing(overrides.direction, DEFAULT_FACING_DIRECTION);
+    return {
+      state: overrides.state || 'idle',
+      direction,
+      sequence: Number.isFinite(overrides.sequence) ? overrides.sequence : 0,
+      startedAt: Number.isFinite(overrides.startedAt) ? overrides.startedAt : Date.now(),
+      duration: Number.isFinite(overrides.duration) ? overrides.duration : 0,
+      speed: Number.isFinite(overrides.speed) ? overrides.speed : 1,
+      skillId: overrides.skillId || null,
+      holdState: overrides.holdState || null,
+    };
+  }
+
+  setAnimationState(state, options = {}) {
+    const resolvedState = state || 'idle';
+    const direction = this.setFacing(options.direction);
+    const nowTs = Number.isFinite(options.startedAt) ? options.startedAt : Date.now();
+    const previousSequence = this.animation && typeof this.animation.sequence === 'number'
+      ? this.animation.sequence
+      : 0;
+    const sequence = Number.isFinite(options.sequence) ? options.sequence : previousSequence + 1;
+    const duration = Number.isFinite(options.duration)
+      ? options.duration
+      : (DEFAULT_ANIMATION_DURATIONS[resolvedState] || 0);
+    const holdState = options.holdState !== undefined
+      ? options.holdState
+      : (DEFAULT_ANIMATION_HOLDS[resolvedState] || null);
+
+    this.animation = {
+      state: resolvedState,
+      direction,
+      sequence,
+      startedAt: nowTs,
+      duration,
+      speed: Number.isFinite(options.speed) ? options.speed : 1,
+      skillId: options.skillId || null,
+      holdState,
+    };
+
+    return this.animation;
   }
 
   /**
@@ -160,6 +236,23 @@ class NPC {
           blocked: action === 'move' && blockedAttempt && !moved,
         };
 
+        if (directionTaken) {
+          npc.setFacing(directionTaken);
+        }
+
+        if (moved && directionTaken) {
+          npc.setAnimationState('run', {
+            direction: directionTaken,
+            duration,
+            startedAt,
+          });
+        } else {
+          npc.setAnimationState('idle', {
+            direction: directionTaken || npc.facing,
+            startedAt,
+          });
+        }
+
         // Register their last action
         npc.lastAction = startedAt;
       }
@@ -172,6 +265,11 @@ class NPC {
         id: npc.id,
         uuid: npc.uuid || null,
         movementStep: npc.movementStep,
+      })),
+      animations: world.npcs.map((npc) => ({
+        id: npc.id,
+        uuid: npc.uuid || null,
+        animation: npc.animation || null,
       })),
     };
 

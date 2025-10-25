@@ -5,6 +5,8 @@ import blockedMouse from '@/assets/graphics/ui/mouse/blocked.png';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
 import bus from './utilities/bus';
 import MovementController, { centerOfTile } from './utilities/movement-controller';
+import SpriteAnimator from './utilities/sprite-animator';
+import { PLAYER_SPRITE_CONFIG } from './config/animation';
 import { now } from './config/movement';
 
 const INITIAL_VIEWPORT = {
@@ -84,6 +86,32 @@ class Map {
     this.setDroppedItems(data.droppedItems);
   }
 
+  ensureAnimation(actor) {
+    if (!actor) {
+      return null;
+    }
+
+    if (!actor.animation) {
+      actor.animation = {
+        state: PLAYER_SPRITE_CONFIG.defaultState || 'idle',
+        direction: PLAYER_SPRITE_CONFIG.defaultDirection || 'down',
+        sequence: 0,
+        startedAt: now(),
+        duration: 0,
+        speed: 1,
+        skillId: null,
+        holdState: null,
+      };
+    }
+
+    if (!actor.animationController || !(actor.animationController instanceof SpriteAnimator)) {
+      actor.animationController = new SpriteAnimator(PLAYER_SPRITE_CONFIG);
+    }
+
+    actor.animationController.applyServerState(actor.animation);
+    return actor.animationController;
+  }
+
   getViewportMetrics() {
     const { viewport, tileset } = this.config.map;
     return {
@@ -122,6 +150,13 @@ class Map {
 
       this.camera.offsetX = offsetX;
       this.camera.offsetY = offsetY;
+
+      if (this.player.animationController) {
+        this.player.animationController.update(deltaSeconds);
+        this.player.animation = { ...this.player.animationController.toJSON() };
+      } else {
+        this.ensureAnimation(this.player);
+      }
     } else {
       this.camera.offsetX = 0;
       this.camera.offsetY = 0;
@@ -132,6 +167,13 @@ class Map {
         if (player.movement) {
           player.movement.update();
         }
+
+        if (player.animationController) {
+          player.animationController.update(deltaSeconds);
+          player.animation = { ...player.animationController.toJSON() };
+        } else {
+          this.ensureAnimation(player);
+        }
       });
     }
 
@@ -139,6 +181,13 @@ class Map {
       this.npcs.forEach((npc) => {
         if (npc.movement) {
           npc.movement.update();
+        }
+
+        if (npc.animationController) {
+          npc.animationController.update(deltaSeconds);
+          npc.animation = { ...npc.animationController.toJSON() };
+        } else {
+          this.ensureAnimation(npc);
         }
       });
     }
@@ -165,11 +214,18 @@ class Map {
       controller.hardSync(player.x, player.y);
     }
 
+    const animator = player.animationController
+      || (existing && existing.animationController)
+      || null;
+
     this.player = {
       ...(existing || {}),
       ...player,
       movement: controller,
+      animationController: animator,
     };
+
+    this.ensureAnimation(this.player);
   }
 
   /**
@@ -203,6 +259,19 @@ class Map {
         .filter((entry) => entry !== null),
     );
 
+    const animationEntries = Array.isArray(meta.animations) ? meta.animations : [];
+    const animationLookup = new window.Map(
+      animationEntries
+        .map((entry) => {
+          const key = entry && (entry.uuid || entry.id);
+          if (!key) {
+            return null;
+          }
+          return [key, entry.animation || null];
+        })
+        .filter((entry) => entry !== null),
+    );
+
     this.npcs = (npcs || []).map((npc) => {
       const key = npc && (npc.uuid || npc.id);
       const previous = key ? existing.get(key) : null;
@@ -211,6 +280,10 @@ class Map {
         : new MovementController().initialise(npc.x, npc.y);
 
       const step = npc.movementStep || movementLookup.get(key) || null;
+      const animation = npc.animation
+        || animationLookup.get(key)
+        || (previous && previous.animation)
+        || null;
 
       if (step) {
         controller.applyServerStep(npc.x, npc.y, step, {
@@ -221,10 +294,19 @@ class Map {
         controller.hardSync(npc.x, npc.y);
       }
 
-      return {
+      const animator = npc.animationController
+        || (previous && previous.animationController)
+        || null;
+
+      const updated = {
         ...npc,
         movement: controller,
+        animationController: animator,
+        animation,
       };
+
+      this.ensureAnimation(updated);
+      return updated;
     });
   }
 
@@ -564,19 +646,25 @@ class Map {
     }
 
     const center = this.getViewportCenter();
-    const drawX = Math.round(center.x - 16);
-    const drawY = Math.round(center.y - 16);
+    const tileSize = this.config.map.tileset.tile.width;
+    const drawX = Math.round(center.x - (tileSize / 2));
+    const drawY = Math.round(center.y - (tileSize / 2));
+
+    const animator = this.ensureAnimation(this.player);
+    const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
+    const sourceX = frame.column * tileSize;
+    const sourceY = frame.row * tileSize;
 
     ctx.drawImage(
       this.images.playerImage,
-      0,
-      0,
-      32,
-      32,
+      sourceX,
+      sourceY,
+      tileSize,
+      tileSize,
       drawX,
       drawY,
-      32,
-      32,
+      tileSize,
+      tileSize,
     );
   }
 
@@ -614,10 +702,15 @@ class Map {
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
+      const animator = this.ensureAnimation(player);
+      const frame = animator ? animator.getCurrentFrame() : { column: 0, row: 0 };
+      const sourceX = frame.column * tileSize;
+      const sourceY = frame.row * tileSize;
+
       ctx.drawImage(
         this.images.playerImage,
-        0,
-        0,
+        sourceX,
+        sourceY,
         tileSize,
         tileSize,
         screenPosition.x,
@@ -662,11 +755,16 @@ class Map {
 
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
-      // Paint the NPC on map
+      const animator = this.ensureAnimation(npc);
+      const frame = animator ? animator.getCurrentFrame() : null;
+      const fallbackColumn = Number.isFinite(npc.column) ? npc.column : 0;
+      const sourceX = frame ? frame.column * tileSize : (fallbackColumn * tileSize);
+      const sourceY = frame ? frame.row * tileSize : 0;
+
       ctx.drawImage(
         this.images.npcsImage,
-        (npc.column * 32), // Number in NPC tileset
-        0, // Y-axis always 0
+        sourceX,
+        sourceY,
         tileSize,
         tileSize,
         screenPosition.x,

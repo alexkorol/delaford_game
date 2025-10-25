@@ -85,6 +85,34 @@ export default {
     Player.broadcastMovement(player);
   },
 
+  'player:skill:trigger': (data) => {
+    const payload = data.data || {};
+    const playerIndex = world.players.findIndex(player => player.uuid === payload.id);
+    if (playerIndex === -1) {
+      return;
+    }
+
+    const player = world.players[playerIndex];
+    const triggered = player.recordSkillInput(payload.skillId, {
+      direction: payload.direction,
+      modifiers: payload.modifiers,
+      animationState: payload.animationState,
+      duration: payload.duration,
+      holdState: payload.holdState,
+    });
+
+    if (!triggered) {
+      return;
+    }
+
+    Player.broadcastAnimation(player);
+    Socket.broadcast('player:combat:update', {
+      playerId: player.uuid,
+      combat: player.combat,
+      animation: player.animation,
+    });
+  },
+
   /**
    * Queue up an player action to executed they reach their destination
    */
