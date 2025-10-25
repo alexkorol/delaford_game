@@ -138,7 +138,7 @@ class UI {
     let slotPosition = false;
 
     const slotsAvailable = {
-      inventory: 24,
+      inventory: 84,
       bank: 200,
     };
 
