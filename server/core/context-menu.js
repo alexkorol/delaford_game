@@ -193,9 +193,12 @@ class ContextMenu {
       itemSource[this.context[3]] ||
       this.currentPaneData ||
       this.player.inventory.slots;
-    let itemActedOn =
+    const selectedItem =
       itemsToSearch.find((s) => s.slot === this.miscData.slot) ||
       itemsToSearch[this.miscData.slot];
+    const dynamicItem = typeof selectedItem === 'object' ? selectedItem : null;
+
+    let itemActedOn = selectedItem;
     /* eslint-enable */
 
     if (typeof itemActedOn === 'object') {
@@ -238,11 +241,15 @@ class ContextMenu {
     case 'player:inventory-drop':
       if (this.clickedOn('inventorySlot')) {
         if (this.isFromInventory()) {
-          const {
-            actions, name, context, uuid, id,
-          } = Query.getItemData(
+          const baseData = Query.getItemData(
             itemActedOn,
           );
+          const {
+            actions, name, context, uuid, id,
+          } = baseData;
+          const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
+          const referenceUuid = dynamicItem && dynamicItem.uuid ? dynamicItem.uuid : uuid;
+          const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
 
           const color = UI.getContextSubjectColor(context);
 
@@ -250,12 +257,12 @@ class ContextMenu {
             items.push({
               label: `${
                 action.name
-              } <span style='color:${color}'>${name}</span>`,
+              } <span style='color:${color}'>${displayName}</span>`,
               action,
               type: 'item',
               miscData: this.miscData,
-              uuid,
-              id,
+              uuid: referenceUuid,
+              id: referenceId,
             });
           }
         }
@@ -265,12 +272,14 @@ class ContextMenu {
       // Take item from floor
     case 'player:take':
       getItems.forEach((item) => {
+        const combined = Object.assign(
+          {},
+          Query.getItemData(item.id),
+          item,
+        );
         const {
           actions, name, x, y, id, uuid, timestamp,
-        } = Object.assign(
-          item,
-          Query.getItemData(item.id),
-        );
+        } = combined;
 
         const color = UI.getContextSubjectColor(item.context);
 
@@ -296,11 +305,15 @@ class ContextMenu {
       // Equip item from inventory
     case 'item:equip':
       if (this.clickedOn('inventorySlot') && this.isFromInventory()) {
-        const {
-          actions, context, name, uuid, id,
-        } = Query.getItemData(
+        const baseData = Query.getItemData(
           itemActedOn,
         );
+        const {
+          actions, context, name, uuid, id,
+        } = baseData;
+        const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
+        const referenceUuid = dynamicItem && dynamicItem.uuid ? dynamicItem.uuid : uuid;
+        const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
 
         const color = UI.getContextSubjectColor(context);
 
@@ -308,12 +321,12 @@ class ContextMenu {
           items.push({
             label: `${
               action.name
-            } <span style='color:${color}'>${name}</span>`,
+            } <span style='color:${color}'>${displayName}</span>`,
             action,
             type: 'item',
             miscData: this.miscData,
-            uuid,
-            id,
+            uuid: referenceUuid,
+            id: referenceId,
           });
         }
       }
@@ -383,12 +396,14 @@ class ContextMenu {
         });
 
         getItems.forEach((item) => {
+          const combined = Object.assign(
+            {},
+            Query.getItemData(item.id),
+            item,
+          );
           const {
             name, examine, id, actions, timestamp,
-          } = Object.assign(
-            item,
-            Query.getItemData(item.id),
-          );
+          } = combined;
 
           const color = UI.getContextSubjectColor(item.context);
 
@@ -406,11 +421,15 @@ class ContextMenu {
       }
 
       if (this.isFromInventory()) {
-        const {
-          name, examine, id, context, actions,
-        } = Query.getItemData(
+        const baseData = Query.getItemData(
           itemActedOn,
         );
+        const {
+          name, examine, id, context, actions,
+        } = baseData;
+        const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
+        const displayExamine = dynamicItem && dynamicItem.examine ? dynamicItem.examine : examine;
+        const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
 
         const color = UI.getContextSubjectColor(context);
 
@@ -418,11 +437,11 @@ class ContextMenu {
           items.push({
             label: `${
               action.name
-            } <span style='color:${color}'>${name}</span>`,
+            } <span style='color:${color}'>${displayName}</span>`,
             action,
-            examine,
+            examine: displayExamine,
             type: 'item',
-            id,
+            id: referenceId,
           });
         }
       }

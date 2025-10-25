@@ -1,7 +1,7 @@
 import Socket from '@server/socket';
 import UI from 'shared/ui';
-import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
+import ItemFactory from '@server/core/items/factory';
 
 export default class Skill {
   constructor(playerIndex) {
@@ -51,13 +51,16 @@ export default class Skill {
     // Do we have an open slot for the newly-mined resource?
     if (openSlot === false) {
       // If not, we let it fall on the ground
-      world.items.push({
-        id: getItem.id,
-        uuid: uuid(),
-        x: world.players[this.playerIndex].x,
-        y: world.players[this.playerIndex].y,
-        timestamp: Date.now(),
-      });
+      const dropped = ItemFactory.toWorldInstance(
+        ItemFactory.createById(getItem.id),
+        {
+          x: world.players[this.playerIndex].x,
+          y: world.players[this.playerIndex].y,
+        },
+        { timestamp: Date.now() },
+      );
+
+      world.items.push(dropped);
 
       Socket.broadcast('world:itemDropped', world.items);
     } else {

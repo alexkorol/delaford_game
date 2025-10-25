@@ -1,7 +1,7 @@
 import { addHours, addMinutes, addSeconds } from 'date-fns';
-import { v4 as uuid } from 'uuid';
 
 import Socket from '@server/socket';
+import ItemFactory from './items/factory';
 import world from './world';
 
 class Item {
@@ -49,14 +49,15 @@ class Item {
     if (itemsWaitingToRespawn.length) {
       itemsWaitingToRespawn.forEach((item) => {
         if (Item.itemAlreadyPlaced(item) === undefined) {
-          world.items.push({
-            id: item.id,
-            uuid: uuid(),
-            x: item.x,
-            y: item.y,
-            respawn: true,
-            timestamp: Date.now(),
-          });
+          const baseItem = ItemFactory.createById(item.id);
+          const respawned = ItemFactory.toWorldInstance(
+            baseItem || { id: item.id },
+            { x: item.x, y: item.y },
+            { respawn: true },
+          );
+
+          respawned.respawnIn = item.respawnIn;
+          world.items.push(respawned);
 
           Socket.broadcast('world:itemDropped', world.items);
 

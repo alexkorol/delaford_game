@@ -3,6 +3,7 @@ import UI from 'shared/ui';
 import { wearableItems } from '@server/core/data/items';
 import world from '@server/core/world';
 import Wear from '@server/core/utilities/wear';
+import ItemFactory from '@server/core/items/factory';
 
 export default {
   /**
@@ -11,29 +12,35 @@ export default {
    * @param {object} data Item you are equipping
    */
   equippedAnItem(data) {
-    const equippingItem = data.player.inventory.slots.find(s => s.slot === data.item.miscData.slot);
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
-    const getItem = wearableItems.find(i => i.id === data.item.id);
+    const player = world.players[playerIndex];
+    const equippingItem = player.inventory.slots.find(s => s.slot === data.item.miscData.slot);
+    const baseItem = wearableItems.find(i => i.id === data.item.id) || equippingItem;
 
-    const item = {
-      name: getItem.name,
-      graphics: getItem.graphics,
-      id: getItem.id,
-      uuid: equippingItem.uuid,
-    };
+    if (!equippingItem || !baseItem) {
+      return;
+    }
 
-    world.players[playerIndex].wear[getItem.slot] = item;
-    // eslint-disable-next-line
-    const getRealPlacement = world.players[playerIndex].inventory.slots.findIndex(i => item.uuid === i.uuid);
-    world.players[playerIndex].inventory.slots.splice(getRealPlacement, 1);
+    const wearItem = ItemFactory.adoptExisting(equippingItem, { baseItem });
+    wearItem.graphics = equippingItem.graphics || baseItem.graphics;
+    wearItem.name = equippingItem.name || baseItem.name;
+    wearItem.id = equippingItem.id || baseItem.id;
+    wearItem.slotType = baseItem.slot;
+
+    player.wear[baseItem.slot] = wearItem;
+
+    const inventoryIndex = player.inventory.slots.findIndex(i => i.uuid === wearItem.uuid);
+    if (inventoryIndex > -1) {
+      player.inventory.slots.splice(inventoryIndex, 1);
+    }
 
     const combatStats = Wear.updateCombat(playerIndex);
-    world.players[playerIndex].combat = {
-      ...world.players[playerIndex].combat,
+    player.combat = {
+      ...player.combat,
       attack: combatStats.attack,
       defense: combatStats.defense,
     };
-    Socket.broadcast('player:equippedAnItem', world.players[playerIndex]);
+    Socket.broadcast('player:equippedAnItem', player);
   },
 
   /**
@@ -44,38 +51,41 @@ export default {
   unequipItem(data) {
     return new Promise((resolve) => {
       const playerIndex = world.players.findIndex(p => p.uuid === data.id);
-      const getItem = wearableItems.find(i => i.id === data.item.id);
+      const player = world.players[playerIndex];
+      const baseItem = wearableItems.find(i => i.id === data.item.id);
 
-      const item = {
-        slot: UI.getOpenSlot(world.players[playerIndex].inventory.slots),
-        id: getItem.id,
-        graphics: getItem.graphics,
-        uuid: world.players[playerIndex].wear[getItem.slot].uuid,
-      };
-
-      // If we are replacing an item (because we are equipping while wielding)
-      // and the slot from where the item was equipped is less than the first
-      // slot available, then let us unequip to that slot.
-      if (data.replacing && UI.isNumeric(item.slot) && item.slot >= data.item.slot) {
-        item.slot = data.item.slot;
+      if (!baseItem) {
+        resolve(400);
+        return;
       }
 
-      world.players[playerIndex].inventory.add(
-        getItem.id,
-        1,
-        world.players[playerIndex].wear[getItem.slot].uuid,
-      );
+      const equipped = player.wear[baseItem.slot];
+      if (!equipped) {
+        resolve(400);
+        return;
+      }
 
-      world.players[playerIndex].wear[getItem.slot] = null;
+      const slot = UI.getOpenSlot(player.inventory.slots);
+      const targetSlot = (data.replacing && UI.isNumeric(slot) && slot >= data.item.slot)
+        ? data.item.slot
+        : slot;
 
-      const combatStats = Wear.updateCombat(playerIndex, true);
-      world.players[playerIndex].combat = {
-        ...world.players[playerIndex].combat,
+      const inventoryItem = ItemFactory.adoptExisting(equipped, { baseItem });
+      inventoryItem.slot = targetSlot;
+      inventoryItem.context = 'item';
+
+      player.inventory.slots.push(inventoryItem);
+
+      player.wear[baseItem.slot] = null;
+
+      const combatStats = Wear.updateCombat(playerIndex);
+      player.combat = {
+        ...player.combat,
         attack: combatStats.attack,
         defense: combatStats.defense,
       };
 
-      Socket.broadcast('player:unequippedAnItem', world.players[playerIndex]);
+      Socket.broadcast('player:unequippedAnItem', player);
       resolve(200);
     });
   },
