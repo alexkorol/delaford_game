@@ -40,6 +40,9 @@ export default {
       attack: combatStats.attack,
       defense: combatStats.defense,
     };
+    if (typeof player.refreshDerivedStats === 'function') {
+      player.refreshDerivedStats();
+    }
     Socket.broadcast('player:equippedAnItem', player);
   },
 
@@ -84,6 +87,10 @@ export default {
         attack: combatStats.attack,
         defense: combatStats.defense,
       };
+
+      if (typeof player.refreshDerivedStats === 'function') {
+        player.refreshDerivedStats();
+      }
 
       Socket.broadcast('player:unequippedAnItem', player);
       resolve(200);

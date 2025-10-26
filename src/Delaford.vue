@@ -380,12 +380,25 @@ export default {
       };
 
       const stats = player.stats || {};
-      const hpSource = player.hp || player.health || stats.hp;
-      const mpSource = player.mp || player.mana || stats.mp;
+      const resources = stats.resources || {};
+      const hpSource = player.hp || player.health || resources.health || stats.hp;
+      const mpSource = player.mp || player.mana || resources.mana || stats.mp;
+
+      const hpMax = resources.health && Number.isFinite(resources.health.max)
+        ? resources.health.max
+        : stats.hp && stats.hp.max
+          ? stats.hp.max
+          : 0;
+
+      const mpMax = resources.mana && Number.isFinite(resources.mana.max)
+        ? resources.mana.max
+        : stats.mp && stats.mp.max
+          ? stats.mp.max
+          : 0;
 
       return {
-        hp: normaliseMeter(hpSource, stats.hp && stats.hp.max ? stats.hp.max : 0),
-        mp: normaliseMeter(mpSource, stats.mp && stats.mp.max ? stats.mp.max : 0),
+        hp: normaliseMeter(hpSource, hpMax),
+        mp: normaliseMeter(mpSource, mpMax),
       };
     },
     chatExpanded() {

@@ -7,6 +7,17 @@ import config from '@server/config';
 import * as emoji from 'node-emoji';
 import playerEvent from '@server/player/handlers/actions';
 import { v4 as uuid } from 'uuid';
+import {
+  ATTRIBUTE_IDS,
+  createAttributeMap,
+  createCharacterState,
+  aggregateAttributes,
+  computeResources,
+  applyDamage as applyStatDamage,
+  applyHealing as applyStatHealing,
+  tryRespawn as tryStatRespawn,
+  syncShortcuts,
+} from 'shared/stats';
 import Inventory from './utilities/common/player/inventory';
 import { wearableItems } from './data/items';
 import world from './world';
@@ -33,10 +44,8 @@ class Player {
     this.y = data.y;
     this.level = data.level;
     this.skills = data.skills;
-    this.hp = {
-      current: data.hp.current,
-      max: data.hp.max,
-    };
+
+    this.buildInitialStats(data);
 
     // A player's bank
     this.bank = data.bank;
@@ -71,6 +80,8 @@ class Player {
     // Tabs
     this.friend_list = data.friend_list;
     this.wear = Player.constructWear(data.wear);
+
+    this.refreshDerivedStats();
 
     // Pathfinding
     this.path = {
@@ -152,6 +163,133 @@ class Player {
         this.x
       }, ${this.y})`,
     );
+  }
+
+  buildInitialStats(data = {}) {
+    const attributeSources = {
+      base: data.attributes && data.attributes.base
+        ? data.attributes.base
+        : data.baseAttributes,
+      bonuses: data.attributes && data.attributes.bonuses
+        ? data.attributes.bonuses
+        : data.attributeBonuses,
+      equipment: data.attributes && data.attributes.equipment
+        ? data.attributes.equipment
+        : data.equipmentAttributes,
+    };
+
+    const resourceOverrides = {
+      health: (data.resources && data.resources.health) || data.hp || {},
+      mana: (data.resources && data.resources.mana) || data.mana || {},
+    };
+
+    const lifecycle = data.lifecycle || {};
+
+    this.stats = createCharacterState({
+      level: this.level,
+      attributes: attributeSources,
+      resources: resourceOverrides,
+      lifecycle,
+    });
+
+    syncShortcuts(this.stats, this);
+    return this.stats;
+  }
+
+  getEquipmentAttributeTotals() {
+    const totals = createAttributeMap(0);
+
+    if (!this.wear) {
+      return totals;
+    }
+
+    Object.values(this.wear).forEach((item) => {
+      if (!item || !item.attributes) {
+        return;
+      }
+
+      ATTRIBUTE_IDS.forEach((attributeId) => {
+        const value = Number(item.attributes[attributeId]);
+        if (Number.isFinite(value)) {
+          totals[attributeId] += value;
+        }
+      });
+    });
+
+    return totals;
+  }
+
+  refreshDerivedStats(overrides = {}) {
+    if (!this.stats) {
+      this.buildInitialStats({});
+    }
+
+    const existingSources = (this.stats && this.stats.attributes && this.stats.attributes.sources) || {};
+
+    const baseSource = overrides.base || existingSources.base || {};
+    const bonusSource = overrides.bonuses || existingSources.bonuses || {};
+    const equipmentSource = overrides.equipment || this.getEquipmentAttributeTotals();
+
+    const aggregated = aggregateAttributes({
+      base: baseSource,
+      bonuses: bonusSource,
+      equipment: equipmentSource,
+    });
+
+    const healthOverride = {
+      current: this.hp && this.hp.current !== undefined ? this.hp.current : undefined,
+      max: this.hp && this.hp.max !== undefined ? this.hp.max : undefined,
+    };
+    if (healthOverride.current === 0) {
+      healthOverride.allowZero = true;
+    }
+
+    const manaOverride = {
+      current: this.mana && this.mana.current !== undefined ? this.mana.current : undefined,
+      max: this.mana && this.mana.max !== undefined ? this.mana.max : undefined,
+    };
+
+    const resources = computeResources(
+      { level: this.level, attributes: aggregated.total },
+      { health: healthOverride, mana: manaOverride },
+    );
+
+    this.stats.level = this.level;
+    this.stats.attributes = aggregated;
+    this.stats.resources = resources;
+
+    syncShortcuts(this.stats, this);
+    return this.stats;
+  }
+
+  applyDamage(amount, options = {}) {
+    if (!this.stats) {
+      this.buildInitialStats({});
+    }
+
+    const result = applyStatDamage(this.stats, amount, options);
+    syncShortcuts(this.stats, this);
+    return result;
+  }
+
+  applyHealing(amount, options = {}) {
+    if (!this.stats) {
+      this.buildInitialStats({});
+    }
+
+    const result = applyStatHealing(this.stats, amount, options);
+    syncShortcuts(this.stats, this);
+    return result;
+  }
+
+  tryRespawn(options = {}) {
+    if (!this.stats) {
+      this.buildInitialStats({});
+    }
+
+    const result = tryStatRespawn(this.stats, options);
+    syncShortcuts(this.stats, this);
+    return result;
   }
 
   /**
