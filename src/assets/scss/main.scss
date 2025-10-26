@@ -1,7 +1,13 @@
-// Game Stylesheet
 @charset 'utf-8';
 
-// Import SCSS
-@use './typography/fonts' as *;
-@use './typography/sizes' as *;
-@use './elements/form' as *;
+@use './abstracts/tokens';
+@use './abstracts/breakpoints';
+@use './abstracts/mixins';
+@use './base/globals';
+@use './typography/fonts';
+@use './typography/sizes';
+@use './elements/form';
+
+:root {
+  --chat-width: clamp(260px, 22vw, 360px);
+}

@@ -1,18 +1,26 @@
-@use 'sass:color';
-@use './colors' as *;
+@use '@/assets/scss/abstracts/tokens' as *;
 
 .button {
-  $background_color: grey;
-  $text_color: color.adjust(orange, $lightness: 5%);
-
-  background-color: color.adjust($background_color, $lightness: -5%);
-  border: 2px solid color.adjust($background_color, $lightness: -25%);
-  text-shadow: 1px 1px 0 #000;
-  outline: none;
-  cursor: pointer;
-  padding: 1px 6px 0 6px;
-  color: $text_color;
-  margin: 0;
-  font-size: 15px;
+  appearance: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--color-border-strong);
+  background: linear-gradient(180deg, rgba(80, 110, 168, 0.85), rgba(40, 62, 112, 0.95));
+  color: var(--color-text-primary);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
   font-family: 'UIFont', serif;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, border-color 140ms ease-out;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: var(--shadow-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-accent-strong);
+    outline-offset: 2px;
+  }
 }

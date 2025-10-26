@@ -1,0 +1,12 @@
+@use 'sass:math';
+
+@mixin fluid-size($property, $min, $max, $viewport-min: 320px, $viewport-max: 1440px) {
+  #{$property}: clamp($min, calc(#{$min} + (#{$max} - #{$min}) * ((100vw - #{$viewport-min}) / (#{$viewport-max} - #{$viewport-min}))), $max);
+}
+
+@mixin glass-panel($background: rgba(18, 24, 40, 0.78)) {
+  background: $background;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px);
+}

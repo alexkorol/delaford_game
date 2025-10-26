@@ -1,0 +1,32 @@
+@use 'sass:string';
+
+$breakpoints: (
+  'mobile': 0,
+  'tablet': 768px,
+  'desktop': 1200px,
+);
+
+@function breakpoint-value($name) {
+  @if map-has-key($breakpoints, $name) {
+    @return map-get($breakpoints, $name);
+  }
+  @error 'Unknown breakpoint: '#{$name};
+}
+
+@mixin media($query) {
+  $operator: string.slice($query, 1, 2);
+  $name: string.slice($query, 3);
+  $value: breakpoint-value($name);
+
+  @if $operator == '>=' {
+    @media (min-width: $value) {
+      @content;
+    }
+  } @else if $operator == '<=' {
+    @media (max-width: if($value == 0, 0px, $value - 0.02px)) {
+      @content;
+    }
+  } @else {
+    @error 'Unsupported media query operator: '#{$operator};
+  }
+}
