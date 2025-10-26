@@ -653,6 +653,9 @@ export default {
       // Extract resource and either add to inventory or drop it
       mining.extractResource(rockMined);
 
+      // TODO(instancing): update this mutation to target the active scene map instead of
+      // the global world.map so resource/door/tree interactions behave correctly inside
+      // instanced encounters.
       // Update rock to dead-rock after successful mine
       world.map.foreground[data.todo.actionToQueue.onTile] = 532;
 

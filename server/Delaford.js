@@ -9,6 +9,7 @@ import Socket from '@server/socket';
 import * as emoji from 'node-emoji';
 import { v4 as uuid } from 'uuid';
 import world from '@server/core/world';
+import { partyService } from '@server/player/handlers/party';
 
 class Delaford {
   constructor(server) {
@@ -62,7 +63,7 @@ class Delaford {
    * @param {boolean} logout Whether the connection was via player or interruption
    */
   static async close(ws, logout = false) {
-    const player = world.players.find(f => f.socket_id === ws.id);
+    const player = world.removePlayerBySocket(ws.id);
 
     if (player) {
       // Logout the player out and save the profile
@@ -72,17 +73,18 @@ class Delaford {
 
         console.log(`${emoji.get('red_circle')}  Player ${player.username} left the game`);
 
-        // Remove player from the list.
-        world.players = world.players.filter(p => p.socket_id !== ws.id);
-
         // If the user did not logout,
         // then we remove them from list
         if (!logout) {
           world.clients = world.clients.filter(c => c.id !== ws.id);
         }
 
+        // Remove from any parties the player was in
+        partyService.removePlayer(player.uuid);
+
         // Tell the clients someone left
-        Socket.broadcast('player:left', ws.id);
+        const scenePlayers = world.getScenePlayers(player.sceneId);
+        Socket.broadcast('player:left', ws.id, scenePlayers);
       } catch (err) {
         console.log(err);
       }

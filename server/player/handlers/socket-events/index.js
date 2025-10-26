@@ -46,8 +46,13 @@ export default {
     const { id, said } = data;
     const { viewport } = config.map;
 
-    const { username, x, y } = world.players.find(p => p.socket_id === id);
+    const speaker = world.players.find(p => p.socket_id === id);
+    if (!speaker) {
+      return;
+    }
 
+    const { username, x, y } = speaker;
+    
     // Put a limit on the length of a player message to 50 characters.
     const text = said.length > 50 ? said.substring(0, 50) : said;
 
@@ -60,7 +65,8 @@ export default {
     };
 
     // Get nearby Players
-    const nearbyPlayers = world.players.filter((p) => {
+    const scenePlayers = world.getScenePlayers(speaker.sceneId);
+    const nearbyPlayers = scenePlayers.filter((p) => {
       const playerInX = p.x >= viewportValues.minX && p.x <= viewportValues.maxX;
       const playerInY = p.y >= viewportValues.minY && p.y <= viewportValues.maxY;
       return playerInX && playerInY;

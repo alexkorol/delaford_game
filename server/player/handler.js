@@ -1,5 +1,6 @@
 import actionEvents from './handlers/actions';
 import socketEvents from './handlers/socket-events';
+import partyEvents from './handlers/party';
 
 /**
  * A global event handler (RPC)
@@ -13,6 +14,8 @@ const Handler = {
   ...socketEvents,
   // Items from the context-menu.
   ...actionEvents,
+  // Party lifecycle and instancing events
+  ...partyEvents,
 };
 
 export default Handler;

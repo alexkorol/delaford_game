@@ -10,13 +10,16 @@ class Action {
     // Player
     this.player = World.players.find(p => p.socket_id === player);
 
+    this.scene = this.player ? World.getSceneForPlayer(this.player) : World.getDefaultTown();
+
     // Map layers
-    this.background = World.map.background;
-    this.foreground = World.map.foreground;
+    const mapLayers = this.scene && this.scene.map ? this.scene.map : World.map;
+    this.background = mapLayers.background;
+    this.foreground = mapLayers.foreground;
 
     // Moving map objects (npcs, items, etc.)
-    this.npcs = World.npcs;
-    this.droppedItems = World.items;
+    this.npcs = this.scene && Array.isArray(this.scene.npcs) ? this.scene.npcs : World.npcs;
+    this.droppedItems = this.scene && Array.isArray(this.scene.items) ? this.scene.items : World.items;
 
     // Misc data (slots, etc)
     this.miscData = miscData;
