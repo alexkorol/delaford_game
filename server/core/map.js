@@ -164,6 +164,7 @@ class Map {
       },
       items: [],
       npcs: [],
+      monsters: [],
     };
   }
 

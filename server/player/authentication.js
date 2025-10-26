@@ -100,6 +100,11 @@ class Authentication {
       player,
       map: scene.map,
       npcs: scene.npcs,
+      monsters: Array.isArray(scene.monsters)
+        ? scene.monsters.map((monster) => (monster && typeof monster.toJSON === 'function'
+          ? monster.toJSON()
+          : monster))
+        : [],
       droppedItems: scene.items,
       scene: {
         id: scene.id,

@@ -232,6 +232,11 @@ class PartyService {
       type: scene.type,
       map: scene.map,
       npcs: scene.npcs,
+      monsters: Array.isArray(scene.monsters)
+        ? scene.monsters.map((monster) => (monster && typeof monster.toJSON === 'function'
+          ? monster.toJSON()
+          : monster))
+        : [],
       droppedItems: scene.items,
       metadata: clone(scene.metadata || {}),
     };
@@ -301,6 +306,7 @@ class PartyService {
       const scene = world.createInstance(party.id, {
         map: generation.map,
         npcs: generation.npcs,
+        monsters: generation.monsters,
         items: generation.items,
         respawns: generation.respawns,
         metadata: generation.metadata,

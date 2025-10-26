@@ -17,6 +17,7 @@ import {
   applyHealing as applyStatHealing,
   tryRespawn as tryStatRespawn,
   syncShortcuts,
+  toClientPayload as statsToClientPayload,
 } from 'shared/stats';
 import Inventory from './utilities/common/player/inventory';
 import { wearableItems } from './data/items';
@@ -29,6 +30,21 @@ import {
 } from 'shared/combat';
 
 const BASE_MOVE_DURATION = 150; // ms per cardinal tile step (matches legacy timing)
+
+function clone(value) {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(clone);
+  }
+
+  return Object.entries(value).reduce((acc, [key, entry]) => {
+    acc[key] = clone(entry);
+    return acc;
+  }, {});
+}
 
 const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DURATION) => {
   const diagonal = Math.abs(deltaX) === 1 && Math.abs(deltaY) === 1;
@@ -765,6 +781,25 @@ class Player {
       playerId: player.uuid,
       animation: player.animation,
     }, recipients);
+  }
+
+  static broadcastStats(player, players = null) {
+    if (!player || !player.stats) {
+      return;
+    }
+
+    const recipients = players || world.getScenePlayers(player.sceneId);
+    const payload = {
+      playerId: player.uuid,
+      stats: statsToClientPayload(player.stats),
+      resources: {
+        health: clone(player.stats.resources.health),
+        mana: clone(player.stats.resources.mana),
+      },
+      lifecycle: clone(player.stats.lifecycle),
+    };
+
+    Socket.broadcast('player:stats:update', payload, recipients);
   }
 
   /**

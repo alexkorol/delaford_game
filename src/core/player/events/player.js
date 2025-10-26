@@ -212,4 +212,70 @@ export default {
       context.game.map.players.splice(index, 1, actor);
     }
   },
+  'player:stats:update': (message, context) => {
+    if (!context.game || !context.game.player) {
+      return;
+    }
+
+    const payload = message.data || {};
+    const playerId = payload.playerId || payload.uuid;
+    if (!playerId) {
+      return;
+    }
+
+    const stats = payload.stats || null;
+    const resources = payload.resources || (stats && stats.resources) || {};
+    const lifecycle = payload.lifecycle || (stats && stats.lifecycle) || null;
+
+    const applyToActor = (actor) => {
+      if (!actor) {
+        return;
+      }
+
+      if (stats) {
+        actor.stats = stats;
+      }
+
+      if (resources && resources.health) {
+        actor.hp = resources.health;
+        if (actor.stats && actor.stats.resources) {
+          actor.stats.resources.health = resources.health;
+        }
+      }
+
+      if (resources && resources.mana) {
+        actor.mana = resources.mana;
+        if (actor.stats && actor.stats.resources) {
+          actor.stats.resources.mana = resources.mana;
+        }
+      }
+
+      if (lifecycle) {
+        actor.lifecycle = lifecycle;
+        if (actor.stats) {
+          actor.stats.lifecycle = lifecycle;
+        }
+      }
+    };
+
+    if (context.game.player.uuid === playerId) {
+      applyToActor(context.game.player);
+      return;
+    }
+
+    const playerIndex = (context.game.map.players || []).findIndex((p) => p.uuid === playerId);
+    if (playerIndex !== -1) {
+      const actor = context.game.map.players[playerIndex];
+      applyToActor(actor);
+      context.game.map.players.splice(playerIndex, 1, actor);
+      return;
+    }
+
+    const monsterIndex = (context.game.map.monsters || []).findIndex((monster) => monster.uuid === playerId);
+    if (monsterIndex !== -1) {
+      const monster = context.game.map.monsters[monsterIndex];
+      applyToActor(monster);
+      context.game.map.monsters.splice(monsterIndex, 1, monster);
+    }
+  },
 };

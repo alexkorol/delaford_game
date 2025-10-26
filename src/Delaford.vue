@@ -1035,6 +1035,15 @@ export default {
       this.game.npcs = this.game.map.npcs;
     },
 
+    monsterState(data, meta = {}) {
+      if (!this.game || !this.game.map) {
+        return;
+      }
+
+      this.game.map.setMonsters(data, meta);
+      this.game.monsters = this.game.map.monsters;
+    },
+
     pruneExpiredInvites() {
       const now = Date.now();
       this.partyInvites = this.partyInvites.filter((invite) => !invite.expiresAt || invite.expiresAt > now);
@@ -1172,6 +1181,7 @@ export default {
       // Start the Client
       this.game = new Client(data);
       await this.game.buildMap();
+      this.game.monsters = this.game.map.monsters;
 
       // Start game engine
       const engine = new Engine(this.game);
