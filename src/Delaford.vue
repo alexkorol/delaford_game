@@ -248,6 +248,7 @@ import FriendListPane from './components/slots/FriendList.vue';
 import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
+import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
 
 // Sub Vue components
 import ContextMenu from './components/sub/ContextMenu.vue';
@@ -280,6 +281,7 @@ const paneRegistry = {
   settings: SettingsPane,
   logout: LogoutPane,
   quests: QuestsPane,
+  flowerOfLife: FlowerOfLifePane,
 };
 
 const paneTitles = {
@@ -290,6 +292,7 @@ const paneTitles = {
   settings: 'Settings',
   logout: 'Logout',
   quests: 'Quests',
+  flowerOfLife: 'Flower of Life',
 };
 
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
@@ -519,7 +522,12 @@ export default {
       this.screen = 'server-down';
     };
 
+    this.handleFlowerPaneOpen = () => {
+      this.openPane('flowerOfLife');
+    };
+
     bus.$on('show-sidebar', this.showSidebar);
+    bus.$on('flower-of-life:open', this.handleFlowerPaneOpen);
 
     // On logout, let's do a few things...
     bus.$on('player:logout', this.logout);
@@ -556,6 +564,8 @@ export default {
         this.quickbarFlashTimeout = null;
       }
     }
+
+    bus.$off('flower-of-life:open', this.handleFlowerPaneOpen);
 
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
       this.game.map.destroy();
