@@ -15,6 +15,7 @@ import MovementController from './utilities/movement-controller';
 import SpriteAnimator from './utilities/sprite-animator';
 import { PLAYER_SPRITE_CONFIG } from './config/animation';
 import { DEFAULT_FACING_DIRECTION } from 'shared/combat';
+import { createCharacterState, syncShortcuts } from 'shared/stats';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement';
 
 import Map from './map';
@@ -82,6 +83,28 @@ class Client {
       });
     playerData.animationController = new SpriteAnimator(PLAYER_SPRITE_CONFIG);
     playerData.animationController.applyServerState(playerData.animation);
+
+    const attributeSources = playerData.stats && playerData.stats.attributes
+      ? playerData.stats.attributes.sources
+      : playerData.attributes;
+    const resourceOverrides = playerData.stats && playerData.stats.resources
+      ? playerData.stats.resources
+      : {
+        health: playerData.hp || playerData.health || {},
+        mana: playerData.mana || playerData.mp || {},
+      };
+    const lifecycle = playerData.stats && playerData.stats.lifecycle
+      ? playerData.stats.lifecycle
+      : playerData.lifecycle || {};
+
+    const statsState = createCharacterState({
+      level: playerData.level,
+      attributes: attributeSources || {},
+      resources: resourceOverrides || {},
+      lifecycle,
+    });
+
+    syncShortcuts(statsState, playerData);
 
     this.player = playerData;
     this.players = [];
