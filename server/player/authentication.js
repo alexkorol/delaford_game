@@ -92,15 +92,21 @@ class Authentication {
    * @param {object} player The player who has just joined the server
    */
   static addPlayer(player) {
-    // Add the player
-    world.players.push(player);
+    world.addPlayer(player);
 
-    // Send back the updated world
+    const scene = world.getSceneForPlayer(player);
+
     const block = {
       player,
-      map: world.map,
-      npcs: world.npcs,
-      droppedItems: world.items,
+      map: scene.map,
+      npcs: scene.npcs,
+      droppedItems: scene.items,
+      scene: {
+        id: scene.id,
+        name: scene.name,
+        type: scene.type,
+        seed: scene.metadata && scene.metadata.seed,
+      },
     };
 
     // Tell the client they are logging in
@@ -108,13 +114,14 @@ class Authentication {
 
     // Tell the world someone logged in
     const meta = {
-      players: world.players.map((p) => ({
+      players: world.getScenePlayers(scene.id).map((p) => ({
         uuid: p.uuid,
         movementStep: p.movementStep,
       })),
     };
 
-    Socket.broadcast('player:joined', world.players, null, { meta });
+    const recipients = world.getScenePlayers(scene.id);
+    Socket.broadcast('player:joined', recipients, recipients, { meta });
   }
 }
 

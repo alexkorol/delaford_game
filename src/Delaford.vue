@@ -90,6 +90,23 @@
             <GameCanvas :game="game" />
 
             <div class="hud-shell">
+              <PartyPanel
+                v-if="game && game.player"
+                class="hud-shell__party"
+                :player-id="game.player.uuid"
+                :party="party"
+                :invites="partyInvites"
+                :loading="partyLoading"
+                :status-message="partyStatusMessage"
+                @create="handlePartyCreate"
+                @leave="handlePartyLeave"
+                @toggle-ready="handlePartyReadyToggle"
+                @start-instance="handlePartyStartInstance"
+                @return-to-town="handlePartyReturnToTown"
+                @invite="handlePartyInviteRequest"
+                @accept-invite="handlePartyAcceptInvite"
+                @decline-invite="handlePartyDeclineInvite"
+              />
               <div class="hud-shell__row">
                 <HudOrb
                   class="hud-shell__orb hud-shell__orb--left"
@@ -176,6 +193,7 @@ import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
 import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
+import PartyPanel from './components/ui/world/PartyPanel.vue';
 
 // Sub Vue components
 import ContextMenu from './components/sub/ContextMenu.vue';
@@ -190,6 +208,7 @@ import bus from './core/utilities/bus';
 import Event from './core/player/events';
 import MovementController from './core/utilities/movement-controller';
 import { now } from './core/config/movement';
+import Socket from './core/utilities/socket';
 
 const createDefaultQuickSlots = () => Array.from(
   { length: 8 },
@@ -232,6 +251,7 @@ export default {
     Login,
     AudioMainMenu,
     CharacterCreate,
+    PartyPanel,
   },
   data() {
     return {
@@ -254,6 +274,11 @@ export default {
       bodyOverflowBackup: '',
       quickbarActiveIndex: null,
       quickbarFlashTimeout: null,
+      party: null,
+      partyInvites: [],
+      partyLoading: { active: false, state: null },
+      partyStatusMessage: '',
+      partyStatusTimeout: null,
     };
   },
   computed: {
@@ -509,6 +534,11 @@ export default {
       }
     }
 
+    if (this.partyStatusTimeout) {
+      clearTimeout(this.partyStatusTimeout);
+      this.partyStatusTimeout = null;
+    }
+
     bus.$off('flower-of-life:open', this.handleFlowerPaneOpen);
 
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
@@ -527,6 +557,14 @@ export default {
       this.game = { exit: true };
       this.layout.activePane = null;
       this.resetChatState();
+      this.party = null;
+      this.partyInvites = [];
+      this.partyLoading = { active: false, state: null };
+      this.partyStatusMessage = '';
+      if (this.partyStatusTimeout) {
+        clearTimeout(this.partyStatusTimeout);
+        this.partyStatusTimeout = null;
+      }
     },
 
     /**
@@ -997,6 +1035,133 @@ export default {
       this.game.npcs = this.game.map.npcs;
     },
 
+    pruneExpiredInvites() {
+      const now = Date.now();
+      this.partyInvites = this.partyInvites.filter((invite) => !invite.expiresAt || invite.expiresAt > now);
+    },
+
+    setPartyStatusMessage(message, duration = 4000) {
+      if (this.partyStatusTimeout) {
+        clearTimeout(this.partyStatusTimeout);
+        this.partyStatusTimeout = null;
+      }
+
+      this.partyStatusMessage = message || '';
+
+      if (message) {
+        this.partyStatusTimeout = setTimeout(() => {
+          this.partyStatusMessage = '';
+          this.partyStatusTimeout = null;
+        }, duration);
+      }
+    },
+
+    handlePartyCreate() {
+      Socket.emit('party:create');
+    },
+
+    handlePartyLeave() {
+      Socket.emit('party:leave');
+      this.party = null;
+      this.partyLoading = { active: false, state: null };
+      this.partyInvites = [];
+      this.setPartyStatusMessage('');
+    },
+
+    handlePartyReadyToggle() {
+      Socket.emit('party:ready');
+    },
+
+    handlePartyStartInstance() {
+      Socket.emit('party:startInstance');
+    },
+
+    handlePartyReturnToTown() {
+      Socket.emit('party:returnToTown');
+    },
+
+    handlePartyInviteRequest(payload) {
+      const username = payload && payload.username ? payload.username.trim() : '';
+      if (!username) {
+        return;
+      }
+
+      Socket.emit('party:invite', { username });
+    },
+
+    handlePartyAcceptInvite(invite) {
+      if (!invite || !invite.partyId) {
+        return;
+      }
+
+      Socket.emit('party:invite:accept', { partyId: invite.partyId });
+      this.partyInvites = this.partyInvites.filter((entry) => entry.partyId !== invite.partyId);
+    },
+
+    handlePartyDeclineInvite(invite) {
+      if (!invite || !invite.partyId) {
+        return;
+      }
+
+      Socket.emit('party:invite:decline', { partyId: invite.partyId });
+      this.partyInvites = this.partyInvites.filter((entry) => entry.partyId !== invite.partyId);
+    },
+
+    handlePartyUpdate(party, meta = {}) {
+      this.pruneExpiredInvites();
+      this.party = party;
+      if (party) {
+        this.partyInvites = this.partyInvites.filter((invite) => invite.partyId !== party.id);
+      }
+
+      if (!party || party.state !== 'instance') {
+        this.partyLoading = { active: false, state: null };
+      }
+    },
+
+    handlePartyInvite(invite) {
+      if (!invite || !invite.partyId) {
+        return;
+      }
+
+      this.pruneExpiredInvites();
+      const now = Date.now();
+      const expiresAt = invite.expiresAt || (now + 60000);
+      const filtered = this.partyInvites.filter((entry) => entry.partyId !== invite.partyId);
+      this.partyInvites = [...filtered, { ...invite, expiresAt }];
+      this.setPartyStatusMessage(`Party invite from ${invite.invitedBy || 'Unknown'}`);
+    },
+
+    handlePartyLoading(state) {
+      const active = Boolean(state && state !== 'idle');
+      this.partyLoading = { active, state };
+      if (active) {
+        this.setPartyStatusMessage('');
+      }
+    },
+
+    async handlePartySceneTransition(scene, playerState = {}, partySnapshot = null) {
+      if (!scene || !this.game) {
+        return;
+      }
+
+      await this.game.loadScene(scene, playerState);
+
+      if (partySnapshot) {
+        this.party = partySnapshot;
+      }
+
+      this.partyLoading = { active: false, state: null };
+    },
+
+    handlePartyError(error = {}) {
+      if (!error || !error.message) {
+        return;
+      }
+
+      this.setPartyStatusMessage(error.message);
+    },
+
     /**
      * Start the whole game
      */
@@ -1215,6 +1380,11 @@ export default {
     align-items: center;
     gap: var(--space-lg);
     pointer-events: auto;
+  }
+
+  .hud-shell__party {
+    margin-bottom: var(--space-sm);
+    max-width: 320px;
   }
 
   .hud-shell__orb {

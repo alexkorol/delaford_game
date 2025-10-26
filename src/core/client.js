@@ -110,6 +110,9 @@ class Client {
     this.players = [];
     this.droppedItems = data.droppedItems;
     this.npcs = data.npcs;
+    this.sceneId = (data.scene && data.scene.id) || data.sceneId || null;
+    this.sceneMetadata = data.scene && data.scene.metadata ? data.scene.metadata : {};
+    this.cachedImages = null;
 
     // Tell client to draw mouse on canvas
     bus.$on('DRAW:MOUSE', ({ x, y }) => this.map.setMouseCoordinates(x, y));
@@ -119,7 +122,7 @@ class Client {
    * Build the local Map based on data from server
    */
   async buildMap() {
-    const images = await this.start();
+    const images = await this.ensureAssets();
 
     const data = {
       droppedItems: this.droppedItems,
@@ -135,19 +138,81 @@ class Client {
   /**
    * Start loading assets from server
    */
-  async start() {
-    return Promise.all(this.loadAssets());
+  async ensureAssets() {
+    if (this.cachedImages) {
+      return this.cachedImages;
+    }
+
+    this.cachedImages = await Promise.all(this.loadAssets());
+    return this.cachedImages;
+  }
+
+  async start(force = false) {
+    if (force) {
+      this.cachedImages = await Promise.all(this.loadAssets());
+      return this.cachedImages;
+    }
+
+    return this.ensureAssets();
   }
 
   /**
    * Start building the map itself
    */
   async setUp() {
-    const images = await this.start();
+    const images = await this.ensureAssets();
     this.map.setImages(images);
     this.map.setPlayer(this.player);
     this.map.setNPCs(this.npcs);
     this.map.setDroppedItems(this.droppedItems);
+  }
+
+  async loadScene(scenePayload, playerState = {}) {
+    if (!scenePayload || !scenePayload.map) {
+      return;
+    }
+
+    if (playerState && typeof playerState.x === 'number') {
+      this.player.x = playerState.x;
+    }
+    if (playerState && typeof playerState.y === 'number') {
+      this.player.y = playerState.y;
+    }
+    if (playerState && typeof playerState.sceneId === 'string') {
+      this.sceneId = playerState.sceneId;
+    }
+
+    if (scenePayload.metadata) {
+      this.sceneMetadata = scenePayload.metadata;
+    }
+
+    this.droppedItems = scenePayload.droppedItems || [];
+    this.npcs = scenePayload.npcs || [];
+
+    if (!this.player.movement) {
+      this.player.movement = new MovementController().initialise(this.player.x, this.player.y);
+    } else if (typeof this.player.movement.hardSync === 'function') {
+      this.player.movement.hardSync(this.player.x, this.player.y);
+    }
+
+    this.players = [];
+
+    const images = await this.ensureAssets();
+
+    if (this.map && typeof this.map.destroy === 'function') {
+      this.map.destroy();
+    }
+
+    const data = {
+      droppedItems: this.droppedItems,
+      map: scenePayload.map,
+      npcs: this.npcs,
+      player: this.player,
+    };
+
+    this.map = new Map(data, images);
+    this.background = scenePayload.map.background;
+    this.foreground = scenePayload.map.foreground;
   }
 
   /**

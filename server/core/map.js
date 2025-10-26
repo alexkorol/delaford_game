@@ -8,6 +8,9 @@ import ItemFactory from './items/factory';
 import { Shop } from './functions';
 import world from './world';
 
+const DEFAULT_INSTANCE_ROOM_COUNT = 6;
+const DEFAULT_CORRIDOR_WIDTH = 3;
+
 class Map {
   constructor(level) {
     // Getters & Setters
@@ -18,6 +21,150 @@ class Map {
     this.foreground = world.map.foreground;
 
     this.setUp();
+  }
+
+  static createSeededGenerator(seed) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  static normaliseSeed(seed) {
+    if (Number.isFinite(seed)) {
+      return Math.abs(Math.floor(seed)) || Date.now();
+    }
+
+    if (typeof seed === 'string') {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i += 1) {
+        hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+        hash |= 0;
+      }
+      return Math.abs(hash) || Date.now();
+    }
+
+    return Date.now();
+  }
+
+  static carveRoom(background, foreground, width, height, x, y, tileId) {
+    for (let row = y; row < y + height; row += 1) {
+      for (let col = x; col < x + width; col += 1) {
+        const index = (row * surfaceMap.width) + col;
+        background[index] = tileId;
+        foreground[index] = 0;
+      }
+    }
+  }
+
+  static carveCorridor(background, foreground, from, to, corridorWidth, tileId) {
+    const minX = Math.min(from.x, to.x);
+    const maxX = Math.max(from.x, to.x);
+    const minY = Math.min(from.y, to.y);
+    const maxY = Math.max(from.y, to.y);
+
+    const carveColumn = (xCoord) => {
+      for (let row = minY; row <= maxY; row += 1) {
+        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+          const col = xCoord + offset;
+          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+            continue;
+          }
+
+          const index = (row * surfaceMap.width) + col;
+          background[index] = tileId;
+          foreground[index] = 0;
+        }
+      }
+    };
+
+    const carveRow = (yCoord) => {
+      for (let col = minX; col <= maxX; col += 1) {
+        for (let offset = -Math.floor(corridorWidth / 2); offset <= Math.floor(corridorWidth / 2); offset += 1) {
+          const row = yCoord + offset;
+          if (col < 0 || col >= surfaceMap.width || row < 0 || row >= surfaceMap.height) {
+            continue;
+          }
+
+          const index = (row * surfaceMap.width) + col;
+          background[index] = tileId;
+          foreground[index] = 0;
+        }
+      }
+    };
+
+    carveRow(from.y);
+    carveColumn(to.x);
+  }
+
+  static async generateInstance(options = {}) {
+    const template = options.template || 'dungeon';
+    const seed = Map.normaliseSeed(options.seed);
+    const layers = await Map.fetchMap('surface');
+    const background = [...layers[0].data];
+    const foreground = [...layers[1].data];
+
+    const width = surfaceMap.width || config.map.size.x;
+    const height = surfaceMap.height || config.map.size.y;
+    const centerIndex = (Math.floor(height / 2) * width) + Math.floor(width / 2);
+    const baseTile = background[centerIndex] || 1;
+    const rng = Map.createSeededGenerator(seed);
+
+    const rooms = Math.max(1, options.rooms || DEFAULT_INSTANCE_ROOM_COUNT);
+    const carvedRooms = [];
+
+    for (let index = 0; index < rooms; index += 1) {
+      const roomWidth = Math.max(6, Math.floor(rng() * 12) + 6);
+      const roomHeight = Math.max(6, Math.floor(rng() * 12) + 6);
+      const marginX = Math.max(2, Math.floor(width * 0.05));
+      const marginY = Math.max(2, Math.floor(height * 0.05));
+      const originX = Math.min(
+        width - roomWidth - 1,
+        Math.max(marginX, Math.floor(rng() * (width - roomWidth - marginX))),
+      );
+      const originY = Math.min(
+        height - roomHeight - 1,
+        Math.max(marginY, Math.floor(rng() * (height - roomHeight - marginY))),
+      );
+
+      Map.carveRoom(background, foreground, roomWidth, roomHeight, originX, originY, baseTile);
+
+      const center = {
+        x: Math.floor(originX + (roomWidth / 2)),
+        y: Math.floor(originY + (roomHeight / 2)),
+      };
+      carvedRooms.push(center);
+    }
+
+    if (carvedRooms.length > 1) {
+      const corridorWidth = Math.max(2, options.corridorWidth || DEFAULT_CORRIDOR_WIDTH);
+      const anchor = carvedRooms[0];
+      carvedRooms.slice(1).forEach((roomCenter) => {
+        Map.carveCorridor(background, foreground, anchor, roomCenter, corridorWidth, baseTile);
+      });
+    }
+
+    return {
+      map: {
+        background,
+        foreground,
+      },
+      metadata: {
+        seed,
+        template,
+        spawnPoints: carvedRooms,
+      },
+      respawns: {
+        items: [],
+        monsters: [],
+        resources: [],
+      },
+      items: [],
+      npcs: [],
+    };
   }
 
   /**
@@ -179,7 +326,12 @@ class Map {
       surface: surfaceMap,
     };
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (!mapToLoad[level]) {
+        reject(new Error(`Unknown map level: ${level}`));
+        return;
+      }
+
       resolve(mapToLoad[level].layers);
     });
   }
@@ -248,9 +400,11 @@ class Map {
             grid.push(1);
           } else {
             const onTile = (worldColumn * size.x) + worldRow;
+            const scene = world.getSceneForPlayer(player);
+            const activeMap = scene && scene.map ? scene.map : world.map;
             const tiles = {
-              background: world.map.background[onTile] - 1,
-              foreground: (world.map.foreground[onTile] - 1) - 252,
+              background: activeMap.background[onTile] - 1,
+              foreground: (activeMap.foreground[onTile] - 1) - 252,
             };
 
             // Push the block/non-blocked tile to the
@@ -262,6 +416,7 @@ class Map {
               onTile,
               row,
               column,
+              activeMap,
             ));
           }
         }

@@ -76,6 +76,7 @@ class Player {
     this.token = token;
     this.uuid = data.uuid;
     this.socket_id = socketId;
+    this.sceneId = data.sceneId || world.defaultTownId;
 
     // Tabs
     this.friend_list = data.friend_list;
@@ -608,9 +609,11 @@ class Player {
     }
 
     const tileIndex = (tileY * size.x) + tileX;
+    const scene = world.getSceneForPlayer(this);
+    const mapLayers = scene && scene.map ? scene.map : world.map;
     const steppedOn = {
-      background: world.map.background[tileIndex] - 1,
-      foreground: world.map.foreground[tileIndex] - 1,
+      background: mapLayers.background[tileIndex] - 1,
+      foreground: mapLayers.foreground[tileIndex] - 1,
     };
 
     const tiles = {
@@ -618,7 +621,7 @@ class Player {
       foreground: steppedOn.foreground - 252,
     };
 
-    return MapUtils.gridWalkable(tiles, this, tileIndex) === 0;
+    return MapUtils.gridWalkable(tiles, this, tileIndex, 0, 0, mapLayers) === 0;
   }
 
   /**
@@ -748,7 +751,8 @@ class Player {
     if (player.animation) {
       meta.animation = player.animation;
     }
-    Socket.broadcast('player:movement', player, players, { meta });
+    const recipients = players || world.getScenePlayers(player.sceneId);
+    Socket.broadcast('player:movement', player, recipients, { meta });
   }
 
   static broadcastAnimation(player, players = null) {
@@ -756,10 +760,11 @@ class Player {
       return;
     }
 
+    const recipients = players || world.getScenePlayers(player.sceneId);
     Socket.broadcast('player:animation', {
       playerId: player.uuid,
       animation: player.animation,
-    }, players);
+    }, recipients);
   }
 
   /**

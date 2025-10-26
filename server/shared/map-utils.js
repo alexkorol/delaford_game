@@ -12,9 +12,11 @@ class MapUtils {
    * @param {integer} column On what column are they on?
    * @return {integer}
    */
-  static gridWalkable(tiles, player, onTile, row = 0, column = 0) {
+  static gridWalkable(tiles, player, onTile, row = 0, column = 0, mapLayers = null) {
     // What's going on here? FG & BG collision
     let walkableTile = 0;
+
+    const layers = mapLayers || (world.getSceneForPlayer(player).map || world.map);
 
     // Get walkable status of both foreground and background tiles
     const walkable = {
@@ -40,7 +42,7 @@ class MapUtils {
     // Is the foreground walkable BUT the background is not?
     if (walkable.fg && !walkable.bg) {
       // Is there no foreground tile?
-      if ((world.map.foreground[onTile] - 1) === -1) {
+      if ((layers.foreground[onTile] - 1) === -1) {
         walkableTile = 1;
       } else {
         // If there is, then it is (because the BG is not walkable).
