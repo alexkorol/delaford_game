@@ -20,7 +20,12 @@
           v-if="screen === 'register'"
           class="register"
         >
-          To register an account, please visit <a href="https://delaford.com/register">this page</a> to get started and then come back.
+          <p class="register__intro">
+            To register an account, please visit
+            <a href="https://delaford.com/register">this page</a>
+            to get started and then come back. Once you have an account ID, reserve your in-world identity below.
+          </p>
+          <CharacterCreate />
         </div>
         <div
           v-if="screen === 'login'"
@@ -176,6 +181,7 @@ import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
 import ContextMenu from './components/sub/ContextMenu.vue';
 import AudioMainMenu from './components/sub/AudioMainMenu.vue';
 import Login from './components/ui/Login.vue';
+import CharacterCreate from './components/ui/auth/CharacterCreate.vue';
 
 // Core assets
 import Client from './core/client';
@@ -225,6 +231,7 @@ export default {
     ContextMenu,
     Login,
     AudioMainMenu,
+    CharacterCreate,
   },
   data() {
     return {
@@ -1103,6 +1110,19 @@ export default {
       flex-direction: column;
       gap: var(--space-lg);
       width: 100%;
+
+      .register__intro {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.85);
+        text-align: center;
+
+        a {
+          color: #f3b15b;
+          text-decoration: underline;
+        }
+      }
     }
 
     .button_group {
