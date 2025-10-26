@@ -2,6 +2,7 @@ import playerEvents from './events/player';
 import itemEvents from './events/item';
 import resourceEvents from './events/resource';
 import npcEvents from './events/npc';
+import monsterEvents from './events/monster';
 import worldEvents from './events/world';
 import screenEvents from './events/screen';
 import partyEvents from './events/party';
@@ -21,6 +22,7 @@ const handler = {
   ...itemEvents,
   ...resourceEvents,
   ...npcEvents,
+  ...monsterEvents,
   ...worldEvents,
   ...screenEvents,
   ...partyEvents,

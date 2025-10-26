@@ -110,6 +110,7 @@ class Client {
     this.players = [];
     this.droppedItems = data.droppedItems;
     this.npcs = data.npcs;
+    this.monsters = data.monsters || [];
     this.sceneId = (data.scene && data.scene.id) || data.sceneId || null;
     this.sceneMetadata = data.scene && data.scene.metadata ? data.scene.metadata : {};
     this.cachedImages = null;
@@ -128,10 +129,12 @@ class Client {
       droppedItems: this.droppedItems,
       map: this.map,
       npcs: this.npcs,
+      monsters: this.monsters,
       player: this.player,
     };
 
     this.map = new Map(data, images);
+    this.monsters = this.map.monsters;
     return 200;
   }
 
@@ -164,6 +167,7 @@ class Client {
     this.map.setImages(images);
     this.map.setPlayer(this.player);
     this.map.setNPCs(this.npcs);
+    this.map.setMonsters(this.monsters);
     this.map.setDroppedItems(this.droppedItems);
   }
 
@@ -188,6 +192,7 @@ class Client {
 
     this.droppedItems = scenePayload.droppedItems || [];
     this.npcs = scenePayload.npcs || [];
+    this.monsters = scenePayload.monsters || [];
 
     if (!this.player.movement) {
       this.player.movement = new MovementController().initialise(this.player.x, this.player.y);
@@ -207,12 +212,14 @@ class Client {
       droppedItems: this.droppedItems,
       map: scenePayload.map,
       npcs: this.npcs,
+      monsters: this.monsters,
       player: this.player,
     };
 
     this.map = new Map(data, images);
     this.background = scenePayload.map.background;
     this.foreground = scenePayload.map.foreground;
+    this.monsters = this.map.monsters;
   }
 
   /**

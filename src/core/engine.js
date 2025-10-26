@@ -80,6 +80,11 @@ class Engine {
     // Draw dropped items
     this.game.map.drawItems();
 
+    // Draw monsters
+    if (typeof this.game.map.drawMonsters === 'function') {
+      this.game.map.drawMonsters();
+    }
+
     // Draw the NPCs
     this.game.map.drawNPCs();
 

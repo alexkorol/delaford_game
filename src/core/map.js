@@ -25,6 +25,7 @@ class Map {
 
     this.images = [];
     this.npcs = [];
+    this.monsters = [];
     this.config = config;
     this.defaultViewport = { ...INITIAL_VIEWPORT };
     this.defaultCenter = { ...INITIAL_CENTER };
@@ -83,6 +84,7 @@ class Map {
     this.setImages(images);
     this.setPlayer(data.player);
     this.setNPCs(data.npcs);
+    this.setMonsters(data.monsters);
     this.setDroppedItems(data.droppedItems);
   }
 
@@ -188,6 +190,21 @@ class Map {
           npc.animation = { ...npc.animationController.toJSON() };
         } else {
           this.ensureAnimation(npc);
+        }
+      });
+    }
+
+    if (Array.isArray(this.monsters)) {
+      this.monsters.forEach((monster) => {
+        if (monster.movement) {
+          monster.movement.update();
+        }
+
+        if (monster.animationController) {
+          monster.animationController.update(deltaSeconds);
+          monster.animation = { ...monster.animationController.toJSON() };
+        } else {
+          this.ensureAnimation(monster);
         }
       });
     }
@@ -310,6 +327,92 @@ class Map {
     });
   }
 
+  setMonsters(monsters, meta = {}) {
+    const existing = new window.Map(
+      (this.monsters || [])
+        .map((monster) => {
+          const key = monster && (monster.uuid || monster.id);
+          if (!key) {
+            return null;
+          }
+          return [key, monster];
+        })
+        .filter((entry) => entry !== null),
+    );
+
+    const movementEntries = Array.isArray(meta.movements) ? meta.movements : [];
+    const movementLookup = new window.Map(
+      movementEntries
+        .map((entry) => {
+          const key = entry && (entry.uuid || entry.id);
+          if (!key) {
+            return null;
+          }
+          return [key, entry.movementStep || null];
+        })
+        .filter((entry) => entry !== null),
+    );
+
+    const animationEntries = Array.isArray(meta.animations) ? meta.animations : [];
+    const animationLookup = new window.Map(
+      animationEntries
+        .map((entry) => {
+          const key = entry && (entry.uuid || entry.id);
+          if (!key) {
+            return null;
+          }
+          return [key, entry.animation || null];
+        })
+        .filter((entry) => entry !== null),
+    );
+
+    this.monsters = (monsters || []).map((monster) => {
+      const key = monster && (monster.uuid || monster.id);
+      const previous = key ? existing.get(key) : null;
+      const controller = previous && previous.movement
+        ? previous.movement
+        : new MovementController().initialise(monster.x, monster.y);
+
+      const step = monster.movementStep
+        || movementLookup.get(key)
+        || null;
+
+      if (step) {
+        controller.applyServerStep(monster.x, monster.y, step, {
+          sentAt: meta.sentAt || null,
+          receivedAt: now(),
+        });
+      } else {
+        controller.hardSync(monster.x, monster.y);
+      }
+
+      const animator = previous && previous.animationController
+        ? previous.animationController
+        : new SpriteAnimator(PLAYER_SPRITE_CONFIG);
+
+      const updated = {
+        ...monster,
+        movement: controller,
+        animationController: animator,
+      };
+
+      const animationState = animationLookup.has(key)
+        ? animationLookup.get(key)
+        : monster.animation || null;
+
+      if (animationState) {
+        updated.animation = animationState;
+        animator.applyServerState(animationState);
+      } else if (updated.animation) {
+        animator.applyServerState(updated.animation);
+      } else {
+        this.ensureAnimation(updated);
+      }
+
+      return updated;
+    });
+  }
+
   /**
    * The items dropped on the map
    *
@@ -346,11 +449,13 @@ class Map {
     const armorImage = fallback(5);
     const jewelryImage = fallback(6);
     const generalImage = fallback(7);
+    const monstersImage = normalized[8] || npcsImage;
 
     // Image and data
     this.images = {
       playerImage,
       npcsImage,
+      monstersImage,
       objectImage,
       terrainImage,
       weaponsImage,
@@ -709,6 +814,61 @@ class Map {
 
       ctx.drawImage(
         this.images.playerImage,
+        sourceX,
+        sourceY,
+        tileSize,
+        tileSize,
+        screenPosition.x,
+        screenPosition.y,
+        tileSize,
+        tileSize,
+      );
+    });
+  }
+
+  /**
+   * Draw the monsters on the game viewport canvas
+   */
+  drawMonsters() {
+    const ctx = this.bufferContext || this.context;
+    if (!ctx || !Array.isArray(this.monsters) || !this.player) {
+      return;
+    }
+
+    const nearbyMonsters = this.monsters.filter((monster) => {
+      const withinX = this.player.x <= (8 + monster.x) && this.player.x >= (monster.x - 8);
+      const withinY = this.player.y <= (6 + monster.y) && this.player.y >= (monster.y - 6);
+      return withinX && withinY;
+    });
+
+    if (!nearbyMonsters.length) {
+      return;
+    }
+
+    const metrics = this.getViewportMetrics();
+    const { tileSize } = metrics;
+    const spriteSheet = this.images.monstersImage || this.images.npcsImage;
+
+    nearbyMonsters.forEach((monster) => {
+      const centerPosition = monster.movement
+        ? monster.movement.getPosition()
+        : centerOfTile(monster.x, monster.y, tileSize);
+
+      const topLeft = {
+        x: centerPosition.x - (tileSize / 2),
+        y: centerPosition.y - (tileSize / 2),
+      };
+
+      const screenPosition = this.worldToScreen(topLeft, metrics);
+      const animator = this.ensureAnimation(monster);
+      const frame = animator ? animator.getCurrentFrame() : null;
+      const fallbackColumn = Number.isFinite(monster.column) ? monster.column : 0;
+      const fallbackRow = Number.isFinite(monster.row) ? monster.row : 0;
+      const sourceX = frame ? frame.column * tileSize : (fallbackColumn * tileSize);
+      const sourceY = frame ? frame.row * tileSize : (fallbackRow * tileSize);
+
+      ctx.drawImage(
+        spriteSheet,
         sourceX,
         sourceY,
         tileSize,

@@ -5,6 +5,7 @@ import Handler from '@server/player/handler';
 import Item from '@server/core/item';
 import Map from '@server/core/map';
 import NPC from '@server/core/npc';
+import Monster from '@server/core/monster';
 import Socket from '@server/socket';
 import * as emoji from 'node-emoji';
 import { v4 as uuid } from 'uuid';
@@ -37,6 +38,7 @@ class Delaford {
    */
   loadEntities() {
     NPC.load(this);
+    Monster.load(this);
   }
 
   /**
@@ -46,6 +48,10 @@ class Delaford {
     setInterval(() => {
       NPC.movement();
     }, 2000);
+
+    setInterval(() => {
+      Monster.tick();
+    }, 600);
 
     setInterval(() => {
       Item.check();
