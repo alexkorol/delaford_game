@@ -1,9 +1,9 @@
-import Socket from '@server/socket';
-import UI from 'shared/ui';
-import { wearableItems } from '@server/core/data/items';
-import world from '@server/core/world';
-import Wear from '@server/core/utilities/wear';
-import ItemFactory from '@server/core/items/factory';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
+import { wearableItems } from '#server/core/data/items/index.js';
+import world from '#server/core/world.js';
+import Wear from '#server/core/utilities/wear.js';
+import ItemFactory from '#server/core/items/factory.js';
 
 export default {
   /**

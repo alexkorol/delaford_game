@@ -1,4 +1,4 @@
-import world from '@server/core/world';
+import world from '#server/core/world.js';
 
 class PlayerSocket {
   constructor(socketId) {

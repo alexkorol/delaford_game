@@ -33,12 +33,12 @@
 </template>
 
 <script>
-import UI from 'shared/ui';
-import config from 'root/config';
-import ClientUI from '../core/utilities/client-ui';
-import bus from '../core/utilities/bus';
-import Socket from '../core/utilities/socket';
-import InputController from '../core/utilities/input-controller';
+import UI from '@shared/ui.js';
+import config from '@server/config.js';
+import ClientUI from '../core/utilities/client-ui.js';
+import bus from '../core/utilities/bus.js';
+import Socket from '../core/utilities/socket.js';
+import InputController from '../core/utilities/input-controller.js';
 
 export default {
   name: 'Game',

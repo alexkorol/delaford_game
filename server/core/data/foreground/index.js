@@ -1,6 +1,6 @@
-import resources from './resources';
-import miscellaneous from './miscellaneous';
-import shops from './shops';
+import resources from './resources.js';
+import miscellaneous from './miscellaneous.js';
+import shops from './shops.js';
 
 const foregroundObjects = [
   ...resources,

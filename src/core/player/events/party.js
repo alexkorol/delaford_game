@@ -1,4 +1,4 @@
-import bus from '../../utilities/bus';
+import bus from '../../utilities/bus.js';
 
 const safeCall = (context, method, ...args) => {
   if (!context || typeof context[method] !== 'function') {

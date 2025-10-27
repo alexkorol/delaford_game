@@ -1,4 +1,4 @@
-import { map } from '../config';
+import { map } from '../config.js';
 
 class UI {
   /**

@@ -1,9 +1,9 @@
-import weapons from './weapons';
-import armor from './armor';
-import jewelry from './jewelry';
-import general from './general';
+import weapons from './weapons.js';
+import armor from './armor.js';
+import jewelry from './jewelry.js';
+import general from './general.js';
 
-import smithing from './skills/smithing';
+import smithing from './skills/smithing.js';
 
 const wearableItems = [...weapons, ...armor, ...jewelry];
 

@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
-import Query from '@server/core/data/query';
-import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine';
+import Query from '#server/core/data/query.js';
+import { rollAffixes, cloneAndMergeStats, structuredCloneSafe } from './affix-engine.js';
 
 const composeAffixedName = (baseName, brand, bond) => {
   const prefix = brand ? `${brand.name} ` : '';

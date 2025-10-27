@@ -1,7 +1,7 @@
-import Query from '@server/core/data/query';
-import { foregroundObjects } from '@server/core/data/foreground';
-import world from '@server/core/world';
-import Skill from './index';
+import Query from '#server/core/data/query.js';
+import { foregroundObjects } from '#server/core/data/foreground/index.js';
+import world from '#server/core/world.js';
+import Skill from './index.js';
 
 export default class Mining extends Skill {
   constructor(playerIndex, rockId) {

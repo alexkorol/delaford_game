@@ -4,7 +4,7 @@ import {
   DEFAULT_ENTITY_SPEED,
   MOVEMENT_EPSILON,
   now,
-} from '../config/movement';
+} from '../config/movement.js';
 
 const clonePoint = ({ x, y }) => ({ x, y });
 

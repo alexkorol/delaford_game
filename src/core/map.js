@@ -1,13 +1,13 @@
 import PF from 'pathfinding';
-import UI from 'shared/ui';
-import config from 'root/config';
+import UI from '@shared/ui.js';
+import config from '@server/config.js';
 import blockedMouse from '@/assets/graphics/ui/mouse/blocked.png';
 import moveToMouse from '@/assets/graphics/ui/mouse/moveTo.png';
-import bus from './utilities/bus';
-import MovementController, { centerOfTile } from './utilities/movement-controller';
-import SpriteAnimator from './utilities/sprite-animator';
-import { PLAYER_SPRITE_CONFIG } from './config/animation';
-import { now } from './config/movement';
+import bus from './utilities/bus.js';
+import MovementController, { centerOfTile } from './utilities/movement-controller.js';
+import SpriteAnimator from './utilities/sprite-animator.js';
+import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
+import { now } from './config/movement.js';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,

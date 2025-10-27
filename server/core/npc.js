@@ -1,13 +1,13 @@
-import Socket from '@server/socket';
-import UI from 'shared/ui';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
 import * as emoji from 'node-emoji';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
-} from 'shared/combat';
-import npcs from './data/npcs';
-import world from './world';
+} from '#shared/combat.js';
+import npcs from './data/npcs.js';
+import world from './world.js';
 
 const BASE_MOVE_DURATION = 150;
 
@@ -278,4 +278,4 @@ class NPC {
   }
 }
 
-module.exports = NPC;
+export default NPC;

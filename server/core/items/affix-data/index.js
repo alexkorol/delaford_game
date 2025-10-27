@@ -1,5 +1,5 @@
-import brands from './brands';
-import bonds from './bonds';
+import brands from './brands.js';
+import bonds from './bonds.js';
 
 export {
   brands,

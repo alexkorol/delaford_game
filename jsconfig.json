@@ -2,7 +2,11 @@
   "compilerOptions": {
     "baseUrl": "./",
     "paths": {
-      "@server/*": ["server/*"]
+      "@/*": ["src/*"],
+      "@shared/*": ["server/shared/*"],
+      "@server/*": ["server/*"],
+      "#server/*": ["server/*"],
+      "#shared/*": ["server/shared/*"]
     }
   },
   "exclude": ["node_modules", "dist", "build"]

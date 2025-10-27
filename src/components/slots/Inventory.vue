@@ -20,7 +20,7 @@
 </template>
 
 <script>
-import bus from '../../core/utilities/bus';
+import bus from '../../core/utilities/bus.js';
 import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
 
 const INVENTORY_COLUMNS = 12;

@@ -22,7 +22,7 @@
         autocomplete="off"
       >
         <input
-          ref="username"
+          ref="usernameField"
           v-model="username"
           placeholder="Username"
           type="text"
@@ -83,134 +83,133 @@
   </div>
 </template>
 
-<script>
-import bus from '../../core/utilities/bus';
-import Socket from '../../core/utilities/socket';
+<script setup>
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
 
-export default {
-  data() {
-    return {
-      invalid: false,
-      username: '',
-      password: '',
-      guestAccount: false,
-      musicIntroduced: false,
-      rememberMe: false,
-      isLoginInProgress: false,
-    };
-  },
-  computed: {
-    /**
-     * Show only if on production website
-     */
-    inDevelopment() {
-      return process.env.NODE_ENV !== 'production';
-    },
-  },
-  watch: {
-    guestAccount() {
-      // Set back to guest credentials if false
-      if (this.guestAccount) {
-        this.username = 'dev';
-        this.password = 'qwertykeyboard';
-      } else {
-        this.username = '';
-        this.password = '';
-      }
-    },
-  },
-  created() {
-    this.invalid = false;
+import { useUiStore } from '@/stores/ui.js';
 
-    const tempGuest = window.location.href.includes('?useGuestAccount');
+import bus from '../../core/utilities/bus.js';
+import Socket from '../../core/utilities/socket.js';
 
-    this.rememberMe = this.$store.getters.rememberMe;
-    this.guestAccount = tempGuest || this.$store.getters.guestAccount;
+const uiStore = useUiStore();
 
-    bus.$on('player:login-error', (data) => this.incorrectLogin(data));
-    bus.$on('login:done', () => this.setLoginProgress(false));
+const invalid = ref(false);
+const username = ref('');
+const password = ref('');
+const guestAccount = ref(false);
+const rememberMe = ref(false);
+const isLoginInProgress = ref(false);
+const usernameField = ref(null);
 
-    console.log('NODE_ENV:', process.env.NODE_ENV);
-    console.log('inDev', this.inDevelopment);
+const inDevelopment = computed(() => !import.meta.env.PROD);
 
-    if (this.guestAccount && process.env.NODE_ENV === 'development') {
-      // Development user
-      this.username = 'dev';
-      this.password = 'qwertykeyboard';
-    }
-
-    if (this.$store.getters.account.username) {
-      const { username, password } = this.$store.getters.account;
-      this.username = username;
-      this.password = password;
-      if (window.location.href.includes('#autologin')) {
-        this.username = username;
-        this.password = password;
-        setTimeout(() => document.querySelector('button.login').click(), 250);
-      }
-    }
-  },
-  mounted() {
-    this.$nextTick(() => {
-      if (this.$refs.username) {
-        this.$refs.username.focus();
-      }
-    });
-  },
-  methods: {
-    toggleGuestAccount() {
-      this.$store.dispatch('setGuestAccount', this.guestAccount);
-    },
-    /**
-     * Save the state between remember me checkbox
-     */
-    toggleRememberMe() {
-      this.$store.dispatch('setRememberMe', this.rememberMe);
-
-      const url = this.rememberMe ? `${window.location.origin}/?#autologin` : window.location.origin;
-
-      window.history.pushState('Page', 'Title', url);
-    },
-    /**
-     * Load up the glorious music
-     */
-    introduceMusic() {
-      bus.$emit('music:start');
-    },
-    /**
-     * Cancels login and goes back to main
-     */
-    cancel() {
-      bus.$emit('go:main');
-    },
-    /**
-     * Send login request to server.
-     */
-    login() {
-      if (this.isLoginInProgress) return;
-      this.setLoginProgress(true);
-      this.invalid = false;
-      const data = {
-        username: this.username,
-        password: this.password,
-        useGuestAccount: this.guestAccount,
-      };
-
-      this.$store.dispatch('rememberDevAccount', { username: this.username, password: this.password });
-      Socket.emit('player:login', data);
-    },
-    /**
-     * Displays when a user login is invalid
-     */
-    incorrectLogin() {
-      this.setLoginProgress(false);
-      this.invalid = true;
-    },
-    setLoginProgress(isLoginInProgress) {
-      this.isLoginInProgress = isLoginInProgress;
-    },
-  },
+const setLoginProgress = (value) => {
+  isLoginInProgress.value = value;
 };
+
+const applyGuestCredentials = (value) => {
+  if (value) {
+    username.value = 'dev';
+    password.value = 'qwertykeyboard';
+  } else {
+    username.value = '';
+    password.value = '';
+  }
+};
+
+watch(
+  guestAccount,
+  (value) => {
+    applyGuestCredentials(value);
+  },
+  { immediate: false },
+);
+
+const toggleGuestAccount = () => {
+  uiStore.setGuestAccount(guestAccount.value);
+};
+
+const toggleRememberMe = () => {
+  uiStore.setRememberMe(rememberMe.value);
+  const url = rememberMe.value
+    ? `${window.location.origin}/?#autologin`
+    : window.location.origin;
+  window.history.pushState('Page', 'Title', url);
+};
+
+const introduceMusic = () => {
+  bus.emit('music:start');
+};
+
+const cancel = () => {
+  bus.emit('go:main');
+};
+
+const incorrectLogin = () => {
+  setLoginProgress(false);
+  invalid.value = true;
+};
+
+const login = () => {
+  if (isLoginInProgress.value) return;
+  setLoginProgress(true);
+  invalid.value = false;
+  const data = {
+    username: username.value,
+    password: password.value,
+    useGuestAccount: guestAccount.value,
+  };
+
+  uiStore.rememberDevAccount({
+    username: username.value,
+    password: password.value,
+  });
+  Socket.emit('player:login', data);
+};
+
+const handleLoginError = () => incorrectLogin();
+const handleLoginComplete = () => setLoginProgress(false);
+
+onMounted(() => {
+  invalid.value = false;
+
+  const tempGuest = window.location.href.includes('?useGuestAccount');
+
+  rememberMe.value = uiStore.rememberMe;
+  guestAccount.value = tempGuest || uiStore.guestAccount;
+
+  bus.on('player:login-error', handleLoginError);
+  bus.on('login:done', handleLoginComplete);
+
+  if (guestAccount.value && import.meta.env.DEV) {
+    applyGuestCredentials(true);
+  }
+
+  const storedAccount = uiStore.account;
+  if (storedAccount?.username) {
+    username.value = storedAccount.username;
+    password.value = storedAccount.password;
+    if (window.location.href.includes('#autologin')) {
+      setTimeout(() => document.querySelector('button.login')?.click(), 250);
+    }
+  }
+
+  nextTick(() => {
+    usernameField.value?.focus();
+  });
+});
+
+onBeforeUnmount(() => {
+  bus.off('player:login-error', handleLoginError);
+  bus.off('login:done', handleLoginComplete);
+});
 </script>
 
 <style lang="scss" scoped>

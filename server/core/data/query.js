@@ -1,6 +1,6 @@
-import { general, wearableItems, smithing } from '@server/core/data/items';
+import { general, wearableItems, smithing } from '#server/core/data/items/index.js';
 
-import { foregroundObjects } from '@server/core/data/foreground';
+import { foregroundObjects } from '#server/core/data/foreground/index.js';
 
 class Query {
   /**

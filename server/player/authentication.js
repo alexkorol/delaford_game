@@ -1,6 +1,6 @@
-import Socket from '@server/socket';
+import Socket from '#server/socket.js';
 import axios from 'axios';
-import world from '@server/core/world';
+import world from '#server/core/world.js';
 
 class Authentication {
   /**
@@ -130,4 +130,4 @@ class Authentication {
   }
 }
 
-module.exports = Authentication;
+export default Authentication;

@@ -67,8 +67,8 @@
 </template>
 
 <script>
-import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from 'shared/stats';
-import { computeAvailablePetalCount, sumAllocatedCost } from 'shared/passives/flower-of-life';
+import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from '@shared/stats.js';
+import { computeAvailablePetalCount, sumAllocatedCost } from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);

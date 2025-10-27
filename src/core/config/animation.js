@@ -2,7 +2,7 @@ import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
-} from 'shared/combat';
+} from '@shared/combat.js';
 
 const baseRows = {
   down: 0,

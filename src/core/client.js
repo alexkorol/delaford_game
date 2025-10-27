@@ -8,17 +8,17 @@ import armorImage from '../assets/graphics/items/armor.png';
 import jewelryImage from '../assets/graphics/items/jewelry.png';
 import generalImage from '../assets/graphics/items/general.png';
 
-import bus from './utilities/bus';
+import bus from './utilities/bus.js';
 
-import Socket from './utilities/socket';
-import MovementController from './utilities/movement-controller';
-import SpriteAnimator from './utilities/sprite-animator';
-import { PLAYER_SPRITE_CONFIG } from './config/animation';
-import { DEFAULT_FACING_DIRECTION } from 'shared/combat';
-import { createCharacterState, syncShortcuts } from 'shared/stats';
-import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement';
+import Socket from './utilities/socket.js';
+import MovementController from './utilities/movement-controller.js';
+import SpriteAnimator from './utilities/sprite-animator.js';
+import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
+import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
+import { createCharacterState, syncShortcuts } from '@shared/stats.js';
+import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
 
-import Map from './map';
+import Map from './map.js';
 
 const directionDeltas = {
   right: { x: 1, y: 0 },

@@ -1,11 +1,11 @@
-import MapUtils from 'shared/map-utils';
+import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
-import Socket from '@server/socket';
-import UI from 'shared/ui';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
 import axios from 'axios';
-import config from '@server/config';
+import config from '#server/config.js';
 import * as emoji from 'node-emoji';
-import playerEvent from '@server/player/handlers/actions';
+import playerEvent from '#server/player/handlers/actions/index.js';
 import { v4 as uuid } from 'uuid';
 import {
   ATTRIBUTE_IDS,
@@ -18,16 +18,16 @@ import {
   tryRespawn as tryStatRespawn,
   syncShortcuts,
   toClientPayload as statsToClientPayload,
-} from 'shared/stats';
-import Inventory from './utilities/common/player/inventory';
-import { wearableItems } from './data/items';
-import world from './world';
+} from '#shared/stats/index.js';
+import Inventory from './utilities/common/player/inventory.js';
+import { wearableItems } from './data/items/index.js';
+import world from './world.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
   GLOBAL_COOLDOWN_MS,
-} from 'shared/combat';
+} from '#shared/combat.js';
 
 const BASE_MOVE_DURATION = 150; // ms per cardinal tile step (matches legacy timing)
 
@@ -936,4 +936,4 @@ class Player {
   }
 }
 
-module.exports = Player;
+export default Player;

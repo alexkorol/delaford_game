@@ -1,9 +1,9 @@
-import world from '@server/core/world';
-import { smithing, weapons } from '@server/core/data/items';
-import Socket from '@server/socket';
-// import Query from '@server/core/data/query';
+import world from '#server/core/world.js';
+import { smithing, weapons } from '#server/core/data/items/index.js';
+import Socket from '#server/socket.js';
+// import Query from '#server/core/data/query.js';
 
-import Skill from './index';
+import Skill from './index.js';
 
 export default class Smithing extends Skill {
   constructor(playerIndex, resourceId, type) {

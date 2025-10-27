@@ -1,16 +1,16 @@
-import { general, wearableItems, smithing } from '@server/core/data/items';
+import { general, wearableItems, smithing } from '#server/core/data/items/index.js';
 
-import Authentication from '@server/player/authentication';
-import Handler from '@server/player/handler';
-import Item from '@server/core/item';
-import Map from '@server/core/map';
-import NPC from '@server/core/npc';
-import Monster from '@server/core/monster';
-import Socket from '@server/socket';
+import Authentication from '#server/player/authentication.js';
+import Handler from '#server/player/handler.js';
+import Item from '#server/core/item.js';
+import Map from '#server/core/map.js';
+import NPC from '#server/core/npc.js';
+import Monster from '#server/core/monster.js';
+import Socket from '#server/socket.js';
 import * as emoji from 'node-emoji';
 import { v4 as uuid } from 'uuid';
-import world from '@server/core/world';
-import { partyService } from '@server/player/handlers/party';
+import world from '#server/core/world.js';
+import { partyService } from '#server/player/handlers/party.js';
 
 class Delaford {
   constructor(server) {
@@ -140,4 +140,4 @@ class Delaford {
   }
 }
 
-module.exports = Delaford;
+export default Delaford;

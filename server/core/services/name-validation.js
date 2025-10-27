@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import identityRegistry from './identity-registry';
+import identityRegistry from './identity-registry.js';
 
 const DEFAULT_CACHE_TTL = Number(process.env.NAME_VALIDATION_CACHE_TTL || 1000 * 60 * 15);
 const MAX_NAME_LENGTH = Number(process.env.NAME_VALIDATION_MAX_LENGTH || 24);
@@ -277,4 +277,6 @@ class NameValidationService {
   }
 }
 
-module.exports = new NameValidationService();
+const nameValidationService = new NameValidationService();
+
+export default nameValidationService;

@@ -3,7 +3,7 @@ import {
   DIAGONAL_BINDINGS,
   SKILL_BINDINGS,
   MOVEMENT_REPEAT,
-} from '../config/controls';
+} from '../config/controls.js';
 
 const NORMALISED_SPECIAL_KEYS = {
   space: ' ',

@@ -1,6 +1,6 @@
-import actionEvents from './handlers/actions';
-import socketEvents from './handlers/socket-events';
-import partyEvents from './handlers/party';
+import actionEvents from './handlers/actions/index.js';
+import socketEvents from './handlers/socket-events/index.js';
+import partyEvents from './handlers/party.js';
 
 /**
  * A global event handler (RPC)

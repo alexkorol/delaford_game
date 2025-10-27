@@ -12,7 +12,7 @@ This fork is a fresh take on the original Delaford codebase. The goal is to buil
 - Favors **meaningful character identity**: permadeath with tradeoffs, RP-enforced names via LLM validation, shared stat frameworks for monsters and players.
 - Supports **party-based instanced worlds** and persistent player-modifiable towns.
 
-The high-level roadmap is captured in [`docs/vision.md`](docs/vision.md). It’s a living document that gathers feature specs, UX references, and open questions.
+The high-level roadmap is captured in [`docs/vision.md`](docs/vision.md). Its a living document that gathers feature specs, UX references, and open questions.
 
 ## Quick Start
 
@@ -21,19 +21,27 @@ git clone git@github.com:YOUR_USERNAME/delaford_fork.git
 cd delaford_fork
 volta install node@22 npm@10 # or use nvm/asdf to match .nvmrc
 npm install
-npm run dev           # spins up client + server in parallel
+npm run dev           # spins up Vite + the game server in parallel
 ```
 
-The Vue dev server runs at `http://localhost:8080`, the websocket server on `9000`, and the Express wrapper on `6500`.
+The Vite dev server runs at `http://localhost:5173`, the websocket server on `9000`, and the Express wrapper on `6500`.
+
+Common scripts:
+
+```bash
+npm run build        # bundle the client via Vite
+npm run test:unit    # execute Vitest-powered unit tests
+npm run test:e2e     # run Playwright end-to-end smoke tests against a preview build
+```
 
 Troubleshooting tips and platform-specific notes live in [`docs/development-setup.md`](docs/development-setup.md).
 
 ## Repository Layout
 
-- `server/` – gameplay logic, networking, data tables.
-- `src/` – Vue SPA client, assets, and UI widgets.
-- `docs/` – project vision, setup notes, feature planning.
-- `scripts/` – helper scripts (build, postinstall).
+- `server/`  gameplay logic, networking, data tables.
+- `src/`  Vue SPA client, assets, and UI widgets.
+- `docs/`  project vision, setup notes, feature planning.
+- `src/stores/`  Pinia stores and legacy adapters.
 
 Legacy docs from the original project have been removed or archived. Everything in this fork will track the new gameplay direction.
 
@@ -46,9 +54,9 @@ Legacy docs from the original project have been removed or archived. Everything 
 2. **Gameplay Core**
    - Character stats (Str/Dex/Int), permadeath, cheat-death mechanics.
    - LLM-backed RP name validation.
-   - Passive “flower of life” skill tree.
+   - Passive flower of life skill tree.
 3. **Inventory & Items**
-   - 12×7 backpack grid, equipment paper doll, nested containers.
+   - 127 backpack grid, equipment paper doll, nested containers.
    - Brands/bonds affix model and item binding to player identity.
 4. **UI/UX**
    - PoE-style left/right panes (stats & inventory), semi-transparent chat.
@@ -72,4 +80,4 @@ Contribution standards are being refreshed to match the new scope. Until a forma
 
 ## License & Attribution
 
-Some assets still originate from the original Delaford project (tilesets, fonts, music). Attribution details remain in the asset folders. As the fork evolves, we’ll re-evaluate asset licensing and replacements.
+Some assets still originate from the original Delaford project (tilesets, fonts, music). Attribution details remain in the asset folders. As the fork evolves, well re-evaluate asset licensing and replacements.

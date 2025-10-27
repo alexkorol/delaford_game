@@ -1,4 +1,4 @@
-import { brands, bonds } from './affix-data';
+import { brands, bonds } from './affix-data/index.js';
 
 const structuredCloneSafe = (value) => {
   if (typeof structuredClone === 'function') {
