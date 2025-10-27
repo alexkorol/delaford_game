@@ -185,7 +185,7 @@ export default {
       return `${Math.round(confidence * 100)}%`;
     },
   },
-  beforeDestroy() {
+  beforeUnmount() {
     this.clearPoll();
   },
   methods: {

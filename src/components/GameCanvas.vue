@@ -100,7 +100,7 @@ export default {
   mounted() {
     this.initialiseInputController();
   },
-  beforeDestroy() {
+  beforeUnmount() {
     if (this.inputController) {
       this.inputController.destroy();
       this.inputController = null;

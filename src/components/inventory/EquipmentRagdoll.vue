@@ -107,7 +107,7 @@ export default {
   created() {
     bus.$on('game:context-menu:first-only', ClientUI.displayFirstAction);
   },
-  beforeDestroy() {
+  beforeUnmount() {
     bus.$off('game:context-menu:first-only', ClientUI.displayFirstAction);
   },
   methods: {
