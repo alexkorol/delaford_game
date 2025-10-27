@@ -299,6 +299,7 @@ class WorldManager {
   }
 }
 
-module.exports = new WorldManager();
-module.exports.WorldScene = WorldScene;
-module.exports.DEFAULT_TOWN_ID = DEFAULT_TOWN_ID;
+const worldManager = new WorldManager();
+
+export default worldManager;
+export { WorldScene, DEFAULT_TOWN_ID };

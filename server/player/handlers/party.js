@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
-import world from '@server/core/world';
-import Map from '@server/core/map';
-import Socket from '@server/socket';
+import world from '#server/core/world.js';
+import Map from '#server/core/map.js';
+import Socket from '#server/socket.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 

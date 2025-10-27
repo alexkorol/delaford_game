@@ -37,9 +37,9 @@
 
 <script>
 /* eslint-disable max-len */
-import UI from 'shared/ui';
-import bus from '../../core/utilities/bus';
-import ClientUI from '../../core/utilities/client-ui';
+import UI from '@shared/ui.js';
+import bus from '../../core/utilities/bus.js';
+import ClientUI from '../../core/utilities/client-ui.js';
 
 export default {
   props: {

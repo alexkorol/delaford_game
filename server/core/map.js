@@ -1,12 +1,12 @@
-import { armor, jewelry, weapons } from '@server/core/data/respawn';
+import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
 
-import MapUtils from 'shared/map-utils';
+import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
-import config from '@server/config';
-import surfaceMap from '@server/maps/layers/surface.json';
-import ItemFactory from './items/factory';
-import { Shop } from './functions';
-import world from './world';
+import config from '#server/config.js';
+import surfaceMap from '#server/maps/layers/surface.json' assert { type: 'json' };
+import ItemFactory from './items/factory.js';
+import { Shop } from './functions/index.js';
+import world from './world.js';
 
 const DEFAULT_INSTANCE_ROOM_COUNT = 6;
 const DEFAULT_CORRIDOR_WIDTH = 3;
@@ -436,4 +436,4 @@ class Map {
   }
 }
 
-module.exports = Map;
+export default Map;

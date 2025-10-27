@@ -1,4 +1,4 @@
-import store from '../../store';
+import { useUiStore } from '@/stores/ui.js';
 
 class ClientUI {
   /**
@@ -11,7 +11,8 @@ class ClientUI {
     if (count === -1) return;
     let { label } = incoming.data.data.firstItem;
     if (count > 0) label += ` / ${count} other options`;
-    store.dispatch('setAction', {
+    const store = useUiStore();
+    store.setAction({
       object: incoming.data.data.firstItem,
       label,
     });

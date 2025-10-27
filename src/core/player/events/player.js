@@ -1,8 +1,8 @@
 // Player event handler
 
-import bus from '../../utilities/bus';
-import MovementController from '../../utilities/movement-controller';
-import { now } from '../../config/movement';
+import bus from '../../utilities/bus.js';
+import MovementController from '../../utilities/movement-controller.js';
+import { now } from '../../config/movement.js';
 
 export default {
   /**

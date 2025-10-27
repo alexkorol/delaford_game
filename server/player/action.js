@@ -1,9 +1,9 @@
-import UI from 'shared/ui';
-import World from '@server/core/world';
-import config from '@server/config';
+import UI from '#shared/ui.js';
+import World from '#server/core/world.js';
+import config from '#server/config.js';
 import { merge } from 'lodash';
-import Handler from './handler';
-import playerEvent from './handlers/actions';
+import Handler from './handler.js';
+import playerEvent from './handlers/actions/index.js';
 
 class Action {
   constructor(player, miscData) {

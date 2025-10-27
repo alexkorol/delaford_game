@@ -1,5 +1,5 @@
-import UI from 'shared/ui';
-import world from '@server/core/world';
+import UI from '#shared/ui.js';
+import world from '#server/core/world.js';
 
 class MapUtils {
   /**

@@ -1,8 +1,8 @@
 import { addHours, addMinutes, addSeconds } from 'date-fns';
 
-import Socket from '@server/socket';
-import ItemFactory from './items/factory';
-import world from './world';
+import Socket from '#server/socket.js';
+import ItemFactory from './items/factory.js';
+import world from './world.js';
 
 class Item {
   constructor(data) {

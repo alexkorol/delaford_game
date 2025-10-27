@@ -1,8 +1,8 @@
-import Config from '@server/config';
-import UI from 'shared/ui';
-import Query from './data/query';
-import actionList from './data/action-list';
-import world from './world';
+import Config from '#server/config.js';
+import UI from '#shared/ui.js';
+import Query from './data/query.js';
+import actionList from './data/action-list.js';
+import world from './world.js';
 
 class ContextMenu {
   constructor(player, tile, miscData) {

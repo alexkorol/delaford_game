@@ -1,4 +1,4 @@
-import { DEFAULT_FACING_DIRECTION } from 'shared/combat';
+import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
 
 const FALLBACK_FRAME_DURATION = 120;
 

@@ -85,8 +85,8 @@
 </template>
 
 <script>
-import Socket from '../core/utilities/socket';
-import bus from '../core/utilities/bus';
+import Socket from '../core/utilities/socket.js';
+import bus from '../core/utilities/bus.js';
 
 const formatTime = (timestamp) => {
   const date = new Date(timestamp);

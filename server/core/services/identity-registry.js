@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const DEFAULT_STORE_FILE = path.join(__dirname, '../../data/identity-store.json');
+const serviceDir = fileURLToPath(new URL('.', import.meta.url));
+const DEFAULT_STORE_FILE = path.join(serviceDir, '../../data/identity-store.json');
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -131,4 +133,6 @@ class IdentityRegistry {
   }
 }
 
-module.exports = new IdentityRegistry();
+const identityRegistry = new IdentityRegistry();
+
+export default identityRegistry;

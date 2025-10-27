@@ -179,7 +179,7 @@
 
 <script>
 // Vue components
-import config from 'root/config';
+import config from '@server/config.js';
 import GameCanvas from './components/GameCanvas.vue';
 import Chatbox from './components/Chatbox.vue';
 import Quickbar from './components/hud/Quickbar.vue';
@@ -202,13 +202,13 @@ import Login from './components/ui/Login.vue';
 import CharacterCreate from './components/ui/auth/CharacterCreate.vue';
 
 // Core assets
-import Client from './core/client';
-import Engine from './core/engine';
-import bus from './core/utilities/bus';
-import Event from './core/player/events';
-import MovementController from './core/utilities/movement-controller';
-import { now } from './core/config/movement';
-import Socket from './core/utilities/socket';
+import Client from './core/client.js';
+import Engine from './core/engine.js';
+import bus from './core/utilities/bus.js';
+import Event from './core/player/events.js';
+import MovementController from './core/utilities/movement-controller.js';
+import { now } from './core/config/movement.js';
+import Socket from './core/utilities/socket.js';
 
 const createDefaultQuickSlots = () => Array.from(
   { length: 8 },

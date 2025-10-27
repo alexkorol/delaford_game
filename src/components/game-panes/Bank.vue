@@ -11,7 +11,7 @@
 </template>
 
 <script>
-import bus from '../../core/utilities/bus';
+import bus from '../../core/utilities/bus.js';
 
 export default {
   props: {

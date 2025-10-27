@@ -1,4 +1,4 @@
-import bus from './utilities/bus';
+import bus from './utilities/bus.js';
 
 class Engine {
   constructor(game) {

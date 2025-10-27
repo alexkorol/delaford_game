@@ -1,4 +1,4 @@
-import Bank from './bank';
-import Shop from './shop';
+import Bank from './bank.js';
+import Shop from './shop.js';
 
 export { Bank, Shop };

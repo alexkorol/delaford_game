@@ -3,24 +3,24 @@
  * for example: (take, drop, pickup, etc.)
  */
 
-import { Bank, Shop } from '@server/core/functions';
-import { wearableItems } from '@server/core/data/items';
+import { Bank, Shop } from '#server/core/functions/index.js';
+import { wearableItems } from '#server/core/data/items/index.js';
 
-import config from '@server/config';
-import Action from '@server/player/action';
-import ContextMenu from '@server/core/context-menu';
-import Handler from '@server/player/handler';
-import Item from '@server/core/item';
-import Map from '@server/core/map';
-import Player from '@server/core/player';
-import Mining from '@server/core/skills/mining';
-import Smithing from '@server/core/skills/smithing';
-import Query from '@server/core/data/query';
-import Socket from '@server/socket';
-import UI from 'shared/ui';
-import pipe from '@server/player/pipeline';
-import ItemFactory from '@server/core/items/factory';
-import world from '@server/core/world';
+import config from '#server/config.js';
+import Action from '#server/player/action.js';
+import ContextMenu from '#server/core/context-menu.js';
+import Handler from '#server/player/handler.js';
+import Item from '#server/core/item.js';
+import Map from '#server/core/map.js';
+import Player from '#server/core/player.js';
+import Mining from '#server/core/skills/mining.js';
+import Smithing from '#server/core/skills/smithing.js';
+import Query from '#server/core/data/query.js';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
+import pipe from '#server/player/pipeline/index.js';
+import ItemFactory from '#server/core/items/factory.js';
+import world from '#server/core/world.js';
 
 export default {
   'player:walk-here': (data) => {

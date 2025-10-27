@@ -1,4 +1,4 @@
-import { presetActions } from '@server/core/data/helpers/database';
+import { presetActions } from '#server/core/data/helpers/database.js';
 
 // TODO
 // Find out why hovering over furnace grid shows inventyory grid items

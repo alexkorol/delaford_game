@@ -1,20 +1,19 @@
-// Core libraries
-import Vue from 'vue';
+import { createApp } from 'vue';
+import { plugin as VueTippy } from 'vue-tippy';
+import 'vue-tippy/dist/vue-tippy.css';
 
-// 3rd-party libraries
-import VueTippy from 'vue-tippy';
-
-// Import Delaford
 import Delaford from './Delaford.vue';
-import store from './store';
-import Socket from './core/utilities/socket';
+import Socket from './core/utilities/socket.js';
+import { registerGlobalComponents } from './plugins/register-components.js';
+import { installStores } from './stores/index.js';
+import { createLegacyStore } from './stores/legacy.js';
 
-// Vue configuration
-Vue.config.productionTip = false;
-Vue.config.devtools = process.env.NODE_ENV !== 'production';
+const app = createApp(Delaford);
 
-// Vue plugins
-Vue.use(VueTippy, {
+installStores(app);
+registerGlobalComponents(app);
+
+app.use(VueTippy, {
   animation: 'fade',
   inertia: true,
   size: 'small',
@@ -23,36 +22,31 @@ Vue.use(VueTippy, {
   followCursor: true,
 });
 
-// Import game-panes
-const files = require.context('./components/game-panes', true, /\.vue$/i);
-const utilFiles = require.context('./components/util', true, /\.vue$/i);
-files.keys().map((key) => Vue.component(key.split('/').pop().split('.')[0], files(key).default));
-utilFiles.keys().map((key) => Vue.component(key.split('/').pop().split('.')[0], utilFiles(key).default));
+app.config.globalProperties.$store = createLegacyStore();
 
-// Start the websocket server client-side
-if ('WebSocket' in window) {
+if (typeof window !== 'undefined' && 'WebSocket' in window) {
   const wsurl = {
     prod: 'wss://play.delaford.com',
     dev: `ws://${window.location.hostname}:6500`,
   };
 
-  const url = process.env.NODE_ENV === 'production' ? wsurl.prod : wsurl.dev;
+  const url = import.meta.env.PROD ? wsurl.prod : wsurl.dev;
   window.ws = new WebSocket(url);
   Socket.ensureListeners();
   Socket.flushQueue();
 }
 
-// Add an event listener to close the websocket
-// connection right before the browser closes.
-window.addEventListener('beforeunload', () => window.ws.close());
+window.addEventListener('beforeunload', () => {
+  if (window.ws) {
+    window.ws.close();
+  }
+});
 
-// Focus mouse on game-canvas
 window.focusOnGame = () => {
-  document.querySelector('canvas#game-map.main-canvas').focus();
+  const canvas = document.querySelector('canvas#game-map.main-canvas');
+  if (canvas) {
+    canvas.focus();
+  }
 };
 
-/* eslint-disable no-new */
-new Vue({
-  store,
-  render: (h) => h(Delaford),
-}).$mount('#delaford');
+app.mount('#delaford');

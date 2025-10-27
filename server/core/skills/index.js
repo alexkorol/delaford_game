@@ -1,7 +1,7 @@
-import Socket from '@server/socket';
-import UI from 'shared/ui';
-import world from '@server/core/world';
-import ItemFactory from '@server/core/items/factory';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
+import world from '#server/core/world.js';
+import ItemFactory from '#server/core/items/factory.js';
 
 export default class Skill {
   constructor(playerIndex) {

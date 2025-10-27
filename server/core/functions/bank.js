@@ -1,7 +1,7 @@
-import Query from '@server/core/data/query';
-import UI from 'shared/ui';
-import config from '@server/config';
-import world from '@server/core/world';
+import Query from '#server/core/data/query.js';
+import UI from '#shared/ui.js';
+import config from '#server/config.js';
+import world from '#server/core/world.js';
 
 export default class Bank {
   constructor(playerUuid, itemId, quantity, type) {

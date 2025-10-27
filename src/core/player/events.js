@@ -1,11 +1,11 @@
-import playerEvents from './events/player';
-import itemEvents from './events/item';
-import resourceEvents from './events/resource';
-import npcEvents from './events/npc';
-import monsterEvents from './events/monster';
-import worldEvents from './events/world';
-import screenEvents from './events/screen';
-import partyEvents from './events/party';
+import playerEvents from './events/player.js';
+import itemEvents from './events/item.js';
+import resourceEvents from './events/resource.js';
+import npcEvents from './events/npc.js';
+import monsterEvents from './events/monster.js';
+import worldEvents from './events/world.js';
+import screenEvents from './events/screen.js';
+import partyEvents from './events/party.js';
 
 /**
  * A global event handler [CLIENT SIDE] (RPC)

@@ -1,12 +1,12 @@
 import { v4 as uuid } from 'uuid';
-import Socket from '@server/socket';
-import UI from 'shared/ui';
-import config from '@server/config';
-import world from './world';
-import Player from './player';
-import monsterDefinitions from './data/monsters';
-import { getArchetype } from './monsters/archetypes';
-import { getRarity } from './monsters/rarities';
+import Socket from '#server/socket.js';
+import UI from '#shared/ui.js';
+import config from '#server/config.js';
+import world from './world.js';
+import Player from './player.js';
+import monsterDefinitions from './data/monsters/index.js';
+import { getArchetype } from './monsters/archetypes.js';
+import { getRarity } from './monsters/rarities.js';
 import {
   ATTRIBUTE_IDS,
   createCharacterState,
@@ -14,12 +14,12 @@ import {
   applyDamage as applyStatDamage,
   applyHealing as applyStatHealing,
   toClientPayload as statsToClientPayload,
-} from 'shared/stats';
+} from '#shared/stats/index.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
   DEFAULT_ANIMATION_HOLDS,
-} from 'shared/combat';
+} from '#shared/combat.js';
 
 const BASE_MOVE_DURATION = 150;
 

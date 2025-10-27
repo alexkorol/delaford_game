@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import world from '@server/core/world';
+import world from '#server/core/world.js';
 
 /**
  * IDEA: Create seperate socket classes,
@@ -90,4 +90,4 @@ class Socket {
   }
 }
 
-module.exports = Socket;
+export default Socket;

@@ -29,8 +29,8 @@
 
 <script>
 import { omit } from 'lodash';
-import bus from '../../core/utilities/bus';
-import Socket from '../../core/utilities/socket';
+import bus from '../../core/utilities/bus.js';
+import Socket from '../../core/utilities/socket.js';
 
 export default {
   props: {

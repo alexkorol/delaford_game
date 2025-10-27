@@ -1,5 +1,5 @@
-import world from '@server/core/world';
-import { wearableItems } from '../data/items';
+import world from '#server/core/world.js';
+import { wearableItems } from '../data/items/index.js';
 
 class Wear {
   /**
@@ -84,4 +84,4 @@ class Wear {
   }
 }
 
-module.exports = Wear;
+export default Wear;

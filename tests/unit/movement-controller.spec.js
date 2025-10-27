@@ -1,5 +1,7 @@
-import MovementController from '../../src/core/utilities/movement-controller';
-import { TILE_SIZE } from '../../src/core/config/movement';
+import { describe, expect, it } from 'vitest';
+
+import MovementController from '../../src/core/utilities/movement-controller.js';
+import { TILE_SIZE } from '../../src/core/config/movement.js';
 
 describe('MovementController', () => {
   it('applies server timing metadata with elapsed progress', () => {

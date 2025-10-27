@@ -182,7 +182,7 @@ import {
   computeAvailablePetalCount,
   evaluateGate,
   sumAllocatedCost,
-} from 'shared/passives/flower-of-life';
+} from '@shared/passives/flower-of-life.js';
 
 export default {
   name: 'FlowerOfLifePane',
