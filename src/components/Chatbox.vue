@@ -198,7 +198,7 @@ export default {
   mounted() {
     this.scrollToBottom();
   },
-  beforeDestroy() {
+  beforeUnmount() {
     bus.$off('player:say', this.messageHandler);
     bus.$off('item:examine', this.messageHandler);
     this.stopCountdown();

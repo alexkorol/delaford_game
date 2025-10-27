@@ -56,7 +56,7 @@ export default {
       this.loaded = true;
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     bus.$off('game:images:loaded', this.imagesLoaded);
   },
   methods: {

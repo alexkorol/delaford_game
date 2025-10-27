@@ -1,6 +1,7 @@
 import compression from 'compression';
 import express from 'express';
 import enforce from 'express-sslify';
+import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,11 @@ const port = process.env.PORT || 6500;
 const env = process.env.NODE_ENV || 'production';
 const app = express();
 
+const hasClientBundle = () => (
+  fs.existsSync(distDir)
+  && fs.existsSync(path.join(distDir, 'index.html'))
+);
+
 if (env === 'production') {
   app.use(enforce.HTTPS({ trustProtoHeader: true }));
   app.use(secure);
@@ -25,7 +31,13 @@ if (env === 'production') {
 
 app.use(compression());
 app.use(express.json({ limit: '32kb' }));
-app.use(express.static(distDir));
+
+if (hasClientBundle()) {
+  app.use(express.static(distDir));
+} else {
+  // eslint-disable-next-line no-console
+  console.warn('[server] Client bundle not found in dist/. Static assets will be skipped.');
+}
 
 const serializeJob = (job) => {
   const payload = {
@@ -88,7 +100,14 @@ app.get('/world/respawns', (_req, res) => res.send(world.respawns));
 app.get('/world/shops', (_req, res) => res.send(world.shops));
 
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(distDir, 'index.html'));
+  if (hasClientBundle()) {
+    res.sendFile(path.join(distDir, 'index.html'));
+    return;
+  }
+
+  res.status(503).json({
+    message: 'Client bundle not found. Run `npm run build` or use the Vite dev server.',
+  });
 });
 
 const server = http.createServer(app);

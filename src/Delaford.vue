@@ -512,7 +512,7 @@ export default {
       this.layout.chat.isOpen = true;
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', this.onViewportResize);
       window.removeEventListener('keydown', this.handleGlobalKeydown);
