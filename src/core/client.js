@@ -15,7 +15,7 @@ import MovementController from './utilities/movement-controller.js';
 import SpriteAnimator from './utilities/sprite-animator.js';
 import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
-import { createCharacterState, syncShortcuts } from '@shared/stats.js';
+import { createCharacterState, syncShortcuts } from '@shared/stats/index.js';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
 
 import Map from './map.js';
