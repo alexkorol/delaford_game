@@ -9,19 +9,28 @@
     />
 
     <div class="inventory-pane__grid">
-      <item-grid
+      <InventoryGrid
         :images="game.map.images"
-        :items="items"
-        :slots="totalSlots"
-        screen="inventory"
+        :columns="grid.columns"
+        :rows="grid.rows"
+        @commit="handleInventoryCommit"
       />
+
+      <WorldDropZone />
+      <ContainerStack />
     </div>
   </div>
 </template>
 
 <script>
+import { watch } from 'vue';
+
 import bus from '../../core/utilities/bus.js';
+import { useInventoryStore } from '@/stores/inventory.js';
 import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
+import InventoryGrid from '../inventory/InventoryGrid.vue';
+import WorldDropZone from '../inventory/WorldDropZone.vue';
+import ContainerStack from '../inventory/ContainerStack.vue';
 
 const INVENTORY_COLUMNS = 12;
 const INVENTORY_ROWS = 7;
@@ -30,6 +39,9 @@ export default {
   name: 'InventoryPane',
   components: {
     EquipmentRagdoll,
+    InventoryGrid,
+    WorldDropZone,
+    ContainerStack,
   },
   props: {
     game: {
@@ -37,18 +49,34 @@ export default {
       required: true,
     },
   },
+  setup(props) {
+    const inventoryStore = useInventoryStore();
+
+    watch(() => props.game?.player?.inventory, (items) => {
+      inventoryStore.setInventoryItems(items || []);
+    }, { immediate: true, deep: true });
+
+    watch(() => props.game?.player?.wear, (wear) => {
+      inventoryStore.setEquipment(wear || {});
+    }, { immediate: true, deep: true });
+
+    return {
+      inventoryStore,
+    };
+  },
+  provide() {
+    return {
+      inventoryDragStore: this.inventoryStore,
+    };
+  },
   data() {
     return {
       loaded: false,
+      grid: {
+        columns: INVENTORY_COLUMNS,
+        rows: INVENTORY_ROWS,
+      },
     };
-  },
-  computed: {
-    items() {
-      return this.game.player.inventory;
-    },
-    totalSlots() {
-      return INVENTORY_COLUMNS * INVENTORY_ROWS;
-    },
   },
   created() {
     bus.$on('game:images:loaded', this.imagesLoaded);
@@ -62,6 +90,16 @@ export default {
   methods: {
     imagesLoaded() {
       this.loaded = true;
+    },
+    handleInventoryCommit(result) {
+      if (!result || result.cancelled) {
+        return;
+      }
+
+      bus.$emit('inventory:interaction', {
+        source: 'inventory-pane',
+        result,
+      });
     },
   },
 };
@@ -81,11 +119,9 @@ export default {
   }
 
   &__grid {
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.65);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 }
 </style>
