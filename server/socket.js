@@ -56,30 +56,41 @@ class Socket {
       ...(options.meta || {}),
     };
 
-    const obj = {
+    const payload = {
       event,
       data,
       meta,
     };
 
-    world.clients.forEach((client, index) => {
-      if (!players || players.find(p => p.socket_id === client.id)) {
-        const sender = world.players.find(p => p.socket_id === client.id);
+    const serializedPayload = JSON.stringify(payload);
+    const allowedSocketIds = players ? new Set(players.map(player => player.socket_id)) : null;
+    const disconnectedClientIds = [];
 
-        if (world.players.length && sender) {
-          if (client.readyState === 3) {
-            world.clients.splice(index, 1);
-          }
-          const player = world.clients.find(c => c.id === client.id);
+    world.clients.forEach(client => {
+      if (client.readyState === WebSocket.CLOSED) {
+        disconnectedClientIds.push(client.id);
+        return;
+      }
 
-          if (player && (client.readyState === player.readyState) && (world.clients.length)) {
-            client.send(JSON.stringify(obj));
-          }
-        }
+      if (allowedSocketIds && !allowedSocketIds.has(client.id)) {
+        return;
+      }
+
+      const sender = world.players.find(p => p.socket_id === client.id);
+
+      if (!world.players.length || !sender) {
+        return;
+      }
+
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(serializedPayload);
       }
     });
 
-    world.clients = world.clients.filter(client => client.readyState !== 3);
+    if (disconnectedClientIds.length) {
+      const disconnectedSet = new Set(disconnectedClientIds);
+      world.clients = world.clients.filter(client => !disconnectedSet.has(client.id));
+    }
   }
 
   static sendMessageToPlayer(playerIndex, message) {
