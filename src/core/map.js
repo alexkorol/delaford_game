@@ -143,7 +143,7 @@ class Map {
     const tileSize = tileset.tile.width;
 
     if (this.player && this.player.movement) {
-      const renderPosition = this.player.movement.update();
+      const renderPosition = this.player.movement.update({ deltaSeconds });
       const tileCenter = centerOfTile(this.player.x, this.player.y, tileSize);
 
       const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -167,7 +167,7 @@ class Map {
     if (Array.isArray(this.players)) {
       this.players.forEach((player) => {
         if (player.movement) {
-          player.movement.update();
+          player.movement.update({ deltaSeconds });
         }
 
         if (player.animationController) {
@@ -182,7 +182,7 @@ class Map {
     if (Array.isArray(this.npcs)) {
       this.npcs.forEach((npc) => {
         if (npc.movement) {
-          npc.movement.update();
+          npc.movement.update({ deltaSeconds });
         }
 
         if (npc.animationController) {
@@ -197,7 +197,7 @@ class Map {
     if (Array.isArray(this.monsters)) {
       this.monsters.forEach((monster) => {
         if (monster.movement) {
-          monster.movement.update();
+          monster.movement.update({ deltaSeconds });
         }
 
         if (monster.animationController) {
