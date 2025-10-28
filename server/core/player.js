@@ -1,59 +1,28 @@
-import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
-import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
 import axios from 'axios';
 import config from '#server/config.js';
 import * as emoji from 'node-emoji';
-import playerEvent from '#server/player/handlers/actions/index.js';
-import { v4 as uuid } from 'uuid';
-import {
-  ATTRIBUTE_IDS,
-  createAttributeMap,
-  createCharacterState,
-  aggregateAttributes,
-  computeResources,
-  applyDamage as applyStatDamage,
-  applyHealing as applyStatHealing,
-  tryRespawn as tryStatRespawn,
-  syncShortcuts,
-  toClientPayload as statsToClientPayload,
-} from '#shared/stats/index.js';
-import Inventory from './utilities/common/player/inventory.js';
-import { wearableItems } from './data/items/index.js';
 import world from './world.js';
-import {
-  DEFAULT_FACING_DIRECTION,
-  DEFAULT_ANIMATION_DURATIONS,
-  DEFAULT_ANIMATION_HOLDS,
-  GLOBAL_COOLDOWN_MS,
-} from '#shared/combat.js';
-
-const BASE_MOVE_DURATION = 150; // ms per cardinal tile step (matches legacy timing)
-
-function clone(value) {
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(clone);
-  }
-
-  return Object.entries(value).reduce((acc, [key, entry]) => {
-    acc[key] = clone(entry);
-    return acc;
-  }, {});
-}
-
-const computeStepDuration = (deltaX, deltaY, baseDuration = BASE_MOVE_DURATION) => {
-  const diagonal = Math.abs(deltaX) === 1 && Math.abs(deltaY) === 1;
-  const multiplier = diagonal ? Math.SQRT2 : 1;
-  return Math.round(baseDuration * multiplier);
-};
+import createPlayerCombatController from '#server/core/entities/player/combat-controller.js';
+import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
+import createPlayerMovementHandler, {
+  broadcastAnimation as broadcastPlayerAnimation,
+  broadcastMovement as broadcastPlayerMovement,
+  directionDelta as movementDirectionDelta,
+  queueEmpty as movementQueueEmpty,
+} from '#server/core/entities/player/movement-handler.js';
+import createPlayerStatsManager, {
+  broadcastStats as broadcastPlayerStats,
+} from '#server/core/entities/player/stats-manager.js';
 
 class Player {
   constructor(data, token, socketId) {
+    this.movement = createPlayerMovementHandler(this);
+    this.statsManager = createPlayerStatsManager(this);
+    this.combatController = createPlayerCombatController(this, this.movement);
+    this.inventoryManager = createPlayerInventoryManager(this);
+
     // Main statistics
     this.username = data.username;
     this.x = data.x;
@@ -156,9 +125,9 @@ class Player {
     };
 
     // Player inventory
-    this.inventory = new Inventory(data.inventory, this.socket_id);
+    this.inventory = this.inventoryManager.initializeInventory(data.inventory, this.socket_id);
 
-    this.facing = DEFAULT_FACING_DIRECTION;
+    this.facing = this.movement.resolveFacing(null);
     this.animation = this.createInitialAnimation();
     Object.defineProperty(this, 'animationTimer', {
       value: null,
@@ -183,130 +152,27 @@ class Player {
   }
 
   buildInitialStats(data = {}) {
-    const attributeSources = {
-      base: data.attributes && data.attributes.base
-        ? data.attributes.base
-        : data.baseAttributes,
-      bonuses: data.attributes && data.attributes.bonuses
-        ? data.attributes.bonuses
-        : data.attributeBonuses,
-      equipment: data.attributes && data.attributes.equipment
-        ? data.attributes.equipment
-        : data.equipmentAttributes,
-    };
-
-    const resourceOverrides = {
-      health: (data.resources && data.resources.health) || data.hp || {},
-      mana: (data.resources && data.resources.mana) || data.mana || {},
-    };
-
-    const lifecycle = data.lifecycle || {};
-
-    this.stats = createCharacterState({
-      level: this.level,
-      attributes: attributeSources,
-      resources: resourceOverrides,
-      lifecycle,
-    });
-
-    syncShortcuts(this.stats, this);
-    return this.stats;
+    return this.statsManager.buildInitialStats(data);
   }
 
   getEquipmentAttributeTotals() {
-    const totals = createAttributeMap(0);
-
-    if (!this.wear) {
-      return totals;
-    }
-
-    Object.values(this.wear).forEach((item) => {
-      if (!item || !item.attributes) {
-        return;
-      }
-
-      ATTRIBUTE_IDS.forEach((attributeId) => {
-        const value = Number(item.attributes[attributeId]);
-        if (Number.isFinite(value)) {
-          totals[attributeId] += value;
-        }
-      });
-    });
-
-    return totals;
+    return this.statsManager.getEquipmentAttributeTotals();
   }
 
   refreshDerivedStats(overrides = {}) {
-    if (!this.stats) {
-      this.buildInitialStats({});
-    }
-
-    const existingSources = (this.stats && this.stats.attributes && this.stats.attributes.sources) || {};
-
-    const baseSource = overrides.base || existingSources.base || {};
-    const bonusSource = overrides.bonuses || existingSources.bonuses || {};
-    const equipmentSource = overrides.equipment || this.getEquipmentAttributeTotals();
-
-    const aggregated = aggregateAttributes({
-      base: baseSource,
-      bonuses: bonusSource,
-      equipment: equipmentSource,
-    });
-
-    const healthOverride = {
-      current: this.hp && this.hp.current !== undefined ? this.hp.current : undefined,
-      max: this.hp && this.hp.max !== undefined ? this.hp.max : undefined,
-    };
-    if (healthOverride.current === 0) {
-      healthOverride.allowZero = true;
-    }
-
-    const manaOverride = {
-      current: this.mana && this.mana.current !== undefined ? this.mana.current : undefined,
-      max: this.mana && this.mana.max !== undefined ? this.mana.max : undefined,
-    };
-
-    const resources = computeResources(
-      { level: this.level, attributes: aggregated.total },
-      { health: healthOverride, mana: manaOverride },
-    );
-
-    this.stats.level = this.level;
-    this.stats.attributes = aggregated;
-    this.stats.resources = resources;
-
-    syncShortcuts(this.stats, this);
-    return this.stats;
+    return this.statsManager.refreshDerivedStats(overrides);
   }
 
   applyDamage(amount, options = {}) {
-    if (!this.stats) {
-      this.buildInitialStats({});
-    }
-
-    const result = applyStatDamage(this.stats, amount, options);
-    syncShortcuts(this.stats, this);
-    return result;
+    return this.statsManager.applyDamage(amount, options);
   }
 
   applyHealing(amount, options = {}) {
-    if (!this.stats) {
-      this.buildInitialStats({});
-    }
-
-    const result = applyStatHealing(this.stats, amount, options);
-    syncShortcuts(this.stats, this);
-    return result;
+    return this.statsManager.applyHealing(amount, options);
   }
 
   tryRespawn(options = {}) {
-    if (!this.stats) {
-      this.buildInitialStats({});
-    }
-
-    const result = tryStatRespawn(this.stats, options);
-    syncShortcuts(this.stats, this);
-    return result;
+    return this.statsManager.tryRespawn(options);
   }
 
   /**
@@ -316,172 +182,31 @@ class Player {
    * @param {string} data The array of wear objects
    */
   static constructWear(data) {
-    const wearData = data;
-    // Do not load arrows for now
-    delete wearData.arrows;
-
-    // Go through every wear slot
-    // and map from database to Vue object
-    Object.keys(wearData).forEach((property) => {
-      if (Object.prototype.hasOwnProperty.call(wearData, property)) {
-        if (wearData[property] !== null) {
-          const id = wearData[property];
-          const { name, graphics } = wearableItems.find(db => db.id === id);
-          wearData[property] = {
-            uuid: uuid(),
-            graphics,
-            name,
-            id,
-          };
-        }
-      }
-    });
-
-    return data;
+    return constructWear(data);
   }
 
   createInitialAnimation(overrides = {}) {
-    const direction = this.resolveFacing(overrides.direction, DEFAULT_FACING_DIRECTION);
-    return {
-      state: overrides.state || 'idle',
-      direction,
-      sequence: Number.isFinite(overrides.sequence) ? overrides.sequence : 0,
-      startedAt: Number.isFinite(overrides.startedAt) ? overrides.startedAt : Date.now(),
-      duration: Number.isFinite(overrides.duration) ? overrides.duration : 0,
-      speed: Number.isFinite(overrides.speed) ? overrides.speed : 1,
-      skillId: overrides.skillId || null,
-      holdState: overrides.holdState || null,
-    };
+    return this.movement.createInitialAnimation(overrides);
   }
 
-  resolveFacing(direction, fallback = DEFAULT_FACING_DIRECTION) {
-    if (!direction) {
-      return fallback;
-    }
-
-    const mapping = {
-      'up-right': 'right',
-      'down-right': 'right',
-      'up-left': 'left',
-      'down-left': 'left',
-    };
-
-    const candidate = mapping[direction] || direction;
-    if (['up', 'down', 'left', 'right'].includes(candidate)) {
-      return candidate;
-    }
-
-    return fallback;
+  resolveFacing(direction, fallback) {
+    return this.movement.resolveFacing(direction, fallback);
   }
 
   setFacing(direction) {
-    this.facing = this.resolveFacing(direction, this.facing || DEFAULT_FACING_DIRECTION);
-    return this.facing;
+    return this.movement.setFacing(direction);
   }
 
   clearAnimationTimer() {
-    if (this.animationTimer) {
-      clearTimeout(this.animationTimer);
-      this.animationTimer = null;
-    }
+    return this.movement.clearAnimationTimer();
   }
 
   setAnimationState(state, options = {}) {
-    const resolvedState = state || 'idle';
-    const direction = this.resolveFacing(options.direction, this.facing || DEFAULT_FACING_DIRECTION);
-    const nowTs = Number.isFinite(options.startedAt) ? options.startedAt : Date.now();
-    const previousSequence = this.animation && typeof this.animation.sequence === 'number'
-      ? this.animation.sequence
-      : 0;
-    const sequence = Number.isFinite(options.sequence) ? options.sequence : previousSequence + 1;
-    const duration = Number.isFinite(options.duration)
-      ? options.duration
-      : (DEFAULT_ANIMATION_DURATIONS[resolvedState] || 0);
-    const holdState = options.holdState !== undefined
-      ? options.holdState
-      : (DEFAULT_ANIMATION_HOLDS[resolvedState] || null);
-
-    this.animation = {
-      state: resolvedState,
-      direction,
-      sequence,
-      startedAt: nowTs,
-      duration,
-      speed: Number.isFinite(options.speed) ? options.speed : 1,
-      skillId: options.skillId || null,
-      holdState,
-    };
-
-    this.clearAnimationTimer();
-
-    if (holdState && duration > 0 && options.autoHold !== false) {
-      this.animationTimer = setTimeout(() => {
-        if (!this.animation || this.animation.sequence !== sequence) {
-          return;
-        }
-
-        this.setAnimationState(holdState, {
-          direction,
-          sequence: sequence + 0.1,
-          startedAt: Date.now(),
-          duration: DEFAULT_ANIMATION_DURATIONS[holdState] || 0,
-          holdState: DEFAULT_ANIMATION_HOLDS[holdState] || null,
-          autoHold: false,
-        });
-        Player.broadcastAnimation(this);
-      }, duration);
-    }
-
-    return this.animation;
+    return this.movement.setAnimationState(state, options);
   }
 
   recordSkillInput(skillId, data = {}) {
-    if (!skillId) {
-      return false;
-    }
-
-    const nowTs = Date.now();
-    if (this.combat.globalCooldown && this.combat.globalCooldown > nowTs) {
-      return false;
-    }
-
-    const direction = this.resolveFacing(data.direction, this.facing);
-    this.setFacing(direction);
-
-    const currentSequence = Number.isFinite(this.combat.sequence) ? this.combat.sequence : 0;
-    this.combat.sequence = currentSequence + 1;
-    this.combat.globalCooldown = nowTs + GLOBAL_COOLDOWN_MS;
-    this.combat.lastSkill = {
-      id: skillId,
-      usedAt: nowTs,
-      direction,
-      modifiers: data.modifiers || {},
-      sequence: this.combat.sequence,
-    };
-
-    const windowStart = nowTs - 3000;
-    const history = Array.isArray(this.combat.inputHistory) ? this.combat.inputHistory : [];
-    this.combat.inputHistory = [
-      ...history.filter((entry) => entry && entry.usedAt && entry.usedAt >= windowStart),
-      this.combat.lastSkill,
-    ];
-
-    const animationState = data.animationState || 'attack';
-    const duration = data.duration !== undefined
-      ? data.duration
-      : (DEFAULT_ANIMATION_DURATIONS[animationState] || DEFAULT_ANIMATION_DURATIONS.attack);
-    const holdState = data.holdState !== undefined
-      ? data.holdState
-      : (DEFAULT_ANIMATION_HOLDS[animationState] || DEFAULT_ANIMATION_HOLDS.attack);
-
-    this.setAnimationState(animationState, {
-      direction,
-      duration,
-      skillId,
-      holdState,
-    });
-
-    return true;
+    return this.combatController.recordSkillInput(skillId, data);
   }
 
   /**
@@ -491,153 +216,23 @@ class Player {
    * @param {boolean} pathfind Whether pathfinding is being used to move player
    */
   move(direction, options = {}) {
-    const context = typeof options === 'boolean' ? { pathfind: options } : options;
-    const {
-      pathfind = false,
-      duration: durationOverride = null,
-      walkId = null,
-      stepIndex = null,
-      steps = null,
-      startedAt = Date.now(),
-    } = context || {};
-
-    if (!pathfind) {
-      this.cancelPathfinding();
-    }
-
-    if (pathfind) {
-      this.moving = true;
-    }
-
-    const delta = Player.directionDelta(direction);
-    const facing = this.setFacing(direction);
-
-    if (!delta) {
-      console.log('Nothing happened');
-      return false;
-    }
-
-    const attemptedWalkId = pathfind ? walkId : null;
-    const duration = typeof durationOverride === 'number'
-      ? durationOverride
-      : computeStepDuration(delta.x, delta.y);
-
-    if (this.isBlocked(direction, delta)) {
-      this.registerMovementStep({
-        duration: 0,
-        walkId: attemptedWalkId,
-        stepIndex,
-        steps,
-        startedAt,
-        direction,
-        blocked: true,
-      });
-      this.setAnimationState('idle', { direction: facing });
-      return false;
-    }
-
-    this.x += delta.x;
-    this.y += delta.y;
-
-    this.registerMovementStep({
-      duration,
-      walkId: attemptedWalkId,
-      stepIndex,
-      steps,
-      startedAt,
-      direction,
-      blocked: false,
-    });
-    this.setAnimationState('run', { direction: facing, duration });
-
-    return true;
+    return this.movement.move(direction, options);
   }
 
   registerMovementStep(step = {}) {
-    const currentSequence = this.movementStep && typeof this.movementStep.sequence === 'number'
-      ? this.movementStep.sequence
-      : 0;
-
-    const interruption = step.interrupted !== undefined
-      ? step.interrupted
-      : Boolean(this.path && this.path.current && this.path.current.interrupted);
-
-    this.movementStep = {
-      sequence: currentSequence + 1,
-      startedAt: typeof step.startedAt === 'number' ? step.startedAt : Date.now(),
-      duration: typeof step.duration === 'number' ? step.duration : 0,
-      walkId: step.walkId ?? null,
-      stepIndex: step.stepIndex ?? null,
-      steps: step.steps ?? null,
-      direction: step.direction || null,
-      blocked: Boolean(step.blocked),
-      interrupted: interruption,
-    };
-
-    return this.movementStep;
+    return this.movement.registerMovementStep(step);
   }
 
   cancelPathfinding() {
-    const { path } = this;
-    if (!path || !path.current) {
-      return;
-    }
-
-    if (typeof path.current.walkId === 'number') {
-      path.current.walkId += 1;
-    } else {
-      path.current.walkId = 1;
-    }
-
-    path.current.path.walking = [];
-    path.current.path.set = [];
-    path.current.length = 0;
-    path.current.step = 0;
-    path.current.walkable = false;
-    path.current.interrupted = true;
-
-    this.moving = false;
-    this.queue = [];
-    this.action = false;
-    this.setAnimationState('idle', { direction: this.facing });
+    return this.movement.cancelPathfinding();
   }
 
   static directionDelta(direction) {
-    const mapping = {
-      right: { x: 1, y: 0 },
-      left: { x: -1, y: 0 },
-      up: { x: 0, y: -1 },
-      down: { x: 0, y: 1 },
-      'up-right': { x: 1, y: -1 },
-      'down-right': { x: 1, y: 1 },
-      'up-left': { x: -1, y: -1 },
-      'down-left': { x: -1, y: 1 },
-    };
-
-    return mapping[direction] || null;
+    return movementDirectionDelta(direction);
   }
 
   canMoveTo(tileX, tileY) {
-    const { size } = config.map;
-
-    if (tileX < 0 || tileY < 0 || tileX >= size.x || tileY >= size.y) {
-      return false;
-    }
-
-    const tileIndex = (tileY * size.x) + tileX;
-    const scene = world.getSceneForPlayer(this);
-    const mapLayers = scene && scene.map ? scene.map : world.map;
-    const steppedOn = {
-      background: mapLayers.background[tileIndex] - 1,
-      foreground: mapLayers.foreground[tileIndex] - 1,
-    };
-
-    const tiles = {
-      background: steppedOn.background,
-      foreground: steppedOn.foreground - 252,
-    };
-
-    return MapUtils.gridWalkable(tiles, this, tileIndex, 0, 0, mapLayers) === 0;
+    return this.movement.canMoveTo(tileX, tileY);
   }
 
   /**
@@ -647,100 +242,7 @@ class Player {
    * @param {object} map The map object associated with player
    */
   walkPath(playerIndex) {
-    const player = world.players[playerIndex];
-    const { path } = player;
-    const baseSpeed = BASE_MOVE_DURATION; // Base delay per cardinal step in ms
-
-    if (!path || !path.current || !Array.isArray(path.current.path.walking)) {
-      return;
-    }
-
-    if (path.current.path.walking.length <= 1) {
-      if (!Player.queueEmpty(playerIndex)) {
-        const todo = world.players[playerIndex].queue[0];
-
-        playerEvent[todo.action.actionId]({
-          todo,
-          playerIndex,
-        });
-
-        this.queue.shift();
-      }
-
-      this.stopMovement({ player: { socket_id: player.socket_id } });
-      return;
-    }
-
-    path.current.walkId = (path.current.walkId || 0) + 1;
-    const activeWalkId = path.current.walkId;
-    path.current.interrupted = false;
-
-    const scheduleNextStep = () => {
-      if (path.current.walkId !== activeWalkId) {
-        return;
-      }
-
-      if (path.current.step + 1 >= path.current.path.walking.length) {
-        if (!Player.queueEmpty(playerIndex)) {
-          const todo = world.players[playerIndex].queue[0];
-
-          playerEvent[todo.action.actionId]({
-            todo,
-            playerIndex,
-          });
-
-          this.queue.shift();
-        }
-
-        this.stopMovement({ player: { socket_id: world.players[playerIndex].socket_id } });
-        return;
-      }
-
-      const currentIndex = path.current.step;
-      const currentCoordinates = {
-        x: path.current.path.walking[currentIndex][0],
-        y: path.current.path.walking[currentIndex][1],
-      };
-      const nextCoordinates = {
-        x: path.current.path.walking[currentIndex + 1][0],
-        y: path.current.path.walking[currentIndex + 1][1],
-      };
-
-      const movement = UI.getMovementDirection({
-        current: currentCoordinates,
-        next: nextCoordinates,
-      });
-
-      const deltaX = Math.abs(nextCoordinates.x - currentCoordinates.x);
-      const deltaY = Math.abs(nextCoordinates.y - currentCoordinates.y);
-      const stepDuration = computeStepDuration(deltaX, deltaY, baseSpeed);
-      const totalSteps = Math.max(0, path.current.path.walking.length - 1);
-
-      setTimeout(() => {
-        if (path.current.walkId !== activeWalkId) {
-          return;
-        }
-
-        const stepStartedAt = Date.now();
-        this.move(movement, {
-          pathfind: true,
-          duration: stepDuration,
-          walkId: activeWalkId,
-          stepIndex: currentIndex + 1,
-          steps: totalSteps,
-          startedAt: stepStartedAt,
-          direction: movement,
-        });
-
-        const playerChanging = world.players[playerIndex];
-        Player.broadcastMovement(playerChanging);
-
-        path.current.step += 1;
-        scheduleNextStep();
-      }, stepDuration);
-    };
-
-    scheduleNextStep();
+    return this.movement.walkPath(playerIndex);
   }
 
   /**
@@ -749,57 +251,19 @@ class Player {
    * @param {object} data The player object
    */
   stopMovement(data) {
-    Socket.emit('player:stopped', { player: data.player });
-    this.moving = false;
-    this.setAnimationState('idle', { direction: this.facing });
-    Player.broadcastAnimation(this);
+    return this.movement.stopMovement(data);
   }
 
   static broadcastMovement(player, players = null) {
-    if (!player) {
-      return;
-    }
-
-    const meta = {};
-    if (player.movementStep) {
-      meta.movementStep = player.movementStep;
-    }
-    if (player.animation) {
-      meta.animation = player.animation;
-    }
-    const recipients = players || world.getScenePlayers(player.sceneId);
-    Socket.broadcast('player:movement', player, recipients, { meta });
+    return broadcastPlayerMovement(player, players);
   }
 
   static broadcastAnimation(player, players = null) {
-    if (!player || !player.animation) {
-      return;
-    }
-
-    const recipients = players || world.getScenePlayers(player.sceneId);
-    Socket.broadcast('player:animation', {
-      playerId: player.uuid,
-      animation: player.animation,
-    }, recipients);
+    return broadcastPlayerAnimation(player, players);
   }
 
   static broadcastStats(player, players = null) {
-    if (!player || !player.stats) {
-      return;
-    }
-
-    const recipients = players || world.getScenePlayers(player.sceneId);
-    const payload = {
-      playerId: player.uuid,
-      stats: statsToClientPayload(player.stats),
-      resources: {
-        health: clone(player.stats.resources.health),
-        mana: clone(player.stats.resources.mana),
-      },
-      lifecycle: clone(player.stats.lifecycle),
-    };
-
-    Socket.broadcast('player:stats:update', payload, recipients);
+    return broadcastPlayerStats(player, players);
   }
 
   /**
@@ -810,29 +274,7 @@ class Player {
    * @returns {boolean}
    */
   isBlocked(direction, delta = null) {
-    const vector = delta || Player.directionDelta(direction);
-
-    if (!vector) {
-      return true;
-    }
-
-    const targetX = this.x + vector.x;
-    const targetY = this.y + vector.y;
-
-    if (!this.canMoveTo(targetX, targetY)) {
-      return true;
-    }
-
-    if (vector.x !== 0 && vector.y !== 0) {
-      const horizontal = this.canMoveTo(this.x + vector.x, this.y);
-      const vertical = this.canMoveTo(this.x, this.y + vector.y);
-
-      if (!horizontal && !vertical) {
-        return true;
-      }
-    }
-
-    return false;
+    return this.movement.isBlocked(direction, delta);
   }
 
   /**
@@ -841,7 +283,7 @@ class Player {
    * @returns {boolean}
    */
   backgroundBlocked() {
-    return this.blocked.background === true;
+    return this.movement.backgroundBlocked();
   }
 
   /**
@@ -850,7 +292,7 @@ class Player {
    * @returns {boolean}
    */
   foregroundBlocked() {
-    return this.blocked.foreground === true;
+    return this.movement.foregroundBlocked();
   }
 
   /**
@@ -868,7 +310,7 @@ class Player {
    * @returns {boolean}
    */
   static queueEmpty(playerIndex) {
-    return world.players[playerIndex].queue.length === 0;
+    return movementQueueEmpty(playerIndex);
   }
 
   /**
