@@ -60,7 +60,7 @@ export default class Skill {
         { timestamp: Date.now() },
       );
 
-      world.items.push(dropped);
+      world.addItem(dropped);
 
       Socket.broadcast('world:itemDropped', world.items);
     } else {
