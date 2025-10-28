@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+import { WebSocketServer } from 'ws';
 import world from '#server/core/world.js';
 
 /**
@@ -8,7 +8,7 @@ import world from '#server/core/world.js';
 
 class Socket {
   constructor(server) {
-    this.ws = new WebSocket.Server({ server });
+    this.ws = new WebSocketServer({ server });
     this.clients = world.clients;
   }
 

@@ -99,7 +99,7 @@ app.get('/world/players', (_req, res) => res.send(world.players));
 app.get('/world/respawns', (_req, res) => res.send(world.respawns));
 app.get('/world/shops', (_req, res) => res.send(world.shops));
 
-app.get('*', (_req, res) => {
+app.use((_req, res) => {
   if (hasClientBundle()) {
     res.sendFile(path.join(distDir, 'index.html'));
     return;

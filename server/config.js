@@ -58,4 +58,7 @@ const config = {
   },
 };
 
+const { map, player } = config;
+
+export { map, player };
 export default config;

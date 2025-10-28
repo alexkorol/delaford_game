@@ -1,7 +1,7 @@
 import UI from '#shared/ui.js';
 import World from '#server/core/world.js';
 import config from '#server/config.js';
-import { merge } from 'lodash';
+import merge from 'lodash/merge.js';
 import Handler from './handler.js';
 import playerEvent from './handlers/actions/index.js';
 
