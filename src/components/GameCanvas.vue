@@ -33,8 +33,11 @@
 </template>
 
 <script>
+import { mapStores } from 'pinia';
+
 import UI from '@shared/ui.js';
 import config from '@server/config.js';
+import { useUiStore } from '@/stores/ui.js';
 import ClientUI from '../core/utilities/client-ui.js';
 import bus from '../core/utilities/bus.js';
 import Socket from '../core/utilities/socket.js';
@@ -61,6 +64,7 @@ export default {
     };
   },
   computed: {
+    ...mapStores(useUiStore),
     getPaneDimensions() {
       switch (this.current) {
       default:
@@ -70,10 +74,10 @@ export default {
       }
     },
     currentAction() {
-      return this.$store.getters.action.object;
+      return this.uiStore.action.object;
     },
     action() {
-      return this.$store.getters.action.label;
+      return this.uiStore.action.label;
     },
     otherPlayers() {
       return this.game.players.filter(

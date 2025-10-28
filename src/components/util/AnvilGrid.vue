@@ -34,7 +34,10 @@
 
 <script>
 /* eslint-disable max-len */
+import { mapStores } from 'pinia';
+
 import UI from '@shared/ui.js';
+import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 import ClientUI from '../../core/utilities/client-ui.js';
 // import { weapons } from '../../../server/core/data/respawn.js';
@@ -62,6 +65,9 @@ export default {
     return {
       action: '',
     };
+  },
+  computed: {
+    ...mapStores(useUiStore),
   },
   created() {
     this.$forceUpdate();
@@ -161,10 +167,10 @@ export default {
 
       bus.$emit('canvas:select-action', {
         event,
-        item: this.$store.getters.action.object,
+        item: this.uiStore.action.object,
       });
 
-      console.log(this.$store.getters.action.object);
+      console.log(this.uiStore.action.object);
 
       // TODO
       // Make 'context-menu' to smelt bars into weapons

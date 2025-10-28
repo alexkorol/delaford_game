@@ -16,6 +16,9 @@
 </template>
 
 <script>
+import { mapStores } from 'pinia';
+
+import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 
 export default {
@@ -35,6 +38,7 @@ export default {
     },
   },
   computed: {
+    ...mapStores(useUiStore),
     isFilled() {
       return this.wear && this.wear[this.slotId];
     },
@@ -91,7 +95,7 @@ export default {
     handleSelect(event) {
       bus.$emit('canvas:select-action', {
         event,
-        item: this.$store.getters.action.object,
+        item: this.uiStore.action.object,
       });
     },
     emitContext(event, firstOnly) {
