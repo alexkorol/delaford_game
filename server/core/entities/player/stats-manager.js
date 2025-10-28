@@ -12,6 +12,7 @@ import {
   syncShortcuts,
   toClientPayload as statsToClientPayload,
 } from '#shared/stats/index.js';
+import { computeFlowerStatBonuses } from '#shared/passives/flower-of-life.js';
 
 const clone = (value) => {
   if (!value || typeof value !== 'object') {
@@ -26,6 +27,82 @@ const clone = (value) => {
     acc[key] = clone(entry);
     return acc;
   }, {});
+};
+
+const normaliseAttributeValues = (source = {}) => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const map = createAttributeMap(0);
+  let hasFinite = false;
+
+  ATTRIBUTE_IDS.forEach((attributeId) => {
+    const value = Number(source[attributeId]);
+    if (Number.isFinite(value)) {
+      map[attributeId] = value;
+      hasFinite = true;
+    }
+  });
+
+  return hasFinite ? map : null;
+};
+
+const extractAttributeSource = (candidate) => {
+  if (!candidate) {
+    return null;
+  }
+
+  if (typeof candidate === 'object' && !Array.isArray(candidate)) {
+    if (candidate.attributes && typeof candidate.attributes === 'object') {
+      const nested = normaliseAttributeValues(candidate.attributes);
+      if (nested) {
+        return nested;
+      }
+    }
+
+    const direct = normaliseAttributeValues(candidate);
+    if (direct) {
+      return direct;
+    }
+  }
+
+  if (Array.isArray(candidate) || candidate instanceof Set || typeof candidate === 'object') {
+    const { attributes } = computeFlowerStatBonuses(candidate);
+    if (attributes) {
+      return attributes;
+    }
+  }
+
+  return null;
+};
+
+const resolveFlowerPassiveAttributes = (player, data = {}, overrides = {}) => {
+  const candidates = [
+    overrides.passiveAttributes,
+    overrides.passives,
+    overrides.flowerOfLife,
+    overrides.flowerOfLifeProgress,
+    overrides.progress && overrides.progress.flowerOfLife,
+    data.attributes && data.attributes.passives,
+    data.passives && data.passives.attributes,
+    data.passives && data.passives.flowerOfLife,
+    data.flowerOfLife,
+    player.stats && player.stats.attributes && player.stats.attributes.sources && player.stats.attributes.sources.passives,
+    player.passives && player.passives.attributes,
+    player.passives && player.passives.flowerOfLife,
+    player.progression && player.progression.passives && player.progression.passives.flowerOfLife,
+    player.progress && player.progress.passives && player.progress.passives.flowerOfLife,
+  ];
+
+  for (const candidate of candidates) {
+    const resolved = extractAttributeSource(candidate);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return createAttributeMap(0);
 };
 
 const getEquipmentAttributeTotals = (player) => {
@@ -62,6 +139,7 @@ const buildInitialStats = (player, data = {}) => {
     equipment: data.attributes && data.attributes.equipment
       ? data.attributes.equipment
       : data.equipmentAttributes,
+    passives: resolveFlowerPassiveAttributes(player, data),
   };
 
   const resourceOverrides = {
@@ -92,11 +170,17 @@ const refreshDerivedStats = (player, overrides = {}) => {
   const baseSource = overrides.base || existingSources.base || {};
   const bonusSource = overrides.bonuses || existingSources.bonuses || {};
   const equipmentSource = overrides.equipment || getEquipmentAttributeTotals(player);
+  const passiveSource = resolveFlowerPassiveAttributes(
+    player,
+    { passives: { attributes: existingSources.passives } },
+    overrides,
+  );
 
   const aggregated = aggregateAttributes({
     base: baseSource,
     bonuses: bonusSource,
     equipment: equipmentSource,
+    passives: passiveSource,
   });
 
   const healthOverride = {

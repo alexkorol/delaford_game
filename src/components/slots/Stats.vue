@@ -33,6 +33,7 @@
             <span class="base">B {{ attribute.breakdown.base }}</span>
             <span class="gear">G {{ attribute.breakdown.equipment }}</span>
             <span class="bonus">+ {{ attribute.breakdown.bonuses }}</span>
+            <span class="passive">P {{ attribute.breakdown.passives }}</span>
           </small>
         </li>
       </ul>
@@ -67,11 +68,19 @@
 </template>
 
 <script>
-import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from '@shared/stats.js';
-import { computeAvailablePetalCount, sumAllocatedCost } from '@shared/passives/flower-of-life.js';
+import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats.js';
+import {
+  computeAvailablePetalCount,
+  sumAllocatedCost,
+  computeFlowerAttributeBonuses,
+} from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);
+const normaliseAttributes = (source = {}) => ATTRIBUTE_IDS.reduce((acc, attributeId) => {
+  acc[attributeId] = normaliseNumber(source[attributeId]);
+  return acc;
+}, {});
 
 export default {
   props: {
@@ -122,25 +131,45 @@ export default {
         base: sources.base || {},
         equipment: sources.equipment || {},
         bonuses: sources.bonuses || {},
+        passives: sources.passives || {},
       };
     },
-    attributeTotals() {
-      return this.stats.attributes && this.stats.attributes.total
-        ? this.stats.attributes.total
-        : {};
+    passiveAttributeBonuses() {
+      return computeFlowerAttributeBonuses(this.flowerProgress);
     },
     attributes() {
+      const base = normaliseAttributes(this.attributeSources.base);
+      const equipment = normaliseAttributes(this.attributeSources.equipment);
+      const bonuses = normaliseAttributes(this.attributeSources.bonuses);
+      const passiveFromStats = normaliseAttributes(this.attributeSources.passives);
+      const passiveLocal = normaliseAttributes(this.passiveAttributeBonuses);
+
+      const passives = normaliseAttributes({});
+      const hasServerPassive = ATTRIBUTE_IDS.some(attributeId => passiveFromStats[attributeId] !== 0);
+      ATTRIBUTE_IDS.forEach((attributeId) => {
+        const localContribution = hasServerPassive ? 0 : passiveLocal[attributeId];
+        passives[attributeId] = passiveFromStats[attributeId] + localContribution;
+      });
+
+      const aggregated = aggregateAttributes({
+        base,
+        equipment,
+        bonuses,
+        passives,
+      });
+
       return ATTRIBUTE_IDS.map((attributeId) => {
         const breakdown = {
-          base: normaliseNumber(this.attributeSources.base[attributeId]),
-          equipment: normaliseNumber(this.attributeSources.equipment[attributeId]),
-          bonuses: normaliseNumber(this.attributeSources.bonuses[attributeId]),
+          base: normaliseNumber(aggregated.sources.base[attributeId]),
+          equipment: normaliseNumber(aggregated.sources.equipment[attributeId]),
+          bonuses: normaliseNumber(aggregated.sources.bonuses[attributeId]),
+          passives: normaliseNumber(aggregated.sources.passives[attributeId]),
         };
 
         return {
           id: attributeId,
           label: ATTRIBUTE_LABELS[attributeId] || attributeId,
-          value: normaliseNumber(this.attributeTotals[attributeId]),
+          value: normaliseNumber(aggregated.total[attributeId]),
           breakdown,
         };
       });
@@ -262,6 +291,10 @@ div.stats_slot {
 
           span {
             display: inline-block;
+          }
+
+          .passive {
+            color: #80cbc4;
           }
         }
       }
