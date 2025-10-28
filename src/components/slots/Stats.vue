@@ -68,13 +68,16 @@
 </template>
 
 <script>
-import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats.js';
+import { mapStores } from 'pinia';
+import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats/index.js';
 import {
   computeAvailablePetalCount,
   sumAllocatedCost,
   computeFlowerAttributeBonuses,
+  FLOWER_OF_LIFE_DEFAULT_PROGRESS,
 } from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
+import { useUiStore } from '@/stores/ui.js';
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);
 const normaliseAttributes = (source = {}) => ATTRIBUTE_IDS.reduce((acc, attributeId) => {
@@ -90,20 +93,12 @@ export default {
     },
   },
   computed: {
+    ...mapStores(useUiStore),
     player() {
       return this.game && this.game.player ? this.game.player : {};
     },
     flowerProgress() {
-      const passives = this.$store && this.$store.state && this.$store.state.passives;
-      if (!passives || !passives.flowerOfLife) {
-        return {
-          allocatedNodes: [],
-          manualMilestones: {},
-          counters: {},
-          bonusPetals: 0,
-        };
-      }
-      return passives.flowerOfLife;
+      return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     flowerSummary() {
       const summary = computeAvailablePetalCount(this.player, this.flowerProgress);

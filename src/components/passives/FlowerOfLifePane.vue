@@ -230,8 +230,9 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex';
+import { mapActions, mapStores } from 'pinia';
 import FlowerOfLifeTree from './FlowerOfLifeTree.vue';
+import { useUiStore } from '@/stores/ui.js';
 import {
   FLOWER_OF_LIFE_LAYOUT,
   FLOWER_OF_LIFE_NODES,
@@ -273,15 +274,12 @@ export default {
     };
   },
   computed: {
+    ...mapStores(useUiStore),
     player() {
       return this.game && this.game.player ? this.game.player : {};
     },
     flowerProgress() {
-      const passives = this.$store && this.$store.state && this.$store.state.passives;
-      if (!passives || !passives.flowerOfLife) {
-        return FLOWER_OF_LIFE_DEFAULT_PROGRESS;
-      }
-      return passives.flowerOfLife;
+      return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     allocatedSet() {
       return new Set(this.flowerProgress.allocatedNodes || []);
@@ -491,7 +489,7 @@ export default {
     this.clearFeedbackTimeout();
   },
   methods: {
-    ...mapActions([
+    ...mapActions(useUiStore, [
       'allocateFlowerNode',
       'refundFlowerNode',
       'resetFlowerOfLife',

@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import { plugin as VueTippy } from 'vue-tippy';
-import 'vue-tippy/dist/vue-tippy.css';
+import 'tippy.js/dist/tippy.css';
 
 import Delaford from './Delaford.vue';
 import Socket from './core/utilities/socket.js';
