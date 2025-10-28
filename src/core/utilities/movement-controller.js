@@ -53,6 +53,7 @@ class MovementController {
     this.render = { x: 0, y: 0 };
     this.next = { x: 0, y: 0 };
     this.lastUpdate = 0;
+    this.currentTimestamp = 0;
     this.eta = 0;
     this.sequence = 0;
     this.walkId = null;
@@ -69,6 +70,7 @@ class MovementController {
     this.render = clonePoint(center);
     this.next = clonePoint(center);
     this.lastUpdate = timestamp;
+    this.currentTimestamp = timestamp;
     this.eta = 0;
     this.sequence = 0;
     this.walkId = null;
@@ -96,10 +98,11 @@ class MovementController {
 
     this.tile = { x: nextTileX, y: nextTileY };
     this.lastUpdate = timestamp;
+    this.currentTimestamp = timestamp;
     this.eta = duration;
 
     if (duration <= MOVEMENT_EPSILON) {
-      this.complete();
+      this.complete(timestamp);
     }
 
     return this;
@@ -124,12 +127,42 @@ class MovementController {
    * Advance interpolation state to the supplied timestamp,
    * updating {@link render} and settling when eta expires.
    */
-  update(timestamp = now()) {
+  update(input = {}) {
+    if (typeof input === 'number') {
+      const timestamp = input;
+      const position = this.getPosition(timestamp);
+      this.render = clonePoint(position);
+
+      if (this.eta > MOVEMENT_EPSILON && timestamp >= this.lastUpdate + this.eta) {
+        this.complete(timestamp);
+      } else {
+        this.currentTimestamp = timestamp;
+      }
+
+      return clonePoint(this.render);
+    }
+
+    const options = typeof input === 'object' && input !== null ? input : {};
+    const deltaSeconds = Number.isFinite(options.deltaSeconds) ? options.deltaSeconds : 0;
+    const deltaMs = Math.max(0, deltaSeconds * 1000);
+
+    let timestamp;
+    if (Number.isFinite(options.timestamp)) {
+      timestamp = options.timestamp;
+    } else {
+      const reference = (Number.isFinite(this.currentTimestamp) && this.currentTimestamp > 0)
+        ? this.currentTimestamp
+        : (Number.isFinite(this.lastUpdate) && this.lastUpdate > 0 ? this.lastUpdate : now());
+      timestamp = reference + deltaMs;
+    }
+
     const position = this.getPosition(timestamp);
     this.render = clonePoint(position);
 
     if (this.eta > MOVEMENT_EPSILON && timestamp >= this.lastUpdate + this.eta) {
-      this.complete();
+      this.complete(timestamp);
+    } else {
+      this.currentTimestamp = timestamp;
     }
 
     return clonePoint(this.render);
@@ -145,6 +178,7 @@ class MovementController {
     this.next = clonePoint(position);
     this.eta = 0;
     this.lastUpdate = timestamp;
+    this.currentTimestamp = timestamp;
     return this;
   }
 
@@ -243,11 +277,12 @@ class MovementController {
     return true;
   }
 
-  complete() {
+  complete(timestamp = now()) {
     this.previous = clonePoint(this.next);
     this.render = clonePoint(this.next);
     this.eta = 0;
-    this.lastUpdate = now();
+    this.lastUpdate = timestamp;
+    this.currentTimestamp = timestamp;
   }
 }
 
