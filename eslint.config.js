@@ -53,4 +53,12 @@ export default [
       'vue/multi-word-component-names': 'off',
     },
   },
+  {
+    files: ['tests/unit/**/*.{js,vue}'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
+    },
+  },
 ];
