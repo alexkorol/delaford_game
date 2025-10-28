@@ -35,7 +35,7 @@ class Item {
         Socket.broadcast('world:foreground:update', world.map.foreground);
 
         // Take resource off respawn check
-        world.respawns.resources.splice(index, 1);
+        world.removeResourceRespawn(index);
       }
     });
   }
@@ -57,7 +57,7 @@ class Item {
           );
 
           respawned.respawnIn = item.respawnIn;
-          world.items.push(respawned);
+          world.addItem(respawned);
 
           Socket.broadcast('world:itemDropped', world.items);
 

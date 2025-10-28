@@ -1,5 +1,45 @@
 const DEFAULT_TOWN_ID = 'town:delaford';
 
+const isObject = value => value && typeof value === 'object';
+
+const resolveIndex = (collection, target) => {
+  if (!Array.isArray(collection) || !collection.length) {
+    return -1;
+  }
+
+  if (typeof target === 'function') {
+    return collection.findIndex(target);
+  }
+
+  if (Number.isInteger(target)) {
+    return target;
+  }
+
+  if (!isObject(target)) {
+    return -1;
+  }
+
+  return collection.findIndex((entry) => {
+    if (entry === target) {
+      return true;
+    }
+
+    if (!isObject(entry)) {
+      return false;
+    }
+
+    if (target.uuid && entry.uuid === target.uuid) {
+      return true;
+    }
+
+    if (target.id && entry.id === target.id) {
+      return true;
+    }
+
+    return false;
+  });
+};
+
 class WorldScene {
   constructor({
     id,
@@ -201,6 +241,126 @@ class WorldManager {
   set monsters(value) {
     const town = this.getDefaultTown();
     town.monsters = value || [];
+  }
+
+  /**
+   * Append an NPC to a scene.
+   *
+   * @param {object} npc The NPC instance to register.
+   * @param {string} [sceneId] Optional scene identifier (defaults to the main town).
+   * @returns {object|null} The NPC that was inserted when successful.
+   */
+  addNpc(npc, sceneId = this.defaultTownId) {
+    if (!npc) {
+      return null;
+    }
+
+    const scene = this.getScene(sceneId);
+    if (!scene) {
+      return null;
+    }
+
+    if (!Array.isArray(scene.npcs)) {
+      scene.npcs = [];
+    }
+
+    scene.npcs.push(npc);
+    return npc;
+  }
+
+  /**
+   * Remove an NPC from a scene by reference, identifier, or matcher.
+   *
+   * @param {object|number|function} target The NPC, lookup index, or predicate.
+   * @param {string} [sceneId]
+   * @returns {object|null} The NPC that was removed when found.
+   */
+  removeNpc(target, sceneId = this.defaultTownId) {
+    const scene = this.getScene(sceneId);
+    if (!scene || !Array.isArray(scene.npcs)) {
+      return null;
+    }
+
+    const index = resolveIndex(scene.npcs, target);
+    if (index < 0 || index >= scene.npcs.length) {
+      return null;
+    }
+
+    const [removed] = scene.npcs.splice(index, 1);
+    return removed || null;
+  }
+
+  /**
+   * Append an item to a scene.
+   *
+   * @param {object} item The item to register in the world.
+   * @param {string} [sceneId] Optional scene identifier.
+   * @returns {object|null} The inserted item when successful.
+   */
+  addItem(item, sceneId = this.defaultTownId) {
+    if (!item) {
+      return null;
+    }
+
+    const scene = this.getScene(sceneId);
+    if (!scene) {
+      return null;
+    }
+
+    if (!Array.isArray(scene.items)) {
+      scene.items = [];
+    }
+
+    scene.items.push(item);
+    return item;
+  }
+
+  /**
+   * Remove an item from a scene by reference, identifier, or matcher.
+   *
+   * @param {object|number|function} target The item, lookup index, or predicate.
+   * @param {string} [sceneId]
+   * @returns {object|null} The removed item when found.
+   */
+  removeItem(target, sceneId = this.defaultTownId) {
+    const scene = this.getScene(sceneId);
+    if (!scene || !Array.isArray(scene.items)) {
+      return null;
+    }
+
+    const index = resolveIndex(scene.items, target);
+    if (index < 0 || index >= scene.items.length) {
+      return null;
+    }
+
+    const [removed] = scene.items.splice(index, 1);
+    return removed || null;
+  }
+
+  /**
+   * Remove a resource respawn entry.
+   *
+   * @param {object|number|function} target The respawn entry, index, or predicate.
+   * @param {string} [sceneId]
+   * @returns {object|null} The removed respawn record when found.
+   */
+  removeResourceRespawn(target, sceneId = this.defaultTownId) {
+    const scene = this.getScene(sceneId);
+    if (!scene) {
+      return null;
+    }
+
+    if (!scene.respawns || !Array.isArray(scene.respawns.resources)) {
+      return null;
+    }
+
+    const index = resolveIndex(scene.respawns.resources, target);
+    if (index < 0 || index >= scene.respawns.resources.length) {
+      return null;
+    }
+
+    const [removed] = scene.respawns.resources.splice(index, 1);
+    return removed || null;
   }
 
   ensureTown(id, options = {}) {

@@ -142,7 +142,7 @@ class NPC {
    */
   static load(context) {
     npcs.forEach((npc) => {
-      world.npcs.push(new NPC(npc));
+      world.addNpc(new NPC(npc));
     }, context);
 
     console.log(`${emoji.get('walking')}  Loading NPCs...`);
