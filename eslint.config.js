@@ -1,7 +1,28 @@
 import js from '@eslint/js';
-import vue from 'eslint-plugin-vue';
 import importPlugin from 'eslint-plugin-import-x';
+import vue from 'eslint-plugin-vue';
 import globals from 'globals';
+
+import { createAliasResolver } from './eslint/alias-resolver.js';
+
+const resolverExtensions = ['.js', '.vue', '.json'];
+const aliasMap = [
+  ['@', './src'],
+  ['@shared', './server/shared'],
+  ['@server', './server'],
+  ['#server', './server'],
+  ['#shared', './server/shared'],
+];
+
+const aliasResolver = createAliasResolver({
+  map: aliasMap,
+  extensions: resolverExtensions,
+});
+
+const nodeResolver = importPlugin.createNodeResolver({
+  extensions: resolverExtensions,
+  conditionNames: ['import', 'require', 'default', 'module'],
+});
 
 export default [
   {
@@ -21,21 +42,24 @@ export default [
       import: importPlugin,
     },
     settings: {
-      'import-x/resolver': {
-        node: {
-          extensions: ['.js', '.vue', '.json'],
+      'import-x/resolver': [
+        {
+          name: 'alias',
+          options: {
+            map: aliasMap,
+            extensions: resolverExtensions,
+          },
+          resolver: aliasResolver,
         },
-        alias: {
-          map: [
-            ['@', './src'],
-            ['@shared', './server/shared'],
-            ['@server', './server'],
-            ['#server', './server'],
-            ['#shared', './server/shared'],
-          ],
-          extensions: ['.js', '.vue', '.json'],
+        {
+          name: 'node',
+          options: {
+            extensions: resolverExtensions,
+            conditionNames: ['import', 'require', 'default', 'module'],
+          },
+          resolver: nodeResolver,
         },
-      },
+      ],
     },
     rules: {
       'import/no-unresolved': ['error', { ignore: ['^virtual:'] }],
