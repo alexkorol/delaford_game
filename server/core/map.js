@@ -3,7 +3,7 @@ import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import config from '#server/config.js';
-import surfaceMap from '#server/maps/layers/surface.json' assert { type: 'json' };
+import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';

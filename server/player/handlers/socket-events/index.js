@@ -6,7 +6,7 @@ import Authentication from '#server/player/authentication.js';
 import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import config from '#server/config.js';
-import playerGuest from '#server/core/data/helpers/player.json' assert { type: 'json' };
+import playerGuest from '#server/core/data/helpers/player.json' with { type: 'json' };
 import world from '#server/core/world.js';
 
 export default {

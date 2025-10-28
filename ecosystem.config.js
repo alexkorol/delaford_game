@@ -1,4 +1,4 @@
-module.exports = {
+const config = {
   apps: [{
     name: 'server',
     script: './server/index.js',
@@ -12,3 +12,5 @@ module.exports = {
     },
   }],
 };
+
+export default config;
