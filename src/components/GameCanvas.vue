@@ -36,6 +36,7 @@
 import { mapStores } from 'pinia';
 
 import UI from '@shared/ui.js';
+import { getSkillExecutionProfile } from '@shared/skills/index.js';
 import config from '@server/config.js';
 import { useUiStore } from '@/stores/ui.js';
 import ClientUI from '../core/utilities/client-ui.js';
@@ -140,12 +141,15 @@ export default {
         return;
       }
 
-      if (phase === 'end') {
-        this.dispatchSkill(skillId, { phase });
-        return;
-      }
+      const profile = getSkillExecutionProfile(skillId) || {};
+      const options = {
+        animationState: profile.animationState,
+        duration: profile.duration,
+        holdState: profile.holdState,
+        modifiers: profile.modifiers || {},
+      };
 
-      this.dispatchSkill(skillId);
+      this.dispatchSkill(skillId, { ...options, phase });
     },
     getViewportSnapshot() {
       const fallbackViewport = {

@@ -38,4 +38,8 @@ export default {
 
     await context.handlePartySceneTransition(payload.scene || null, payload.playerState || {}, payload.party || null);
   },
+  'party:instance:complete': (message, context) => {
+    const payload = message && message.data ? message.data : {};
+    safeCall(context, 'handlePartyInstanceComplete', payload);
+  },
 };

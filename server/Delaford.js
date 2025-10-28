@@ -106,6 +106,7 @@ class Delaford {
       Item.check();
       Item.resourcesCheck();
     });
+    this.addPeriodicTask('party:instances', 1500, () => partyService.evaluateInstances());
   }
 
   addPeriodicTask(name, interval, handler) {
