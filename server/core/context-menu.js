@@ -3,6 +3,7 @@ import UI from '#shared/ui.js';
 import Query from './data/query.js';
 import actionList from './data/action-list.js';
 import world from './world.js';
+import { getStrategy } from './context-menu/strategies/registry.js';
 
 class ContextMenu {
   constructor(player, tile, miscData) {
@@ -10,6 +11,7 @@ class ContextMenu {
     this.player = world.players.find(p => p.socket_id === player.socket_id);
 
     this.tileData = tile;
+    this.tile = tile;
 
     // Map layers
     this.background = world.map.background;
@@ -138,7 +140,35 @@ class ContextMenu {
    * @returns {boolean}
    */
   async check(action, items) {
-    const getItems = this.droppedItems
+    if (!action) return;
+
+    const strategy = getStrategy(action.actionId);
+    if (!strategy) return;
+
+    const context = this.createStrategyContext(action);
+
+    if (!strategy.canExecute(context)) {
+      return;
+    }
+
+    const results = strategy.execute(context);
+
+    if (!Array.isArray(results)) {
+      return;
+    }
+
+    results
+      .filter(Boolean)
+      .forEach((result) => {
+        if (!result.action) {
+          result.action = action;
+        }
+        items.push(result);
+      });
+  }
+
+  createStrategyContext(action) {
+    const groundItems = this.droppedItems
       .filter(
         item => item.x < this.player.x + 7 && item.x > this.player.x - 10,
       )
@@ -148,21 +178,20 @@ class ContextMenu {
       .filter(
         item => item.x === this.coordinates.map.x && item.y === this.coordinates.map.y,
       )
-      .map((i) => {
-        i.context = 'item';
-        return i;
+      .map((item) => {
+        item.context = 'item';
+        return item;
       });
 
-    const getNPCs = this.npcs
+    const npcs = this.npcs
       .filter(
         npc => npc.x === this.coordinates.map.x && npc.y === this.coordinates.map.y,
       )
-      .map((i) => {
-        i.context = 'npc';
-        return i;
+      .map((npc) => {
+        npc.context = 'npc';
+        return npc;
       });
 
-    // Foreground
     const foregroundTile = UI.getTileOverMouse(
       this.foreground,
       this.coordinates.player.x,
@@ -175,450 +204,48 @@ class ContextMenu {
 
     const foregroundData = Query.getForegroundData(foregroundTile);
 
-    // Action on item (Equip, Drop, Unequip, etc.)
     const itemSource = {
       inventorySlot: this.player.inventory.slots,
       bankSlot: this.player.bank,
       shopSlot: this.getShopInventory(),
     };
 
-    // From where are we getting our data from?
-    // If we clicked on 'inventorySlot', then obviously player.inventory
-    // if we clicked on 'bankSlot', then player.bank and so on.
-    /* eslint-disable */
-    // Either my neovim config is screwy or I'm lazy. It's 2:49 AM and this is too much.
-    // TODO
-    // Make the context automatically find which slot the click came from
     const itemsToSearch =
-      itemSource[this.context[3]] ||
-      this.currentPaneData ||
-      this.player.inventory.slots;
+      itemSource[this.context[3]]
+      || this.currentPaneData
+      || this.player.inventory.slots;
+
     const selectedItem =
-      itemsToSearch.find((s) => s.slot === this.miscData.slot) ||
-      itemsToSearch[this.miscData.slot];
+      itemsToSearch.find((entry) => entry && entry.slot === this.miscData.slot)
+      || itemsToSearch[this.miscData.slot];
+
     const dynamicItem = typeof selectedItem === 'object' ? selectedItem : null;
 
     let itemActedOn = selectedItem;
-    /* eslint-enable */
-
-    if (typeof itemActedOn === 'object') {
-      // The only time an item is an object is it comes from an inventory, bank,
-      // or shop because those items are dynamic and have other data attached
-      // to them (qty, value, etc.)
+    if (typeof itemActedOn === 'object' && itemActedOn !== null) {
       itemActedOn = itemActedOn.id;
     }
 
-    // Context menu list center
-    /**
-     * TODO
-     * I know there is a MUCH better way to abstract
-     * this switch-case code below to more simpler methods.
-     */
+    const selectedItemData =
+      itemActedOn !== undefined && itemActedOn !== null
+        ? Query.getItemData(itemActedOn)
+        : null;
 
-    // TODO
-    // Can definitely be abstracted out to something
-    // such as "Panes" with items that show on different panes
-    // that come with different requirements (ie: furnace view, cooking, smithing, etc.)
-    if (!action) return;
-    // TODO
-    // SWITCH TO USING actionId?
-    switch (action.actionId) {
-    default:
-    case 'Cancel':
-      break;
-
-      // Walk player to this location
-    case 'player:walk-here':
-      // Do not add WALK HERE if foreground tile is blocked
-      items.push({
-        action,
-        label: action.name,
-      });
-
-      break;
-
-      // Drop item from inventory
-    case 'player:inventory-drop':
-      if (this.clickedOn('inventorySlot')) {
-        if (this.isFromInventory()) {
-          const baseData = Query.getItemData(
-            itemActedOn,
-          );
-          const {
-            actions, name, context, uuid, id,
-          } = baseData;
-          const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
-          const referenceUuid = dynamicItem && dynamicItem.uuid ? dynamicItem.uuid : uuid;
-          const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
-
-          const color = UI.getContextSubjectColor(context);
-
-          if (this.canDoAction(actions, action)) {
-            items.push({
-              label: `${
-                action.name
-              } <span style='color:${color}'>${displayName}</span>`,
-              action,
-              type: 'item',
-              miscData: this.miscData,
-              uuid: referenceUuid,
-              id: referenceId,
-            });
-          }
-        }
-      }
-      break;
-
-      // Take item from floor
-    case 'player:take':
-      getItems.forEach((item) => {
-        const combined = Object.assign(
-          {},
-          Query.getItemData(item.id),
-          item,
-        );
-        const {
-          actions, name, x, y, id, uuid, timestamp,
-        } = combined;
-
-        const color = UI.getContextSubjectColor(item.context);
-
-        if (this.canDoAction(actions, action)) {
-          items.push({
-            label: `${
-              action.name
-            } <span style='color:${color}'>${name}</span>`,
-            action,
-            type: 'item',
-            at: {
-              x,
-              y,
-            },
-            id,
-            uuid,
-            timestamp,
-          });
-        }
-      });
-      break;
-
-      // Equip item from inventory
-    case 'item:equip':
-      if (this.clickedOn('inventorySlot') && this.isFromInventory()) {
-        const baseData = Query.getItemData(
-          itemActedOn,
-        );
-        const {
-          actions, context, name, uuid, id,
-        } = baseData;
-        const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
-        const referenceUuid = dynamicItem && dynamicItem.uuid ? dynamicItem.uuid : uuid;
-        const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          items.push({
-            label: `${
-              action.name
-            } <span style='color:${color}'>${displayName}</span>`,
-            action,
-            type: 'item',
-            miscData: this.miscData,
-            uuid: referenceUuid,
-            id: referenceId,
-          });
-        }
-      }
-      break;
-
-      // Unequip item from the equipment screen
-    case 'item:unequip':
-      if (this.clickedOn('wearSlot') && this.isFromInventory()) {
-        const {
-          name, actions, context, id, uuid,
-        } = Query.getItemData(
-          this.player.wear[this.miscData.slot].id,
-        );
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          items.push({
-            label: `${
-              action.name
-            } <span style='color:${color}'>${name}</span>`,
-            action,
-            type: 'item',
-            miscData: this.miscData,
-            id,
-            uuid,
-          });
-        }
-      }
-      break;
-
-      // Examine item/object/npc from where possible
-    case 'player:examine':
-    case 'player:screen:npc:trade:action:value':
-      if (this.isFromGameCanvas()) {
-        if (
-          foregroundData
-            && this.canDoAction(foregroundData.actions, action)
-        ) {
-          const fgColor = UI.getContextSubjectColor(foregroundData.context);
-          items.push({
-            label: `${action.name} <span style='color:${fgColor}'>${
-              foregroundData.name
-            }</span>`,
-            action,
-            examine: foregroundData.examine,
-            type: 'foreground',
-            id: foregroundData.id,
-          });
-        }
-
-        getNPCs.forEach(({
-          actions, name, context, examine, id,
-        }) => {
-          if (this.canDoAction(actions, action)) {
-            const color = UI.getContextSubjectColor(context);
-            items.push({
-              label: `${
-                action.name
-              } <span style='color:${color}'>${name}</span>`,
-              action,
-              examine,
-              type: 'npc',
-              id,
-            });
-          }
-        });
-
-        getItems.forEach((item) => {
-          const combined = Object.assign(
-            {},
-            Query.getItemData(item.id),
-            item,
-          );
-          const {
-            name, examine, id, actions, timestamp,
-          } = combined;
-
-          const color = UI.getContextSubjectColor(item.context);
-
-          if (this.canDoAction(actions, action)) {
-            items.push({
-              label: `Examine <span style='color:${color}'>${name}</span>`,
-              action,
-              examine,
-              type: 'item',
-              id,
-              timestamp,
-            });
-          }
-        });
-      }
-
-      if (this.isFromInventory()) {
-        const baseData = Query.getItemData(
-          itemActedOn,
-        );
-        const {
-          name, examine, id, context, actions,
-        } = baseData;
-        const displayName = dynamicItem && dynamicItem.name ? dynamicItem.name : name;
-        const displayExamine = dynamicItem && dynamicItem.examine ? dynamicItem.examine : examine;
-        const referenceId = dynamicItem && dynamicItem.id ? dynamicItem.id : id;
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          items.push({
-            label: `${
-              action.name
-            } <span style='color:${color}'>${displayName}</span>`,
-            action,
-            examine: displayExamine,
-            type: 'item',
-            id: referenceId,
-          });
-        }
-      }
-      break;
-
-      // Mine rocks
-    case 'player:resource:mining:rock':
-      if (foregroundData && this.canDoAction(foregroundData, action)) {
-        const color = UI.getContextSubjectColor(foregroundData.context);
-        items.push({
-          label: `${action.name} <span style='color:${color}'>${
-            foregroundData.name
-          }</span>`,
-          action,
-          type: 'mine',
-          coordinates: this.coordinates.map,
-          at: {
-            x: this.coordinates.viewport.x,
-            y: this.coordinates.viewport.y,
-          },
-          id: foregroundData.id,
-        });
-      }
-
-      break;
-
-    case 'player:resource:smelt:furnace:action':
-    case 'player:resource:smelt:anvil:action':
-      if (this.clickedOn('furnaceSlot') || this.clickedOn('anvilSlot')) {
-        const {
-          actions, context, name, uuid, id,
-        } = Query.getItemData(
-          itemActedOn,
-        );
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          items.push({
-            label: `${
-              action.name
-            } <span style='color:${color}'>${name}</span>`,
-            action,
-            type: 'item',
-            miscData: this.miscData,
-            uuid,
-            id,
-          });
-        }
-      }
-      break;
-
-      // Push
-    case 'player:resource:goldenplaque:push':
-    case 'player:resource:smelt:furnace:pane':
-    case 'player:resource:smith:anvil:pane':
-      if (foregroundData && this.canDoAction(foregroundData, action)) {
-        const color = UI.getContextSubjectColor(foregroundData.context);
-        items.push({
-          label: `${action.name} <span style='color:${color}'>${
-            foregroundData.name
-          }</span>`,
-          action,
-          type: 'object',
-          at: {
-            x: this.coordinates.viewport.x,
-            y: this.coordinates.viewport.y,
-          },
-          id: foregroundData.id,
-          tile: this.tile,
-        });
-      }
-
-      break;
-
-      // Bank and Trading
-    case 'player:screen:bank':
-    case 'player:screen:npc:trade':
-      if (this.isFromGameCanvas()) {
-        if (
-          foregroundData
-            && this.canDoAction(foregroundData.actions, action)
-        ) {
-          const fgColor = UI.getContextSubjectColor(foregroundData.context);
-          items.push({
-            label: `${action.name} <span style='color:${fgColor}'>${
-              foregroundData.name
-            }</span>`,
-            action,
-            examine: foregroundData.examine,
-            type: 'foreground',
-            id: foregroundData.id,
-          });
-        }
-
-        getNPCs.forEach(({
-          actions, name, context, examine, id,
-        }) => {
-          if (this.canDoAction(actions, action)) {
-            const color = UI.getContextSubjectColor(context);
-            items.push({
-              label: `${
-                action.name
-              } <span style='color:${color}'>${name}</span>`,
-              action,
-              examine,
-              type: 'npc',
-              id,
-            });
-          }
-        });
-      }
-
-      break;
-
-    case 'player:screen:bank:action':
-      if (this.clickedOn('bankSlot') || this.clickedOn('inventorySlot')) {
-        const {
-          name, examine, id, context, actions,
-        } = Query.getItemData(
-          itemActedOn,
-        );
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          const quantity = [1, 5, 10, 'All'];
-
-          quantity.forEach((q) => {
-            items.push({
-              label: `${
-                action.name
-              }-${q.toString()} <span style='color:${color}'>${name}</span>`,
-              params: {
-                quantity: q,
-              },
-              action,
-              examine,
-              type: 'item',
-              id,
-            });
-          });
-        }
-      }
-      break;
-
-    case 'player:screen:npc:trade:action':
-      if (this.clickedOn('shopSlot') || this.clickedOn('inventorySlot')) {
-        const {
-          name, examine, id, context, actions,
-        } = Query.getItemData(
-          itemActedOn,
-        );
-
-        const color = UI.getContextSubjectColor(context);
-
-        if (this.canDoAction(actions, action)) {
-          const quantity = [1, 5, 10, 50];
-
-          quantity.forEach((q) => {
-            items.push({
-              label: `${
-                action.name
-              }-${q.toString()} <span style='color:${color}'>${name}</span>`,
-              params: {
-                quantity: q,
-              },
-              action,
-              examine,
-              type: 'item',
-              id,
-            });
-          });
-        }
-      }
-      break;
-    }
+    return {
+      menu: this,
+      action,
+      groundItems,
+      npcs,
+      foregroundTile,
+      foregroundData,
+      selectedItem,
+      dynamicItem,
+      itemActedOn,
+      selectedItemData,
+      coordinates: this.coordinates,
+      miscData: this.miscData,
+      tile: this.tileData,
+    };
   }
 
   /**
@@ -720,3 +347,4 @@ class ContextMenu {
 }
 
 export default ContextMenu;
+export { actionCatalog } from './context-menu/strategies/registry.js';
