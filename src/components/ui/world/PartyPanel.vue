@@ -81,13 +81,13 @@
           v-if="isLeader"
           type="button"
           class="party-panel__button"
-          :disabled="!allReady"
+          :disabled="!allReady || !canStartInstance"
           @click="$emit('start-instance')"
         >
           Start instance
         </button>
         <button
-          v-if="isLeader && party.state === 'instance'"
+          v-if="canReturnToTown"
           type="button"
           class="party-panel__button"
           @click="$emit('return-to-town')"
@@ -189,12 +189,23 @@ export default {
       }
       return this.party.members.length > 0 && this.party.members.every(member => member.ready);
     },
+    canStartInstance() {
+      return Boolean(this.party && this.party.state === 'lobby');
+    },
+    canReturnToTown() {
+      if (!this.party || !this.isLeader) {
+        return false;
+      }
+      return ['instance', 'instance-complete'].includes(this.party.state);
+    },
     loadingLabel() {
       if (!this.loading || !this.loading.state) {
         return 'Loading';
       }
       const mapping = {
         'enter-instance': 'Entering instance...',
+        'distribute-rewards': 'Distributing rewards...',
+        'return-instance': 'Returning to town...',
         idle: 'Idle',
       };
       return mapping[this.loading.state] || 'Loading';

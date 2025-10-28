@@ -19,7 +19,7 @@
           class="game-container__world-shell"
           :style="worldShellStyle"
         >
-          <GameCanvas :game="game" />
+          <GameCanvas ref="canvasRef" :game="game" />
           <GameHUD
             :player-id="playerId"
             :party="party"
@@ -209,6 +209,7 @@ export default {
   setup(props, { emit, expose }) {
     const paneHostRef = ref(null);
     const chatboxRef = ref(null);
+    const canvasRef = ref(null);
     const { game } = toRefs(props);
 
     const playerId = computed(() => (game.value && game.value.player ? game.value.player.uuid : null));
@@ -225,15 +226,31 @@ export default {
       emit('request-remap', slot, index);
     };
 
-    expose({ paneHostRef, chatboxRef });
+    const triggerSkill = (skillId, options = {}) => {
+      if (!skillId) {
+        return false;
+      }
+
+      const canvasComponent = canvasRef.value;
+      if (canvasComponent && typeof canvasComponent.dispatchSkill === 'function') {
+        canvasComponent.dispatchSkill(skillId, options);
+        return true;
+      }
+
+      return false;
+    };
+
+    expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill });
 
     return {
       paneHostRef,
       chatboxRef,
+      canvasRef,
       playerId,
       handleRightClick,
       handleQuickSlot,
       handleQuickbarRemap,
+      triggerSkill,
     };
   },
 };

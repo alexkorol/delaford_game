@@ -14,6 +14,7 @@ export const DEFAULT_RESPAWN = {
 };
 
 export const DEFAULT_BEHAVIOUR = {
+  type: 'melee',
   aggressionRange: 5,
   pursuitRange: 8,
   leash: 10,
@@ -24,6 +25,12 @@ export const DEFAULT_BEHAVIOUR = {
     intervalMs: 1600,
     windupMs: 300,
     damageMultiplier: 1,
+    range: 1,
+    minimumRange: 1,
+  },
+  support: {
+    healAmount: 14,
+    healRange: 5,
   },
 };
 
@@ -69,12 +76,28 @@ const buildBehaviour = (monster, overrides = {}) => {
     ...(overrides && overrides.attack ? overrides.attack : {}),
   };
 
+  merged.support = {
+    ...base.support,
+    ...(archetypeBehaviour && archetypeBehaviour.support ? archetypeBehaviour.support : {}),
+    ...(overrides && overrides.support ? overrides.support : {}),
+  };
+
+  merged.type = (overrides && overrides.type)
+    || (archetypeBehaviour && archetypeBehaviour.type)
+    || base.type
+    || 'melee';
+
   if (rarity && rarity.attackSpeedMultiplier) {
     merged.attack.intervalMs = Math.round(merged.attack.intervalMs * rarity.attackSpeedMultiplier);
   }
 
   merged.attack.intervalMs = Math.max(400, merged.attack.intervalMs || DEFAULT_BEHAVIOUR.attack.intervalMs);
   merged.attack.windupMs = Math.max(100, merged.attack.windupMs || DEFAULT_BEHAVIOUR.attack.windupMs);
+  merged.attack.range = Math.max(1, merged.attack.range || DEFAULT_BEHAVIOUR.attack.range || 1);
+  merged.attack.minimumRange = Math.max(0, merged.attack.minimumRange || DEFAULT_BEHAVIOUR.attack.minimumRange || 0);
+
+  merged.support.healAmount = Math.max(1, merged.support.healAmount || DEFAULT_BEHAVIOUR.support.healAmount);
+  merged.support.healRange = Math.max(1, merged.support.healRange || DEFAULT_BEHAVIOUR.support.healRange);
 
   merged.patrolRadius = Math.max(0, Number.isFinite(merged.patrolRadius) ? merged.patrolRadius : 0);
   merged.leash = Math.max(merged.patrolRadius, Number.isFinite(merged.leash) ? merged.leash : 0);

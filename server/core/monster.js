@@ -7,10 +7,8 @@ import { getArchetype } from './monsters/archetypes.js';
 import { getRarity } from './monsters/rarities.js';
 import { syncShortcuts, toClientPayload as statsToClientPayload } from '#shared/stats/index.js';
 import createMonsterCombatController from '#server/core/entities/monster/combat-controller.js';
-import createMonsterMovementHandler, {
-  euclideanDistance,
-  manhattanDistance,
-} from '#server/core/entities/monster/movement-handler.js';
+import createMonsterMovementHandler from '#server/core/entities/monster/movement-handler.js';
+import createMonsterAIController from '#server/core/entities/monster/ai-controller.js';
 import createMonsterStatsManager, {
   clone,
 } from '#server/core/entities/monster/stats-manager.js';
@@ -72,6 +70,8 @@ class Monster {
 
     this.stats = this.buildStats(definition.attributes);
     syncShortcuts(this.stats, this);
+
+    this.ai = createMonsterAIController(this);
   }
 
   get rarity() {
@@ -178,39 +178,10 @@ class Monster {
   }
 
   update(now = Date.now()) {
-    if (!this.isAlive) {
-      if (!this.state.respawnAt) {
-        this.state.respawnAt = now + this.respawn.delayMs;
-      } else if (now >= this.state.respawnAt) {
-        this.respawnNow(now);
-        return true;
-      }
-      return false;
+    if (this.ai && typeof this.ai.update === 'function') {
+      return this.ai.update(now);
     }
-
-    if (this.state.pendingAttack && now >= this.state.pendingAttack.resolveAt) {
-      this.resolvePendingAttack(now);
-    }
-
-    const target = this.resolveTarget(now);
-
-    if (target) {
-      this.state.mode = 'engaged';
-      const distance = manhattanDistance(this, target);
-      if (distance <= 1) {
-        return this.tryAttack(target, now);
-      }
-      return this.pursue(target, now);
-    }
-
-    const distanceFromSpawn = euclideanDistance(this, this.spawn);
-    if (distanceFromSpawn > 0.5) {
-      this.state.mode = 'returning';
-      return this.returnToSpawn(now);
-    }
-
-    this.state.mode = 'patrolling';
-    return this.patrol(now);
+    return false;
   }
 
   takeDamage(amount, options = {}) {
@@ -315,20 +286,24 @@ class Monster {
 
   static tick(options = {}) {
     const now = Date.now();
-    const scene = world.getDefaultTown();
-    if (!scene || !Array.isArray(scene.monsters)) {
-      return;
-    }
+    const scenes = Array.from(world.scenes.values());
 
-    let dirty = false;
-    scene.monsters.forEach((monster) => {
-      const updated = monster.update(now);
-      dirty = dirty || updated;
+    scenes.forEach((scene) => {
+      if (!scene || !Array.isArray(scene.monsters) || scene.monsters.length === 0) {
+        return;
+      }
+
+      let dirty = false;
+      scene.monsters.forEach((monster) => {
+        const updated = monster.update(now);
+        dirty = dirty || updated;
+      });
+
+      if (dirty || options.forceBroadcast) {
+        const players = world.getScenePlayers(scene.id);
+        Monster.broadcast(scene.monsters, { ...options, players });
+      }
     });
-
-    if (dirty || options.forceBroadcast) {
-      Monster.broadcast(scene.monsters, options);
-    }
   }
 }
 

@@ -7,19 +7,19 @@ import {
   vi,
 } from 'vitest';
 
-const mockUI = {
-  getTileOverMouse: vi.fn(() => null),
-  getContextSubjectColor: vi.fn(() => 'inherit'),
-};
+const mockUI = vi.hoisted(() => ({
+  getTileOverMouse: vi.fn(),
+  getContextSubjectColor: vi.fn(),
+}));
 
 vi.mock('#shared/ui.js', () => ({
   default: mockUI,
 }));
 
-const mockQuery = {
+const mockQuery = vi.hoisted(() => ({
   getItemData: vi.fn(),
-  getForegroundData: vi.fn(() => null),
-};
+  getForegroundData: vi.fn(),
+}));
 
 vi.mock('#server/core/data/query.js', () => ({
   default: mockQuery,
@@ -54,7 +54,7 @@ let player;
 
 beforeEach(() => {
   mockUI.getTileOverMouse.mockReturnValue(null);
-  mockUI.getContextSubjectColor.mockImplementation(() => 'inherit');
+  mockUI.getContextSubjectColor.mockReturnValue('inherit');
   mockQuery.getItemData.mockImplementation(id => createBaseItem(id));
   mockQuery.getForegroundData.mockReturnValue(null);
 

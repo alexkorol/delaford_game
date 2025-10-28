@@ -2,6 +2,8 @@ import { v4 as uuid } from 'uuid';
 import world from '#server/core/world.js';
 import Map from '#server/core/map.js';
 import Socket from '#server/socket.js';
+import Monster from '#server/core/monster.js';
+import UI from '#shared/ui.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -62,6 +64,8 @@ class PartyService {
       metadata: {
         template: 'dungeon',
         seed: null,
+        instanceRewards: null,
+        completedAt: null,
       },
     };
 
@@ -283,6 +287,8 @@ class PartyService {
     party.sceneId = null;
     party.state = 'lobby';
     party.metadata.seed = null;
+    party.metadata.instanceRewards = null;
+    party.metadata.completedAt = null;
   }
 
   async startInstance(party, initiator) {
@@ -312,9 +318,22 @@ class PartyService {
         metadata: generation.metadata,
       });
 
+      const monsterInstances = Array.isArray(generation.monsters)
+        ? generation.monsters.map((definition, index) => new Monster({
+          ...definition,
+          sceneId: scene.id,
+          instanceId: `${scene.id}:${definition.id || index}`,
+        }))
+        : [];
+      scene.monsters = monsterInstances;
+
       party.sceneId = scene.id;
       party.state = 'instance';
       party.metadata.seed = generation.metadata.seed;
+      party.metadata.instanceRewards = generation.metadata && generation.metadata.rewards
+        ? { ...generation.metadata.rewards }
+        : null;
+      party.metadata.completedAt = null;
 
       const spawnPoints = Array.isArray(generation.metadata.spawnPoints)
         && generation.metadata.spawnPoints.length
@@ -359,6 +378,8 @@ class PartyService {
     party.state = 'lobby';
     party.sceneId = null;
     party.metadata.seed = null;
+    party.metadata.instanceRewards = null;
+    party.metadata.completedAt = null;
     this.clearReadyState(party);
 
     this.forEachMember(party, (player) => {
@@ -372,6 +393,130 @@ class PartyService {
     this.sendSceneTransition(party, town);
     this.sendLoadingState(party, 'idle');
     world.destroyInstance(party.id);
+  }
+
+  async distributeInstanceRewards(party, rewardsConfig = {}) {
+    if (!party) {
+      return [];
+    }
+
+    const members = [];
+    this.forEachMember(party, (player) => {
+      if (player) {
+        members.push(player);
+      }
+    });
+
+    const coinsPerPlayer = Number.isFinite(rewardsConfig.coinsPerPlayer)
+      ? Math.max(0, Math.floor(rewardsConfig.coinsPerPlayer))
+      : 0;
+
+    const experienceConfig = rewardsConfig.experience && typeof rewardsConfig.experience === 'object'
+      ? {
+        skill: rewardsConfig.experience.skill,
+        amount: Number.isFinite(rewardsConfig.experience.amount)
+          ? Math.max(0, Math.floor(rewardsConfig.experience.amount))
+          : 0,
+      }
+      : null;
+
+    const rewards = await Promise.all(members.map(async (player) => {
+      const entry = {
+        uuid: player.uuid,
+        username: player.username,
+        coins: 0,
+      };
+
+      if (coinsPerPlayer > 0 && player.inventory && typeof player.inventory.add === 'function') {
+        await player.inventory.add('coins', coinsPerPlayer);
+        Socket.emit('core:refresh:inventory', {
+          player: { socket_id: player.socket_id },
+          data: player.inventory.slots,
+        });
+        entry.coins = coinsPerPlayer;
+      }
+
+      if (experienceConfig && experienceConfig.skill && experienceConfig.amount > 0) {
+        const skillId = experienceConfig.skill;
+        const amount = experienceConfig.amount;
+        if (player.skills && player.skills[skillId]) {
+          player.skills[skillId].exp += amount;
+          player.skills[skillId].level = UI.getLevel(player.skills[skillId].exp);
+          Socket.emit('resource:skills:update', {
+            player: { socket_id: player.socket_id },
+            data: player.skills,
+          });
+          entry.experience = { skill: skillId, amount };
+        }
+      }
+
+      return entry;
+    }));
+
+    return rewards.filter(Boolean);
+  }
+
+  sendInstanceComplete(party, rewards = [], message = null) {
+    if (!party) {
+      return;
+    }
+
+    const snapshot = this.getPartySnapshot(party);
+    this.forEachMember(party, (player) => {
+      Socket.emit('party:instance:complete', {
+        player: { socket_id: player.socket_id },
+        rewards,
+        party: snapshot,
+        message,
+      });
+    });
+  }
+
+  async completeInstance(party, options = {}) {
+    if (!party || party.state !== 'instance') {
+      return false;
+    }
+
+    if (party.metadata.completedAt) {
+      return false;
+    }
+
+    const scene = options.scene || world.getInstance(party.id) || world.getScene(party.sceneId);
+    party.metadata.completedAt = Date.now();
+    party.state = 'instance-complete';
+
+    this.sendPartyUpdate(party, { meta: { state: 'instance-complete' } });
+    this.sendLoadingState(party, 'distribute-rewards');
+
+    const rewardsConfig = options.rewards
+      || (party.metadata && party.metadata.instanceRewards)
+      || (scene && scene.metadata && scene.metadata.rewards)
+      || {};
+
+    const rewards = await this.distributeInstanceRewards(party, rewardsConfig);
+
+    const completionMessage = options.message || 'Instance cleared! Rewards distributed.';
+    this.sendInstanceComplete(party, rewards, completionMessage);
+    this.sendLoadingState(party, 'return-instance');
+    this.returnToTown(party);
+    return true;
+  }
+
+  async evaluateInstances() {
+    const parties = Array.from(this.parties.values()).filter((party) => party && party.state === 'instance');
+    const evaluations = parties.map(async (party) => {
+      const scene = world.getScene(party.sceneId);
+      if (!scene || !Array.isArray(scene.monsters) || scene.monsters.length === 0) {
+        return;
+      }
+
+      const alive = scene.monsters.some((monster) => monster && monster.isAlive);
+      if (!alive) {
+        await this.completeInstance(party, { scene, reason: 'monsters-cleared' });
+      }
+    });
+
+    await Promise.all(evaluations);
   }
 
   invitePlayer(party, inviter, target) {

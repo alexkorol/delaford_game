@@ -65,6 +65,8 @@ import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
 import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
 
+import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/index.js';
+
 // Core assets
 import Client from './core/client.js';
 import Engine from './core/engine.js';
@@ -74,15 +76,7 @@ import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
 
-const createDefaultQuickSlots = () => Array.from(
-  { length: 8 },
-  (_value, index) => ({
-    id: `slot-${index + 1}`,
-    label: `Empty Slot ${index + 1}`,
-    hotkey: `${index + 1}`,
-    icon: '',
-  }),
-);
+const createDefaultQuickSlots = () => createQuickbarSlots();
 
 const paneRegistry = {
   stats: { component: StatsPane, title: 'Stats', slot: 'left' },
@@ -485,6 +479,40 @@ export default {
     handleQuickSlot(slot, index) {
       if (!slot) {
         return;
+      }
+
+      if (slot.skillId) {
+        const profile = getSkillExecutionProfile(slot.skillId) || {};
+        const container = this.$refs.gameContainer;
+        const dispatchOptions = {
+          animationState: profile.animationState,
+          duration: profile.duration,
+          holdState: profile.holdState,
+          modifiers: profile.modifiers || {},
+        };
+
+        let dispatched = false;
+        if (container && typeof container.triggerSkill === 'function') {
+          dispatched = container.triggerSkill(slot.skillId, dispatchOptions);
+        }
+
+        if (!dispatched && this.game && this.game.player) {
+          const facing = typeof this.game.getFacingDirection === 'function'
+            ? this.game.getFacingDirection()
+            : (this.game.player.animation && this.game.player.animation.direction) || 'down';
+
+          Socket.emit('player:skill:trigger', {
+            id: this.game.player.uuid,
+            skillId: slot.skillId,
+            direction: facing,
+            issuedAt: Date.now(),
+            modifiers: dispatchOptions.modifiers || {},
+            phase: 'start',
+            animationState: dispatchOptions.animationState,
+            duration: dispatchOptions.duration,
+            holdState: dispatchOptions.holdState,
+          });
+        }
       }
 
       bus.$emit('quickbar:activate', {
@@ -1051,6 +1079,41 @@ export default {
       }
 
       this.setPartyStatusMessage(error.message);
+    },
+
+    handlePartyInstanceComplete(payload = {}) {
+      if (payload.party) {
+        this.party = payload.party;
+      }
+
+      const rewards = Array.isArray(payload.rewards) ? payload.rewards : [];
+
+      if (rewards.length) {
+        const summary = rewards
+          .map((entry) => {
+            if (!entry || !entry.username) {
+              return null;
+            }
+
+            const coinText = Number.isFinite(entry.coins) ? `${entry.coins} coins` : null;
+            const experienceText = entry.experience && entry.experience.amount
+              ? `${entry.experience.amount} ${entry.experience.skill || 'XP'}`
+              : null;
+            const rewardText = [coinText, experienceText].filter(Boolean).join(', ');
+            return rewardText ? `${entry.username}: ${rewardText}` : entry.username;
+          })
+          .filter(Boolean)
+          .join('; ');
+
+        const message = summary
+          ? `Instance complete! Rewards distributed — ${summary}.`
+          : 'Instance complete! Rewards distributed.';
+        this.setPartyStatusMessage(message, 8000);
+      } else if (payload.message) {
+        this.setPartyStatusMessage(payload.message, 6000);
+      } else {
+        this.setPartyStatusMessage('Instance complete! Returning to town...', 6000);
+      }
     },
 
     /**
