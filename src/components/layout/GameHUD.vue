@@ -117,9 +117,12 @@ export default {
 
 .hud-shell {
   position: absolute;
-  left: var(--space-xl);
-  right: var(--space-xl);
-  bottom: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: clamp(var(--space-lg), 4vw, var(--space-2xl));
+  width: min(var(--world-display-width, 100%), 100%);
+  max-width: min(96vw, var(--world-display-width, 1200px));
+  padding: 0 clamp(var(--space-lg), 3vw, var(--space-2xl));
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
@@ -131,13 +134,13 @@ export default {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: flex-end;
-  gap: var(--space-lg);
+  gap: clamp(var(--space-md), 2vw, var(--space-xl));
   pointer-events: auto;
 }
 
 .hud-shell__party {
   margin-bottom: var(--space-sm);
-  max-width: 320px;
+  width: min(100%, 320px);
   pointer-events: auto;
 }
 
@@ -158,9 +161,9 @@ export default {
   transform: translateY(18px);
 }
 
-@media (width <= 1199px) {
+@media (width <= 1279px) {
   .hud-shell__row {
-    gap: var(--space-md);
+    gap: clamp(var(--space-sm), 2vw, var(--space-lg));
   }
 
   .hud-shell__quickbar {
@@ -168,10 +171,13 @@ export default {
   }
 }
 
-@media (width <= 767px) {
+@media (width <= 639px) {
   .hud-shell {
     position: static;
     transform: none;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
     margin-top: var(--space-lg);
   }
 
