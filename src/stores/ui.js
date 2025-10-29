@@ -26,10 +26,6 @@ export const useUiStore = defineStore('ui', {
     },
   }),
   getters: {
-    account: (state) => state.account,
-    action: (state) => state.action,
-    guestAccount: (state) => state.guestAccount,
-    rememberMe: (state) => state.rememberMe,
     flowerOfLifeState: (state) => {
       if (!state.passives.flowerOfLife) {
         state.passives.flowerOfLife = createFlowerOfLifeState();
@@ -56,9 +52,15 @@ export const useUiStore = defineStore('ui', {
     setRememberMe(payload) {
       this.rememberMe = payload;
     },
-    rememberDevAccount(payload) {
-      this.account.username = payload.username;
-      this.account.password = payload.password;
+    rememberDevAccount(payload = {}) {
+      if (!this.account || typeof this.account !== 'object') {
+        this.account = { username: '', password: '' };
+      }
+
+      this.account = {
+        username: payload.username || '',
+        password: payload.password || '',
+      };
     },
     ensureFlowerState() {
       if (!this.passives.flowerOfLife) {

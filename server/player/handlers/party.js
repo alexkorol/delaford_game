@@ -501,7 +501,17 @@ class PartyService {
   }
 
   async evaluateInstances() {
-    const parties = Array.from(this.parties.values()).filter((party) => party && party.state === 'instance');
+    const partyCollection = this.parties instanceof Map
+      ? this.parties
+      : new Map(
+        Object.entries(this.parties || {}).map(([id, party]) => [id, party]),
+      );
+
+    if (!(this.parties instanceof Map)) {
+      this.parties = partyCollection;
+    }
+
+    const parties = Array.from(partyCollection.values()).filter((party) => party && party.state === 'instance');
     const evaluations = parties.map(async (party) => {
       const scene = world.getScene(party.sceneId);
       if (!scene || !Array.isArray(scene.monsters) || scene.monsters.length === 0) {
