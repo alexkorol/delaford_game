@@ -172,7 +172,7 @@ export default {
       if (!this.leftPaneComponent) {
         return false;
       }
-      return this.layoutMode === 'desktop';
+      return this.layoutMode !== 'mobile';
     },
     showRightPane() {
       if (!this.rightPaneComponent) {
@@ -203,19 +203,23 @@ export default {
 
 <style lang="scss" scoped>
 @use '@/assets/scss/abstracts/tokens' as *;
-@use '@/assets/scss/abstracts/breakpoints' as *;
 
 .pane-host {
+  --pane-host-side-width: clamp(220px, 22vw, 320px);
+
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-lg);
+  grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr) minmax(0, var(--pane-host-side-width));
+  gap: clamp(var(--space-md), 2vw, var(--space-xl));
   width: 100%;
   height: 100%;
   align-items: stretch;
   transition: grid-template-columns 160ms ease-out, gap 160ms ease-out;
 
-  &--tablet,
+  &--tablet {
+    grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr);
+  }
+
   &--mobile {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -224,7 +228,8 @@ export default {
 .pane-host__side {
   display: flex;
   flex-direction: column;
-  min-width: clamp(240px, 18vw, 320px);
+  min-width: var(--pane-host-side-width);
+  max-width: clamp(240px, 28vw, 360px);
   pointer-events: auto;
 
   &--left {
@@ -262,20 +267,16 @@ export default {
   width: 100%;
 }
 
-@include media('<=tablet') {
-  .pane-host__side {
-    min-width: min(420px, 90vw);
-  }
+.pane-host--tablet .pane-host__side {
+  min-width: clamp(260px, 48vw, 420px);
 }
 
-@include media('<=mobile') {
-  .pane-host__overlay {
-    padding: var(--space-lg) var(--space-md);
-  }
+.pane-host--mobile .pane-host__overlay {
+  padding: var(--space-lg) var(--space-md);
+}
 
-  .pane-host__side {
-    min-width: 100%;
-  }
+.pane-host--mobile .pane-host__side {
+  min-width: 100%;
 }
 
 .pane-slide-enter-active,

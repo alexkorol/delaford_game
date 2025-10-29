@@ -265,7 +265,7 @@ export default {
   justify-content: center;
   align-items: stretch;
   position: relative;
-  padding: clamp(1rem, 3vw, 2.5rem);
+  padding: clamp(1rem, 2.5vw, 3rem);
   width: 100%;
   min-height: 0;
   box-sizing: border-box;
@@ -285,18 +285,21 @@ export default {
   justify-content: flex-start;
   width: 100%;
   position: relative;
+  gap: clamp(var(--space-lg), 3vw, var(--space-2xl));
 }
 
 .game-container__world-shell {
+  --world-shell-padding: clamp(var(--space-lg), 3vw, var(--space-2xl));
+
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-xl);
-  gap: var(--space-lg);
-  width: 100%;
-  max-width: min(1400px, 96vw);
+  padding: var(--world-shell-padding);
+  gap: clamp(var(--space-lg), 2vw, var(--space-xl));
+  width: min(100%, var(--world-display-width, 100%));
+  max-width: min(96vw, var(--world-display-width, 1200px));
   margin: 0 auto;
   border-radius: var(--radius-lg);
   background: rgba(8, 10, 20, 0.65);
@@ -326,6 +329,7 @@ export default {
   transform: translate(-50%, -50%);
   width: var(--world-display-width, 100%);
   height: var(--world-display-height, auto);
+  max-width: 100%;
   border-radius: var(--radius-md);
   outline: none;
 }
@@ -334,14 +338,18 @@ export default {
   position: relative;
   display: flex;
   justify-content: flex-end;
-  width: 100%;
+  width: min(var(--world-display-width, 100%), 100%);
+  margin: clamp(var(--space-lg), 3vw, var(--space-2xl)) auto 0;
+  pointer-events: auto;
 }
 
 .chat-shell--desktop {
   position: absolute;
-  right: var(--space-xl);
-  bottom: var(--space-2xl);
-  width: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: clamp(var(--space-lg), 4vw, var(--space-2xl));
+  padding: 0 clamp(var(--space-lg), 3vw, var(--space-2xl));
+  width: min(var(--world-display-width, 100%), 100%);
   pointer-events: none;
 }
 
@@ -350,9 +358,9 @@ export default {
 }
 
 .chat-shell__toggle {
-  position: fixed;
-  right: var(--space-md);
-  bottom: var(--space-2xl);
+  position: absolute;
+  right: clamp(var(--space-md), 4vw, var(--space-xl));
+  bottom: clamp(var(--space-lg), 4vw, var(--space-2xl));
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
@@ -364,6 +372,10 @@ export default {
   cursor: pointer;
   box-shadow: var(--shadow-soft);
   z-index: 45;
+}
+
+.chat-shell--desktop .chat-shell__toggle {
+  display: none;
 }
 
 .chat-shell--expanded:not(.chat-shell--desktop) .chat-shell__toggle {
@@ -388,13 +400,26 @@ export default {
   text-align: center;
 }
 
-@media (width <= 767px) {
+@media (width <= 639px) {
+  .game-container__center {
+    gap: var(--space-lg);
+  }
+
   .game-container__world-shell {
-    padding: var(--space-md);
+    --world-shell-padding: var(--space-md);
+
+    max-width: 100%;
+  }
+
+  .chat-shell {
+    position: relative;
+    width: 100%;
+    padding-bottom: var(--space-xl);
   }
 
   .chat-shell__toggle {
-    bottom: var(--space-xl);
+    right: var(--space-md);
+    bottom: var(--space-md);
   }
 }
 </style>

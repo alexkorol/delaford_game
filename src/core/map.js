@@ -511,6 +511,7 @@ class Map {
     const { tileset } = this.config.map;
     const viewportConfig = this.config.map.viewport;
     const container = this.canvas ? this.canvas.parentElement : null;
+    const shell = container && container.parentElement ? container.parentElement : null;
     const tileWidth = tileset.tile.width;
     const tileHeight = tileset.tile.height;
 
@@ -525,7 +526,41 @@ class Map {
 
     const nativeWidth = tileWidth * viewportX;
     const nativeHeight = tileHeight * viewportY;
-    const scale = this.scale || 1;
+
+    const containerMetrics = shell && typeof shell.getBoundingClientRect === 'function'
+      ? shell.getBoundingClientRect()
+      : (container && typeof container.getBoundingClientRect === 'function'
+        ? container.getBoundingClientRect()
+        : null);
+
+    const stage = shell && shell.parentElement && typeof shell.parentElement.getBoundingClientRect === 'function'
+      ? shell.parentElement.getBoundingClientRect()
+      : null;
+
+    const availableWidth = stage && stage.width
+      ? stage.width
+      : (containerMetrics && containerMetrics.width
+        ? containerMetrics.width
+        : (typeof window !== 'undefined' ? window.innerWidth : nativeWidth));
+
+    const availableHeight = stage && stage.height
+      ? stage.height
+      : (containerMetrics && containerMetrics.height
+        ? containerMetrics.height
+        : (typeof window !== 'undefined' ? window.innerHeight : nativeHeight));
+
+    const widthScale = availableWidth / nativeWidth;
+    const heightScale = availableHeight / nativeHeight;
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const computedScale = Number.isFinite(widthScale) && widthScale > 0
+      ? clamp(Math.min(widthScale, Number.isFinite(heightScale) && heightScale > 0 ? heightScale : widthScale), 0.6, 2)
+      : (this.scale || 1);
+
+    const scale = clamp(computedScale, 0.6, 2);
+    this.scale = scale;
+    this.config.map.scale = scale;
+
     const displayWidth = nativeWidth * scale;
     const displayHeight = nativeHeight * scale;
 
@@ -539,13 +574,23 @@ class Map {
     this.canvas.style.maxWidth = `${displayWidth}px`;
     this.canvas.style.maxHeight = `${displayHeight}px`;
 
-    if (container) {
-      container.style.setProperty('--map-native-width', `${nativeWidth}px`);
-      container.style.setProperty('--map-native-height', `${nativeHeight}px`);
-      container.style.setProperty('--map-display-width', `${displayWidth}px`);
-      container.style.setProperty('--map-display-height', `${displayHeight}px`);
-      container.style.setProperty('--map-aspect-ratio', `${nativeWidth} / ${nativeHeight}`);
+    const targetForVariables = shell || container;
+    if (targetForVariables) {
+      targetForVariables.style.setProperty('--map-native-width', `${nativeWidth}px`);
+      targetForVariables.style.setProperty('--map-native-height', `${nativeHeight}px`);
+      targetForVariables.style.setProperty('--map-display-width', `${displayWidth}px`);
+      targetForVariables.style.setProperty('--map-display-height', `${displayHeight}px`);
+      targetForVariables.style.setProperty('--map-aspect-ratio', `${nativeWidth} / ${nativeHeight}`);
+      targetForVariables.style.setProperty('--map-scale', `${scale}`);
     }
+
+    bus.$emit('game:map:dimensions', {
+      nativeWidth,
+      nativeHeight,
+      displayWidth,
+      displayHeight,
+      scale,
+    });
 
     this.context.imageSmoothingEnabled = false;
     this.bufferContext.imageSmoothingEnabled = false;
@@ -574,12 +619,15 @@ class Map {
       this.canvas.style.maxWidth = '';
       this.canvas.style.maxHeight = '';
       const container = this.canvas.parentElement;
-      if (container) {
-        container.style.removeProperty('--map-native-width');
-        container.style.removeProperty('--map-native-height');
-        container.style.removeProperty('--map-display-width');
-        container.style.removeProperty('--map-display-height');
-        container.style.removeProperty('--map-aspect-ratio');
+      const shell = container && container.parentElement ? container.parentElement : null;
+      const target = shell || container;
+      if (target) {
+        target.style.removeProperty('--map-native-width');
+        target.style.removeProperty('--map-native-height');
+        target.style.removeProperty('--map-display-width');
+        target.style.removeProperty('--map-display-height');
+        target.style.removeProperty('--map-aspect-ratio');
+        target.style.removeProperty('--map-scale');
       }
     }
     this.config.map.viewport.x = this.defaultViewport.x;

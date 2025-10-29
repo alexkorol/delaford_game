@@ -97,6 +97,34 @@ const defaultPaneAssignments = {
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
 const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
 
+const getInitialMapDimensions = (mapConfig) => {
+  if (!mapConfig || !mapConfig.tileset || !mapConfig.tileset.tile || !mapConfig.viewport) {
+    return {
+      nativeWidth: 0,
+      nativeHeight: 0,
+      displayWidth: 0,
+      displayHeight: 0,
+      scale: 1,
+    };
+  }
+
+  const tileWidth = mapConfig.tileset.tile.width || 0;
+  const tileHeight = mapConfig.tileset.tile.height || 0;
+  const viewportX = mapConfig.viewport.x || 0;
+  const viewportY = mapConfig.viewport.y || 0;
+
+  const nativeWidth = tileWidth * viewportX;
+  const nativeHeight = tileHeight * viewportY;
+
+  return {
+    nativeWidth,
+    nativeHeight,
+    displayWidth: nativeWidth,
+    displayHeight: nativeHeight,
+    scale: 1,
+  };
+};
+
 export default {
   name: 'Delaford',
   components: {
@@ -129,14 +157,15 @@ export default {
       partyLoading: { active: false, state: null },
       partyStatusMessage: '',
       partyStatusTimeout: null,
+      mapDimensions: getInitialMapDimensions(config.map),
     };
   },
   computed: {
     layoutMode() {
-      if (this.viewportWidth < 768) {
+      if (this.viewportWidth < 640) {
         return 'mobile';
       }
-      if (this.viewportWidth < 1200) {
+      if (this.viewportWidth < 1280) {
         return 'tablet';
       }
       return 'desktop';
@@ -263,19 +292,25 @@ export default {
       const runtimeConfig = mapInstance && mapInstance.config
         ? mapInstance.config.map
         : this.config.map;
-      const { tile } = runtimeConfig.tileset;
-      const { viewport } = runtimeConfig;
-      const width = tile.width * viewport.x;
-      const height = tile.height * viewport.y;
-      const scale = mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1;
-      const displayWidth = width * scale;
-      const displayHeight = height * scale;
+      const fallbackDimensions = getInitialMapDimensions(runtimeConfig);
+      const resolvedDimensions = {
+        ...fallbackDimensions,
+        ...this.mapDimensions,
+      };
+      const width = resolvedDimensions.nativeWidth || fallbackDimensions.nativeWidth;
+      const height = resolvedDimensions.nativeHeight || fallbackDimensions.nativeHeight;
+      const scale = typeof resolvedDimensions.scale === 'number'
+        ? resolvedDimensions.scale
+        : (mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1);
+      const displayWidth = resolvedDimensions.displayWidth || (width * scale);
+      const displayHeight = resolvedDimensions.displayHeight || (height * scale);
       return {
         '--map-aspect-ratio': `${width} / ${height}`,
         '--world-internal-width': `${width}px`,
         '--world-internal-height': `${height}px`,
         '--world-display-width': `${displayWidth}px`,
         '--world-display-height': `${displayHeight}px`,
+        '--world-display-scale': `${scale}`,
       };
     },
   },
@@ -353,6 +388,7 @@ export default {
 
     bus.$on('show-sidebar', this.showSidebar);
     bus.$on('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$on('game:map:dimensions', this.handleMapDimensions);
 
     // On logout, let's do a few things...
     bus.$on('player:logout', this.logout);
@@ -396,6 +432,7 @@ export default {
     }
 
     bus.$off('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$off('game:map:dimensions', this.handleMapDimensions);
 
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
       this.game.map.destroy();
@@ -459,6 +496,25 @@ export default {
       this.layout.chat.isPinned = false;
       this.layout.chat.unreadCount = 0;
       this.layout.chat.preview = DEFAULT_CHAT_PREVIEW;
+    },
+
+    handleMapDimensions(dimensions = {}) {
+      const fallback = getInitialMapDimensions(this.config.map);
+      const {
+        nativeWidth = fallback.nativeWidth,
+        nativeHeight = fallback.nativeHeight,
+        displayWidth = fallback.displayWidth,
+        displayHeight = fallback.displayHeight,
+        scale = fallback.scale,
+      } = dimensions;
+
+      this.mapDimensions = {
+        nativeWidth,
+        nativeHeight,
+        displayWidth,
+        displayHeight,
+        scale,
+      };
     },
 
     onViewportResize() {
