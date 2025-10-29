@@ -26,16 +26,49 @@ class Item {
    * Check the map resources to see if they need to be replenished
    */
   static resourcesCheck() {
-    world.respawns.resources.forEach((item, index) => {
-      if (Item.itemAlreadyPlaced(item) === undefined) {
-        // Set resource back to original tile
-        world.map.foreground[item.onTile] = item.setToTile;
+    world.forEachScene((scene) => {
+      if (!scene || !scene.respawns || !Array.isArray(scene.respawns.resources)) {
+        return;
+      }
 
-        // Tell all players of map update
-        Socket.broadcast('world:foreground:update', world.map.foreground);
+      const resources = scene.respawns.resources;
+      if (!resources.length) {
+        return;
+      }
 
-        // Take resource off respawn check
-        world.respawns.resources.splice(index, 1);
+      const mapLayers = scene.map || world.map;
+      const foreground = mapLayers && Array.isArray(mapLayers.foreground)
+        ? mapLayers.foreground
+        : null;
+
+      if (!foreground) {
+        return;
+      }
+
+      for (let index = resources.length - 1; index >= 0; index -= 1) {
+        const resource = resources[index];
+        if (!resource || !resource.willRespawnIn) {
+          continue;
+        }
+
+        const readyAt = resource.willRespawnIn instanceof Date
+          ? resource.willRespawnIn.getTime()
+          : new Date(resource.willRespawnIn).getTime();
+
+        if (Number.isNaN(readyAt) || Date.now() < readyAt) {
+          continue;
+        }
+
+        if (typeof resource.onTile === 'number' && resource.onTile >= 0) {
+          foreground[resource.onTile] = resource.setToTile;
+        }
+
+        const players = scene.id === world.defaultTownId
+          ? null
+          : world.getScenePlayers(scene.id);
+
+        Socket.broadcast('world:foreground:update', foreground, players);
+        resources.splice(index, 1);
       }
     });
   }

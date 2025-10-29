@@ -3,10 +3,13 @@ import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import config from '#server/config.js';
-import surfaceMap from '#server/maps/layers/surface.json' assert { type: 'json' };
+import { createRequire } from 'node:module';
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
+
+const require = createRequire(import.meta.url);
+const surfaceMap = require('#server/maps/layers/surface.json');
 
 const DEFAULT_INSTANCE_ROOM_COUNT = 6;
 const DEFAULT_CORRIDOR_WIDTH = 3;

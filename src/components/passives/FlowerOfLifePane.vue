@@ -169,7 +169,6 @@
 </template>
 
 <script>
-import { mapActions } from 'vuex';
 import FlowerOfLifeTree from './FlowerOfLifeTree.vue';
 import {
   FLOWER_OF_LIFE_LAYOUT,
@@ -351,12 +350,18 @@ export default {
     },
   },
   methods: {
-    ...mapActions([
-      'allocateFlowerNode',
-      'refundFlowerNode',
-      'resetFlowerOfLife',
-      'setFlowerManualMilestone',
-    ]),
+    allocateFlowerNode(payload) {
+      return this.$store.dispatch('allocateFlowerNode', payload);
+    },
+    refundFlowerNode(payload) {
+      return this.$store.dispatch('refundFlowerNode', payload);
+    },
+    resetFlowerOfLife(payload) {
+      return this.$store.dispatch('resetFlowerOfLife', payload);
+    },
+    setFlowerManualMilestone(payload) {
+      return this.$store.dispatch('setFlowerManualMilestone', payload);
+    },
     formatRequirement(requirement) {
       if (!requirement) {
         return '';
@@ -683,7 +688,7 @@ export default {
   background: rgba(255, 255, 255, 0.15);
 }
 
-@media (max-width: 1024px) {
+@media (width <= 1024px) {
   .flower-pane {
     grid-template-columns: 1fr;
   }

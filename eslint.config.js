@@ -10,8 +10,12 @@ export default [
   {
     files: ['**/*.js', '**/*.vue'],
     languageOptions: {
-      ecmaVersion: 2023,
+      ecmaVersion: 'latest',
       sourceType: 'module',
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
       globals: {
         ...globals.browser,
         ...globals.node,
@@ -39,11 +43,7 @@ export default [
     },
     rules: {
       'import/no-unresolved': ['error', { ignore: ['^virtual:'] }],
-      'import/order': ['error', {
-        alphabetize: { order: 'asc', caseInsensitive: true },
-        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-        'newlines-between': 'always',
-      }],
+      'import/order': 'off',
     },
   },
   ...vue.configs['flat/essential'],

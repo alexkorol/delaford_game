@@ -1,7 +1,7 @@
 import UI from '#shared/ui.js';
 import World from '#server/core/world.js';
 import config from '#server/config.js';
-import { merge } from 'lodash';
+import merge from 'lodash/merge.js';
 import Handler from './handler.js';
 import playerEvent from './handlers/actions/index.js';
 
@@ -89,9 +89,10 @@ class Action {
         ),
       };
 
-      // How ugly is this? Stupid object iteration...
-      // eslint-disable-next-line
-      return Object.assign(...Object.entries(tiles).map(([key, value]) => ({[key]: UI.tileWalkable(value)})));
+      const edgeStates = Object.fromEntries(
+        Object.entries(tiles).map(([key, value]) => [key, UI.tileWalkable(value)]),
+      );
+      return edgeStates;
     }
 
     return false;
@@ -115,9 +116,9 @@ class Action {
       return;
     }
 
-    // eslint-disable-next-line
-    const onTile = (((clickedOn.y + tileCrop.y) * size.x) + clickedOn.x) + tileCrop.x;
-    this.tile = onTile;
+    const yIndex = (clickedOn.y + tileCrop.y) * size.x;
+    const xIndex = clickedOn.x + tileCrop.x;
+    this.tile = yIndex + xIndex;
   }
 
   /**

@@ -1,9 +1,11 @@
 import Query from '#server/core/data/query.js';
 import Socket from '#server/socket.js';
 import UI from '#shared/ui.js';
-import { player } from '#server/config.js';
+import config from '#server/config.js';
 import { shops } from '#server/core/data/foreground/index.js';
 import world from '#server/core/world.js';
+
+const { player } = config;
 
 class Shop {
   constructor(shopId, playerUuid, itemId, type, quantity) {

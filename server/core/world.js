@@ -297,6 +297,16 @@ class WorldManager {
 
     return this.towns.get(townId);
   }
+
+  forEachScene(iterator) {
+    if (typeof iterator !== 'function') {
+      return;
+    }
+
+    this.scenes.forEach((scene, id) => {
+      iterator(scene, id);
+    });
+  }
 }
 
 const worldManager = new WorldManager();

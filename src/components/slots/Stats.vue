@@ -67,7 +67,7 @@
 </template>
 
 <script>
-import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from '@shared/stats.js';
+import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from '@shared/stats/index.js';
 import { computeAvailablePetalCount, sumAllocatedCost } from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
 
@@ -206,6 +206,62 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+section.flower-of-life {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+
+  header {
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #f5d68a;
+  }
+
+  .summary {
+    margin: 0;
+    font-size: 0.8em;
+    display: flex;
+    gap: 0.35rem;
+    align-items: baseline;
+
+    strong {
+      color: #ffd54f;
+      font-size: 1.05em;
+    }
+
+    span {
+      font-size: 0.9em;
+    }
+  }
+
+  .available {
+    margin: 0;
+    font-size: 0.75em;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .flower-button {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.08);
+    color: #f1f1f1;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #111;
+    }
+  }
+}
+
 div.stats_slot {
   height: 100%;
   font-family: "GameFont", sans-serif;
@@ -265,62 +321,6 @@ div.stats_slot {
           }
         }
       }
-    }
-  }
-}
-
-section.flower-of-life {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: flex-start;
-
-  header {
-    font-size: 0.85em;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #f5d68a;
-  }
-
-  .summary {
-    margin: 0;
-    font-size: 0.8em;
-    display: flex;
-    gap: 0.35rem;
-    align-items: baseline;
-
-    strong {
-      color: #ffd54f;
-      font-size: 1.05em;
-    }
-
-    span {
-      font-size: 0.9em;
-    }
-  }
-
-  .available {
-    margin: 0;
-    font-size: 0.75em;
-    color: rgba(255, 255, 255, 0.75);
-  }
-
-  .flower-button {
-    margin-top: 0.35rem;
-    padding: 0.35rem 0.6rem;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.08);
-    color: #f1f1f1;
-    font-size: 0.75em;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.16);
-      color: #111;
     }
   }
 }

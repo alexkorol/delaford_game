@@ -2,12 +2,15 @@
  * Events from socket.
  * for example: (login, logout, queue. etc.)
  */
+import { createRequire } from 'node:module';
 import Authentication from '#server/player/authentication.js';
 import Player from '#server/core/player.js';
 import Socket from '#server/socket.js';
 import config from '#server/config.js';
-import playerGuest from '#server/core/data/helpers/player.json' assert { type: 'json' };
 import world from '#server/core/world.js';
+
+const require = createRequire(import.meta.url);
+const playerGuest = require('#server/core/data/helpers/player.json');
 
 export default {
   /**

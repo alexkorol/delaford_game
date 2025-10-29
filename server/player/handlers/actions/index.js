@@ -653,11 +653,15 @@ export default {
       // Extract resource and either add to inventory or drop it
       mining.extractResource(rockMined);
 
-      // TODO(instancing): update this mutation to target the active scene map instead of
-      // the global world.map so resource/door/tree interactions behave correctly inside
-      // instanced encounters.
-      // Update rock to dead-rock after successful mine
-      world.map.foreground[data.todo.actionToQueue.onTile] = 532;
+      const player = world.players[data.playerIndex];
+      const activeScene = player
+        ? world.getSceneForPlayer(player)
+        : world.getDefaultTown();
+      const scene = activeScene || world.getDefaultTown();
+      const mapLayers = scene && scene.map ? scene.map : world.map;
+      if (mapLayers && Array.isArray(mapLayers.foreground)) {
+        mapLayers.foreground[data.todo.actionToQueue.onTile] = 532;
+      }
 
       // Update the experience
       mining.updateExperience(rockMined.experience);
@@ -669,10 +673,30 @@ export default {
       });
 
       // Update client of dead rock
-      Socket.broadcast('world:foreground:update', world.map.foreground);
+      const scenePlayers = scene.id === world.defaultTownId
+        ? null
+        : world.getScenePlayers(scene.id);
+      Socket.broadcast(
+        'world:foreground:update',
+        mapLayers && Array.isArray(mapLayers.foreground)
+          ? mapLayers.foreground
+          : world.map.foreground,
+        scenePlayers,
+      );
 
       // Add this resource to respawn clock
-      world.respawns.resources.push({
+      if (!scene.respawns) {
+        scene.respawns = {
+          items: [],
+          monsters: [],
+          resources: [],
+        };
+      } else if (!Array.isArray(scene.respawns.resources)) {
+        scene.respawns.resources = [];
+      }
+
+      scene.respawns.resources.push({
+        sceneId: scene.id,
         setToTile: rockMined.id + 253,
         onTile: data.todo.actionToQueue.onTile,
         willRespawnIn: Item.calculateRespawnTime(rockMined.respawnIn),

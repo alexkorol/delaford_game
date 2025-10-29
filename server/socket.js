@@ -19,12 +19,23 @@ class Socket {
    * @param {object} data The data associated with the event
    */
   static emit(event, data, options = {}) {
-    if (!data.player.socket_id) {
-      console.log(event, 'No player socket ID connected.');
+    if (!data || !data.player || !data.player.socket_id) {
+      console.warn(`[socket] Unable to emit ${event}: missing player socket id.`);
+      return;
     }
 
     // Find player wanting the emit request
     const player = world.clients.find(p => p.id === data.player.socket_id);
+
+    if (!player) {
+      console.warn(`[socket] Unable to emit ${event}: socket ${data.player.socket_id} not found.`);
+      return;
+    }
+
+    if (player.readyState !== WebSocket.OPEN) {
+      console.warn(`[socket] Unable to emit ${event}: socket ${data.player.socket_id} not open (state ${player.readyState}).`);
+      return;
+    }
 
     // Send the player back their needed data
     const payload = {

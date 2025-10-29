@@ -35,8 +35,7 @@ app.use(express.json({ limit: '32kb' }));
 if (hasClientBundle()) {
   app.use(express.static(distDir));
 } else {
-  // eslint-disable-next-line no-console
-  console.warn('[server] Client bundle not found in dist/. Static assets will be skipped.');
+  process.stderr.write('[server] Client bundle not found in dist/. Static assets will be skipped.\n');
 }
 
 const serializeJob = (job) => {
@@ -99,7 +98,7 @@ app.get('/world/players', (_req, res) => res.send(world.players));
 app.get('/world/respawns', (_req, res) => res.send(world.respawns));
 app.get('/world/shops', (_req, res) => res.send(world.shops));
 
-app.get('*', (_req, res) => {
+app.get('/*', (_req, res) => {
   if (hasClientBundle()) {
     res.sendFile(path.join(distDir, 'index.html'));
     return;
@@ -112,7 +111,6 @@ app.get('*', (_req, res) => {
 
 const server = http.createServer(app);
 server.listen(port, () => {
-  // eslint-disable-next-line no-console
   console.log(`ENVIRONMENT: ${env} and PORT ${port}`);
 });
 

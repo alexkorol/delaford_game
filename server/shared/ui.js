@@ -1,4 +1,6 @@
-import { map } from '../config.js';
+import config from '../config.js';
+
+const { map } = config;
 
 class UI {
   /**
