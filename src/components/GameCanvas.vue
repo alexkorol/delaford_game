@@ -33,8 +33,12 @@
 </template>
 
 <script>
+import { mapStores } from 'pinia';
+
 import UI from '@shared/ui.js';
+import { getSkillExecutionProfile } from '@shared/skills/index.js';
 import config from '@server/config.js';
+import { useUiStore } from '@/stores/ui.js';
 import ClientUI from '../core/utilities/client-ui.js';
 import bus from '../core/utilities/bus.js';
 import Socket from '../core/utilities/socket.js';
@@ -61,6 +65,7 @@ export default {
     };
   },
   computed: {
+    ...mapStores(useUiStore),
     getPaneDimensions() {
       switch (this.current) {
       default:
@@ -70,10 +75,10 @@ export default {
       }
     },
     currentAction() {
-      return this.$store.getters.action.object;
+      return this.uiStore.action.object;
     },
     action() {
-      return this.$store.getters.action.label;
+      return this.uiStore.action.label;
     },
     otherPlayers() {
       return this.game.players.filter(
@@ -136,12 +141,15 @@ export default {
         return;
       }
 
-      if (phase === 'end') {
-        this.dispatchSkill(skillId, { phase });
-        return;
-      }
+      const profile = getSkillExecutionProfile(skillId) || {};
+      const options = {
+        animationState: profile.animationState,
+        duration: profile.duration,
+        holdState: profile.holdState,
+        modifiers: profile.modifiers || {},
+      };
 
-      this.dispatchSkill(skillId);
+      this.dispatchSkill(skillId, { ...options, phase });
     },
     getViewportSnapshot() {
       const fallbackViewport = {
@@ -287,7 +295,6 @@ export default {
           bus.$emit('DRAW:MOUSE', data);
         }
 
-        // eslint-disable-next-line
         if (
           !event
           || ((this.tileX !== hoveredSquare.x || this.tileY !== hoveredSquare.y)

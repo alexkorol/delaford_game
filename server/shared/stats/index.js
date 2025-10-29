@@ -7,7 +7,7 @@ const ATTRIBUTE_LABELS = {
 };
 
 const DEFAULT_ATTRIBUTE_VALUE = 10;
-const DEFAULT_ATTRIBUTE_SOURCES = ['base', 'equipment', 'bonuses'];
+const DEFAULT_ATTRIBUTE_SOURCES = ['base', 'equipment', 'bonuses', 'passives'];
 
 const RESOURCE_RULES = {
   health: {

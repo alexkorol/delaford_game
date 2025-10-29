@@ -94,6 +94,9 @@ export default {
         'flower-tree__node--keystone': node.type === 'keystone',
         'flower-tree__node--major': node.type === 'major',
         'flower-tree__node--notable': node.type === 'notable',
+        'flower-tree__node--minor': node.type === 'minor',
+        'flower-tree__node--highlighted': node.highlighted,
+        'flower-tree__node--dimmed': node.dimmed,
       };
     },
     connectionClass(connection) {
@@ -101,6 +104,8 @@ export default {
         'flower-tree__connection': true,
         'flower-tree__connection--active': connection.active,
         'flower-tree__connection--reachable': connection.reachable,
+        'flower-tree__connection--highlighted': connection.highlighted,
+        'flower-tree__connection--dimmed': connection.dimmed,
       };
     },
   },
@@ -135,6 +140,15 @@ export default {
 
 .flower-tree__connection--reachable:not(.flower-tree__connection--active) {
   stroke: rgba(255, 224, 130, 0.6);
+}
+
+.flower-tree__connection--highlighted:not(.flower-tree__connection--active) {
+  stroke: rgba(255, 224, 130, 0.75);
+  stroke-width: 3.5;
+}
+
+.flower-tree__connection--dimmed {
+  opacity: 0.2;
 }
 
 .flower-tree__nodes {
@@ -178,15 +192,6 @@ export default {
   fill: rgba(255, 213, 79, 0.35);
 }
 
-.flower-tree__node--available:not(.flower-tree__node--allocated) .flower-tree__node-bg {
-  stroke: #8bc34a;
-  fill: rgba(139, 195, 74, 0.25);
-}
-
-.flower-tree__node--available:not(.flower-tree__node--allocated) .flower-tree__node-core {
-  fill: rgba(139, 195, 74, 0.3);
-}
-
 .flower-tree__node--locked .flower-tree__node-bg {
   stroke: rgba(255, 255, 255, 0.15);
   fill: rgba(0, 0, 0, 0.35);
@@ -194,6 +199,14 @@ export default {
 
 .flower-tree__node--selected {
   filter: drop-shadow(0 0 8px rgba(255, 215, 64, 0.6));
+}
+
+.flower-tree__node--highlighted:not(.flower-tree__node--selected) {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.35));
+}
+
+.flower-tree__node--dimmed {
+  opacity: 0.35;
 }
 
 .flower-tree__node--keystone .flower-tree__node-bg {
@@ -204,8 +217,24 @@ export default {
   stroke-dasharray: 8 4;
 }
 
-.flower-tree__node:hover .flower-tree__node-bg,
+.flower-tree__node--minor .flower-tree__node-bg {
+  stroke-dasharray: 4 4;
+}
+
 .flower-tree__node--available .flower-tree__node-bg {
+  stroke-width: 3;
+}
+
+.flower-tree__node--available:not(.flower-tree__node--allocated) .flower-tree__node-bg {
+  stroke: #8bc34a;
+  fill: rgba(139, 195, 74, 0.25);
+}
+
+.flower-tree__node--available:not(.flower-tree__node--allocated) .flower-tree__node-core {
+  fill: rgba(139, 195, 74, 0.3);
+}
+
+.flower-tree__node:hover .flower-tree__node-bg {
   stroke-width: 3;
 }
 </style>

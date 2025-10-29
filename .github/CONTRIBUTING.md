@@ -4,17 +4,17 @@ We love pull requests from everyone. By participating in this project, you agree
 
 Fork the repo.
 
-Install the dependencies:
+Make sure you are on the toolchain published in `.nvmrc` / `.tool-versions` (Node.js 22 + npm 10). The project relies on the Vite bundler and Pinia-powered stores baked into the existing npm scripts—no global installs required.
+
+Install the dependencies (the Vite client and Express/WebSocket server live in the same workspace, so one install covers both):
 
     npm install
 
-Start the development server:
+Start the development environment (Vite + backend run together via `npm run dev`):
 
-    npm run serve
+    npm run dev
 
-In another terminal, start the server:
-
-    npm run dev:node
+Need to focus on a single process? Use `npm run dev:client` for the Vite UI or `npm run dev:server` for the Express/WebSocket runtime.
 
 Make changes.
 

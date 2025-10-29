@@ -1,5 +1,4 @@
 <template>
-  <!-- eslint-disable max-len -->
   <div class="main grid_container">
     <div
       v-for="(item, i) in items"
@@ -10,7 +9,6 @@
           v-if="slotHasItem(i)"
           :style="{
             backgroundImage: `url(${getBgUrl(i)})`,
-            // eslint-disable-next-line
           backgroundPosition: `left -${(getItem(i).column * 32)}px top -${(getItem(i).row * 32)}px`
           }"
           :class="`slot ${getItemFromSlot(i).isLocked} ${getItemFromSlot(i).id} ${gridData(screen).classId} ${isItemSelected(i)}`"
@@ -33,8 +31,10 @@
 </template>
 
 <script>
-/* eslint-disable max-len */
+import { mapStores } from 'pinia';
+
 import UI from '@shared/ui.js';
+import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 import ClientUI from '../../core/utilities/client-ui.js';
 // import { weapons } from '../../../server/core/data/respawn.js';
@@ -62,6 +62,9 @@ export default {
     return {
       action: '',
     };
+  },
+  computed: {
+    ...mapStores(useUiStore),
   },
   created() {
     this.$forceUpdate();
@@ -161,10 +164,10 @@ export default {
 
       bus.$emit('canvas:select-action', {
         event,
-        item: this.$store.getters.action.object,
+        item: this.uiStore.action.object,
       });
 
-      console.log(this.$store.getters.action.object);
+      console.log(this.uiStore.action.object);
 
       // TODO
       // Make 'context-menu' to smelt bars into weapons

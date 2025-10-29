@@ -33,6 +33,7 @@
             <span class="base">B {{ attribute.breakdown.base }}</span>
             <span class="gear">G {{ attribute.breakdown.equipment }}</span>
             <span class="bonus">+ {{ attribute.breakdown.bonuses }}</span>
+            <span class="passive">P {{ attribute.breakdown.passives }}</span>
           </small>
         </li>
       </ul>
@@ -67,11 +68,22 @@
 </template>
 
 <script>
-import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS } from '@shared/stats/index.js';
-import { computeAvailablePetalCount, sumAllocatedCost } from '@shared/passives/flower-of-life.js';
+import { mapStores } from 'pinia';
+import { ATTRIBUTE_IDS, ATTRIBUTE_LABELS, aggregateAttributes } from '@shared/stats/index.js';
+import {
+  computeAvailablePetalCount,
+  sumAllocatedCost,
+  computeFlowerAttributeBonuses,
+  FLOWER_OF_LIFE_DEFAULT_PROGRESS,
+} from '@shared/passives/flower-of-life.js';
 import bus from '@/core/utilities/bus';
+import { useUiStore } from '@/stores/ui.js';
 
 const normaliseNumber = value => (Number.isFinite(value) ? value : 0);
+const normaliseAttributes = (source = {}) => ATTRIBUTE_IDS.reduce((acc, attributeId) => {
+  acc[attributeId] = normaliseNumber(source[attributeId]);
+  return acc;
+}, {});
 
 export default {
   props: {
@@ -81,20 +93,12 @@ export default {
     },
   },
   computed: {
+    ...mapStores(useUiStore),
     player() {
       return this.game && this.game.player ? this.game.player : {};
     },
     flowerProgress() {
-      const passives = this.$store && this.$store.state && this.$store.state.passives;
-      if (!passives || !passives.flowerOfLife) {
-        return {
-          allocatedNodes: [],
-          manualMilestones: {},
-          counters: {},
-          bonusPetals: 0,
-        };
-      }
-      return passives.flowerOfLife;
+      return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     flowerSummary() {
       const summary = computeAvailablePetalCount(this.player, this.flowerProgress);
@@ -122,25 +126,45 @@ export default {
         base: sources.base || {},
         equipment: sources.equipment || {},
         bonuses: sources.bonuses || {},
+        passives: sources.passives || {},
       };
     },
-    attributeTotals() {
-      return this.stats.attributes && this.stats.attributes.total
-        ? this.stats.attributes.total
-        : {};
+    passiveAttributeBonuses() {
+      return computeFlowerAttributeBonuses(this.flowerProgress);
     },
     attributes() {
+      const base = normaliseAttributes(this.attributeSources.base);
+      const equipment = normaliseAttributes(this.attributeSources.equipment);
+      const bonuses = normaliseAttributes(this.attributeSources.bonuses);
+      const passiveFromStats = normaliseAttributes(this.attributeSources.passives);
+      const passiveLocal = normaliseAttributes(this.passiveAttributeBonuses);
+
+      const passives = normaliseAttributes({});
+      const hasServerPassive = ATTRIBUTE_IDS.some(attributeId => passiveFromStats[attributeId] !== 0);
+      ATTRIBUTE_IDS.forEach((attributeId) => {
+        const localContribution = hasServerPassive ? 0 : passiveLocal[attributeId];
+        passives[attributeId] = passiveFromStats[attributeId] + localContribution;
+      });
+
+      const aggregated = aggregateAttributes({
+        base,
+        equipment,
+        bonuses,
+        passives,
+      });
+
       return ATTRIBUTE_IDS.map((attributeId) => {
         const breakdown = {
-          base: normaliseNumber(this.attributeSources.base[attributeId]),
-          equipment: normaliseNumber(this.attributeSources.equipment[attributeId]),
-          bonuses: normaliseNumber(this.attributeSources.bonuses[attributeId]),
+          base: normaliseNumber(aggregated.sources.base[attributeId]),
+          equipment: normaliseNumber(aggregated.sources.equipment[attributeId]),
+          bonuses: normaliseNumber(aggregated.sources.bonuses[attributeId]),
+          passives: normaliseNumber(aggregated.sources.passives[attributeId]),
         };
 
         return {
           id: attributeId,
           label: ATTRIBUTE_LABELS[attributeId] || attributeId,
-          value: normaliseNumber(this.attributeTotals[attributeId]),
+          value: normaliseNumber(aggregated.total[attributeId]),
           breakdown,
         };
       });
@@ -318,6 +342,10 @@ div.stats_slot {
 
           span {
             display: inline-block;
+          }
+
+          .passive {
+            color: #80cbc4;
           }
         }
       }

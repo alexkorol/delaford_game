@@ -6,6 +6,8 @@
     @click.left="handleSelect"
     @contextmenu.prevent="emitContext($event, false)"
     @mouseover="emitContext($event, true)"
+    @pointerenter="handlePointerEnter"
+    @pointerleave="handlePointerLeave"
   >
     <div
       v-if="isFilled"
@@ -16,6 +18,9 @@
 </template>
 
 <script>
+import { mapStores } from 'pinia';
+
+import { useUiStore } from '@/stores/ui.js';
 import bus from '../../core/utilities/bus.js';
 
 export default {
@@ -34,7 +39,64 @@ export default {
       required: true,
     },
   },
+  inject: {
+    inventoryDragStore: {
+      from: 'inventoryDragStore',
+      default: null,
+    },
+  },
+  methods: {
+    handleSelect(event) {
+      bus.$emit('canvas:select-action', {
+        event,
+        item: this.uiStore.action.object,
+      });
+    },
+    handlePointerEnter() {
+      if (!this.inventoryDragStore || !this.inventoryDragStore.isDragging.value) {
+        return;
+      }
+
+      this.inventoryDragStore.setHoverTarget({
+        type: 'equipment',
+        slotId: this.slotId,
+      });
+    },
+    handlePointerLeave() {
+      if (!this.inventoryDragStore || !this.inventoryDragStore.isDragging.value) {
+        return;
+      }
+
+      if (this.inventoryDragStore.dragState.value?.hoverTarget?.slotId === this.slotId) {
+        this.inventoryDragStore.clearHoverTarget();
+      }
+    },
+    emitContext(event, firstOnly) {
+      if (!this.item) {
+        return;
+      }
+
+      this.$emit('open-context-menu', event, this.slotId, firstOnly);
+    },
+    getTilesetSrc(tileset) {
+      if (!this.images) {
+        return '';
+      }
+
+      switch (tileset) {
+      case 'general':
+        return this.images.generalImage ? this.images.generalImage.src : '';
+      case 'jewelry':
+        return this.images.jewelryImage ? this.images.jewelryImage.src : '';
+      case 'armor':
+        return this.images.armorImage ? this.images.armorImage.src : '';
+      default:
+        return this.images.weaponsImage ? this.images.weaponsImage.src : '';
+      }
+    },
+  },
   computed: {
+    ...mapStores(useUiStore),
     isFilled() {
       return this.wear && this.wear[this.slotId];
     },
@@ -53,6 +115,7 @@ export default {
         'slot',
         this.slotId,
         { wearSlot: this.isFilled },
+        { 'slot--drop-target': this.isDropTarget },
       ];
     },
     backgroundClass() {
@@ -86,36 +149,13 @@ export default {
         backgroundPosition: `left -${column * 32}px top -${row * 32}px`,
       };
     },
-  },
-  methods: {
-    handleSelect(event) {
-      bus.$emit('canvas:select-action', {
-        event,
-        item: this.$store.getters.action.object,
-      });
-    },
-    emitContext(event, firstOnly) {
-      if (!this.item) {
-        return;
+    isDropTarget() {
+      if (!this.inventoryDragStore) {
+        return false;
       }
 
-      this.$emit('open-context-menu', event, this.slotId, firstOnly);
-    },
-    getTilesetSrc(tileset) {
-      if (!this.images) {
-        return '';
-      }
-
-      switch (tileset) {
-      case 'general':
-        return this.images.generalImage ? this.images.generalImage.src : '';
-      case 'jewelry':
-        return this.images.jewelryImage ? this.images.jewelryImage.src : '';
-      case 'armor':
-        return this.images.armorImage ? this.images.armorImage.src : '';
-      default:
-        return this.images.weaponsImage ? this.images.weaponsImage.src : '';
-      }
+      const target = this.inventoryDragStore.dragState.value?.hoverTarget;
+      return target && target.type === 'equipment' && target.slotId === this.slotId;
     },
   },
 };
@@ -147,6 +187,11 @@ export default {
     height: 40px;
     background-repeat: no-repeat;
   }
+}
+
+.slot--drop-target {
+  border-color: rgba(0, 200, 255, 0.65);
+  box-shadow: 0 0 10px rgba(0, 200, 255, 0.35);
 }
 
 .slot.head {

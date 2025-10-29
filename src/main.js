@@ -6,7 +6,6 @@ import Delaford from './Delaford.vue';
 import Socket from './core/utilities/socket.js';
 import { registerGlobalComponents } from './plugins/register-components.js';
 import { installStores } from './stores/index.js';
-import { createLegacyStore } from './stores/legacy.js';
 
 const app = createApp(Delaford);
 
@@ -21,8 +20,6 @@ app.use(VueTippy, {
   arrow: true,
   followCursor: true,
 });
-
-app.config.globalProperties.$store = createLegacyStore();
 
 if (typeof window !== 'undefined' && 'WebSocket' in window) {
   const wsurl = {

@@ -11,6 +11,7 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
   - **Volta**: `volta install` inside the project folder
   - **asdf**: `asdf install`
 - Git, and a working C compiler toolchain if you are on Windows (needed for native node-gyp modules).
+- You do **not** need any global Vue CLI installs. The repo uses [Vite](https://vitejs.dev/) for dev/build tooling and [Pinia](https://pinia.vuejs.org/) for client-side state, both already defined as local dependencies and exposed through npm scripts.
 
 ## First-time setup
 
@@ -39,7 +40,7 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
   npm run dev
   ```
   This runs the Vite dev server and the Express/WebSocket backend in parallel via `concurrently`. Both processes hot-reload on file changes.
-- Visit `http://localhost:5173` to interact with the game client. The Express + WebSocket server listens on `http://localhost:6500`.
+- Visit `http://localhost:5173` to interact with the game client. The Express API wrapper responds on `http://localhost:6500`, and the WebSocket server listens on `ws://localhost:9000`.
 - Want to debug the backend only? Use `npm run dev:server`. For client-only work use `npm run dev:client`.
 
 ## Optional environment variables

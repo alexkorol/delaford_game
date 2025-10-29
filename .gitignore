@@ -26,3 +26,6 @@ scratchpad.txt
 
 #History Files
 *.history
+
+# Generated runtime data
+server/data/

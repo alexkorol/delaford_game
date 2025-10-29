@@ -1,190 +1,61 @@
 <template>
   <div id="app">
-    <!-- Login screen -->
-    <div
-      v-show="!loaded || game.exit"
-      class="wrapper login__screen"
-    >
-      <AudioMainMenu />
-      <div
-        v-if="screen === 'server-down'"
-        class="bg server__down"
-      >
-        The game server is down. Please check the website for more information.
-      </div>
-      <div
-        v-else
-        class="bg"
-      >
-        <div
-          v-if="screen === 'register'"
-          class="register"
-        >
-          <p class="register__intro">
-            To register an account, please visit
-            <a href="https://delaford.com/register">this page</a>
-            to get started and then come back. Once you have an account ID, reserve your in-world identity below.
-          </p>
-          <CharacterCreate />
-        </div>
-        <div
-          v-if="screen === 'login'"
-          class="login"
-        >
-          <img
-            class="logo"
-            src="./assets/logo.png"
-            alt="Logo"
-          >
+    <AuthContainer
+      v-if="showAuthScreen"
+      :screen="screen"
+      @navigate="handleAuthNavigate"
+    />
 
-          <Login />
-        </div>
-        <div v-if="screen === 'main'">
-          <img
-            class="logo"
-            src="./assets/logo.png"
-            alt="Logo"
-          >
-
-          <div class="button_group">
-            <button
-              class="login"
-              @click="screen = 'login'"
-            >
-              Login
-            </button>
-
-            <button
-              class="register"
-              @click="screen = 'register'"
-            >
-              Register
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Game wrapper -->
-    <div
-      v-show="loaded && game.map"
-      class="wrapper game__wrapper"
-      @click.right="nothing"
-    >
-      <PaneHost
-        ref="paneHost"
-        class="game-stage"
-        :layout-mode="layoutMode"
-        :game="game"
-        :registry="paneRegistryMap"
-        :left-pane="defaultLeftPane"
-        :right-pane="defaultRightPane"
-        :overlay-pane="activeOverlayDescriptor"
-        @overlay-close="closePane"
-      >
-        <div class="center-stack">
-          <div
-            class="world-shell"
-            :style="worldShellStyle"
-          >
-            <GameCanvas :game="game" />
-
-            <div class="hud-shell">
-              <PartyPanel
-                v-if="game && game.player"
-                class="hud-shell__party"
-                :player-id="game.player.uuid"
-                :party="party"
-                :invites="partyInvites"
-                :loading="partyLoading"
-                :status-message="partyStatusMessage"
-                @create="handlePartyCreate"
-                @leave="handlePartyLeave"
-                @toggle-ready="handlePartyReadyToggle"
-                @start-instance="handlePartyStartInstance"
-                @return-to-town="handlePartyReturnToTown"
-                @invite="handlePartyInviteRequest"
-                @accept-invite="handlePartyAcceptInvite"
-                @decline-invite="handlePartyDeclineInvite"
-              />
-              <div class="hud-shell__row">
-                <HudOrb
-                  class="hud-shell__orb hud-shell__orb--left"
-                  variant="hp"
-                  label="HP"
-                  :current="playerVitals.hp.current"
-                  :max="playerVitals.hp.max"
-                />
-                <Quickbar
-                  class="hud-shell__quickbar"
-                  :slots="quickSlots"
-                  :active-index="quickbarActiveIndex"
-                  @slot-activate="handleQuickSlot"
-                  @request-remap="handleQuickbarRemap"
-                />
-                <HudOrb
-                  class="hud-shell__orb hud-shell__orb--right"
-                  variant="mp"
-                  label="MP"
-                  :current="playerVitals.mp.current"
-                  :max="playerVitals.mp.max"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div
-            class="chat-shell"
-            :class="chatShellClasses"
-          >
-            <button
-              v-if="!isDesktop"
-              type="button"
-              class="chat-shell__toggle"
-              @click="toggleChat"
-            >
-              <span class="chat-shell__toggle-label">
-                {{ chatToggleLabel }}
-              </span>
-              <span
-                v-if="chatUnreadCount > 0"
-                class="chat-shell__badge"
-              >
-                {{ chatUnreadCount }}
-              </span>
-            </button>
-
-            <Chatbox
-              ref="chatbox"
-              :game="game"
-              :layout-mode="layoutMode"
-              :pinned="layout.chat.isPinned"
-              :collapsed="!chatExpanded"
-              :unread-count="chatUnreadCount"
-              :auto-hide-seconds="chatAutoHideSeconds"
-              @message-appended="handleChatMessage"
-              @toggle-pin="toggleChatPin"
-              @hover-state="handleChatHover"
-              @countdown-complete="closeChat"
-            />
-          </div>
-        </div>
-      </PaneHost>
-
-      <context-menu :game="game" />
-    </div>
-    <!-- End Game wrapper -->
+    <GameContainer
+      v-if="showGameScreen"
+      ref="gameContainer"
+      :game="game"
+      :layout-mode="layoutMode"
+      :pane-registry="paneRegistryMap"
+      :default-left-pane="defaultLeftPane"
+      :default-right-pane="defaultRightPane"
+      :active-overlay-descriptor="activeOverlayDescriptor"
+      :world-shell-style="worldShellStyle"
+      :player-vitals="playerVitals"
+      :quick-slots="quickSlots"
+      :quickbar-active-index="quickbarActiveIndex"
+      :party="party"
+      :party-invites="partyInvites"
+      :party-loading="partyLoading"
+      :party-status-message="partyStatusMessage"
+      :is-desktop="isDesktop"
+      :chat-shell-classes="chatShellClasses"
+      :chat-toggle-label="chatToggleLabel"
+      :chat-unread-count="chatUnreadCount"
+      :chat-pinned="layout.chat.isPinned"
+      :chat-expanded="chatExpanded"
+      :chat-auto-hide-seconds="chatAutoHideSeconds"
+      @right-click="nothing"
+      @overlay-close="closePane"
+      @quick-slot="handleQuickSlot"
+      @request-remap="handleQuickbarRemap"
+      @party-create="handlePartyCreate"
+      @party-leave="handlePartyLeave"
+      @party-toggle-ready="handlePartyReadyToggle"
+      @party-start-instance="handlePartyStartInstance"
+      @party-return-to-town="handlePartyReturnToTown"
+      @party-invite="handlePartyInviteRequest"
+      @party-accept-invite="handlePartyAcceptInvite"
+      @party-decline-invite="handlePartyDeclineInvite"
+      @toggle-chat="toggleChat"
+      @toggle-chat-pin="toggleChatPin"
+      @chat-hover="handleChatHover"
+      @chat-countdown-complete="closeChat"
+      @chat-message="handleChatMessage"
+    />
   </div>
 </template>
 
 <script>
 // Vue components
 import config from '@server/config.js';
-import GameCanvas from './components/GameCanvas.vue';
-import Chatbox from './components/Chatbox.vue';
-import Quickbar from './components/hud/Quickbar.vue';
-import HudOrb from './components/hud/HudOrb.vue';
-import PaneHost from './components/ui/panes/PaneHost.vue';
+import AuthContainer from './components/layout/AuthContainer.vue';
+import GameContainer from './components/layout/GameContainer.vue';
 import StatsPane from './components/slots/Stats.vue';
 import InventoryPane from './components/slots/Inventory.vue';
 import WearPane from './components/slots/Wear.vue';
@@ -193,13 +64,8 @@ import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
 import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
-import PartyPanel from './components/ui/world/PartyPanel.vue';
 
-// Sub Vue components
-import ContextMenu from './components/sub/ContextMenu.vue';
-import AudioMainMenu from './components/sub/AudioMainMenu.vue';
-import Login from './components/ui/Login.vue';
-import CharacterCreate from './components/ui/auth/CharacterCreate.vue';
+import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/index.js';
 
 // Core assets
 import Client from './core/client.js';
@@ -210,15 +76,7 @@ import MovementController from './core/utilities/movement-controller.js';
 import { now } from './core/config/movement.js';
 import Socket from './core/utilities/socket.js';
 
-const createDefaultQuickSlots = () => Array.from(
-  { length: 8 },
-  (_value, index) => ({
-    id: `slot-${index + 1}`,
-    label: `Empty Slot ${index + 1}`,
-    hotkey: `${index + 1}`,
-    icon: '',
-  }),
-);
+const createDefaultQuickSlots = () => createQuickbarSlots();
 
 const paneRegistry = {
   stats: { component: StatsPane, title: 'Stats', slot: 'left' },
@@ -242,16 +100,8 @@ const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
 export default {
   name: 'Delaford',
   components: {
-    GameCanvas,
-    Chatbox,
-    Quickbar,
-    HudOrb,
-    PaneHost,
-    ContextMenu,
-    Login,
-    AudioMainMenu,
-    CharacterCreate,
-    PartyPanel,
+    AuthContainer,
+    GameContainer,
   },
   data() {
     return {
@@ -293,6 +143,12 @@ export default {
     },
     isDesktop() {
       return this.layoutMode === 'desktop';
+    },
+    showAuthScreen() {
+      return !this.loaded || Boolean(this.game && this.game.exit);
+    },
+    showGameScreen() {
+      return this.loaded && Boolean(this.game && this.game.map);
     },
     playerVitals() {
       const fallback = {
@@ -546,6 +402,26 @@ export default {
     }
   },
   methods: {
+    handleAuthNavigate(target) {
+      this.screen = target;
+    },
+    getGameContainerRef() {
+      return this.$refs.gameContainer || null;
+    },
+    getPaneHostComponent() {
+      const container = this.getGameContainerRef();
+      if (!container || !container.paneHostRef) {
+        return null;
+      }
+      return container.paneHostRef.value || null;
+    },
+    getChatComponent() {
+      const container = this.getGameContainerRef();
+      if (!container || !container.chatboxRef) {
+        return null;
+      }
+      return container.chatboxRef.value || null;
+    },
     /**
      * Logout player
      */
@@ -603,6 +479,40 @@ export default {
     handleQuickSlot(slot, index) {
       if (!slot) {
         return;
+      }
+
+      if (slot.skillId) {
+        const profile = getSkillExecutionProfile(slot.skillId) || {};
+        const container = this.$refs.gameContainer;
+        const dispatchOptions = {
+          animationState: profile.animationState,
+          duration: profile.duration,
+          holdState: profile.holdState,
+          modifiers: profile.modifiers || {},
+        };
+
+        let dispatched = false;
+        if (container && typeof container.triggerSkill === 'function') {
+          dispatched = container.triggerSkill(slot.skillId, dispatchOptions);
+        }
+
+        if (!dispatched && this.game && this.game.player) {
+          const facing = typeof this.game.getFacingDirection === 'function'
+            ? this.game.getFacingDirection()
+            : (this.game.player.animation && this.game.player.animation.direction) || 'down';
+
+          Socket.emit('player:skill:trigger', {
+            id: this.game.player.uuid,
+            skillId: slot.skillId,
+            direction: facing,
+            issuedAt: Date.now(),
+            modifiers: dispatchOptions.modifiers || {},
+            phase: 'start',
+            animationState: dispatchOptions.animationState,
+            duration: dispatchOptions.duration,
+            holdState: dispatchOptions.holdState,
+          });
+        }
       }
 
       bus.$emit('quickbar:activate', {
@@ -753,14 +663,14 @@ export default {
         return;
       }
 
-      const chatComponent = this.$refs.chatbox;
+      const chatComponent = this.getChatComponent();
       if (chatComponent && typeof chatComponent.startCountdown === 'function') {
         chatComponent.startCountdown();
       }
     },
 
     cancelChatAutohide() {
-      const chatComponent = this.$refs.chatbox;
+      const chatComponent = this.getChatComponent();
       if (chatComponent && typeof chatComponent.stopCountdown === 'function') {
         chatComponent.stopCountdown();
       }
@@ -768,7 +678,7 @@ export default {
 
     focusChatInput() {
       this.$nextTick(() => {
-        const chatComponent = this.$refs.chatbox;
+        const chatComponent = this.getChatComponent();
         if (!chatComponent) {
           return;
         }
@@ -808,7 +718,7 @@ export default {
     },
 
     focusActivePane() {
-      const paneHost = this.$refs.paneHost;
+      const paneHost = this.getPaneHostComponent();
       if (!paneHost || !paneHost.$refs) {
         return;
       }
@@ -1171,6 +1081,41 @@ export default {
       this.setPartyStatusMessage(error.message);
     },
 
+    handlePartyInstanceComplete(payload = {}) {
+      if (payload.party) {
+        this.party = payload.party;
+      }
+
+      const rewards = Array.isArray(payload.rewards) ? payload.rewards : [];
+
+      if (rewards.length) {
+        const summary = rewards
+          .map((entry) => {
+            if (!entry || !entry.username) {
+              return null;
+            }
+
+            const coinText = Number.isFinite(entry.coins) ? `${entry.coins} coins` : null;
+            const experienceText = entry.experience && entry.experience.amount
+              ? `${entry.experience.amount} ${entry.experience.skill || 'XP'}`
+              : null;
+            const rewardText = [coinText, experienceText].filter(Boolean).join(', ');
+            return rewardText ? `${entry.username}: ${rewardText}` : entry.username;
+          })
+          .filter(Boolean)
+          .join('; ');
+
+        const message = summary
+          ? `Instance complete! Rewards distributed — ${summary}.`
+          : 'Instance complete! Rewards distributed.';
+        this.setPartyStatusMessage(message, 8000);
+      } else if (payload.message) {
+        this.setPartyStatusMessage(payload.message, 6000);
+      } else {
+        this.setPartyStatusMessage('Instance complete! Returning to town...', 6000);
+      }
+    },
+
     /**
      * Start the whole game
      */
@@ -1234,8 +1179,6 @@ export default {
 
 <style lang="scss" scoped>
 @use '@/assets/scss/abstracts/tokens' as *;
-@use '@/assets/scss/abstracts/breakpoints' as *;
-@use '@/assets/scss/abstracts/mixins' as *;
 
 #app {
   font-family: 'Roboto Slab', Helvetica, Arial, sans-serif;
@@ -1249,269 +1192,9 @@ export default {
   background: radial-gradient(circle at top, rgba(25, 32, 48, 0.92), rgba(8, 10, 18, 0.98));
   overflow: hidden;
 
-  img.logo {
-    margin-bottom: var(--space-md);
-  }
-
   .wrapper {
     width: 100%;
     box-sizing: border-box;
-  }
-
-  .login__screen {
-    width: min(720px, 94vw);
-    position: relative;
-    border: 4px solid rgba(255, 255, 255, 0.12);
-    box-sizing: border-box;
-    display: flex;
-    height: auto;
-    min-height: 520px;
-    margin: auto;
-    align-content: center;
-    justify-content: center;
-    background-image: url('./assets/bg-screen.png');
-    background-size: cover;
-    background-position: center;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
-
-    .server__down {
-      font-size: 0.85em;
-    }
-
-    .bg {
-      background-color: rgba(0, 0, 0, 0.55);
-      padding: var(--space-lg) var(--space-xl);
-      display: inline-flex;
-      flex-direction: column;
-      gap: var(--space-lg);
-      width: 100%;
-
-      .register__intro {
-        margin: 0;
-        font-size: 0.95rem;
-        line-height: 1.5;
-        color: rgba(255, 255, 255, 0.85);
-        text-align: center;
-
-        a {
-          color: #f3b15b;
-          text-decoration: underline;
-        }
-      }
-    }
-
-    .button_group {
-      display: inline-flex;
-      justify-content: space-around;
-      gap: var(--space-lg);
-
-      button {
-        background: rgba(220, 220, 220, 0.92);
-        border: 2px solid rgba(255, 255, 255, 0.18);
-        font-size: 1.4rem;
-        cursor: pointer;
-        padding: var(--space-sm) var(--space-lg);
-      }
-    }
-  }
-
-  .game__wrapper {
-    flex: 1 1 auto;
-    display: flex;
-    justify-content: center;
-    align-items: stretch;
-    padding: clamp(1rem, 3vw, 2.5rem);
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    box-sizing: border-box;
-    background: radial-gradient(circle at top, rgba(30, 36, 58, 0.92), rgba(10, 12, 22, 0.96));
-    overflow: auto;
-  }
-
-  .game-stage {
-    position: relative;
-    flex: 1 1 auto;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-  }
-
-  .center-stack {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-xl);
-    width: 100%;
-    min-height: 100%;
-  }
-
-  .world-shell {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-lg);
-    border-radius: var(--radius-lg);
-    background: rgba(8, 10, 20, 0.65);
-    box-shadow: 0 32px 60px rgba(0, 0, 0, 0.55);
-  }
-
-  .world-shell::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    pointer-events: none;
-  }
-
-  .world-shell canvas {
-    border-radius: var(--radius-md);
-    outline: none;
-  }
-
-  .hud-shell {
-    position: absolute;
-    left: 50%;
-    bottom: calc(var(--space-xl) * -0.25);
-    transform: translateX(-50%);
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    pointer-events: none;
-  }
-
-  .hud-shell__row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas: 'left bar right';
-    align-items: center;
-    gap: var(--space-lg);
-    pointer-events: auto;
-  }
-
-  .hud-shell__party {
-    margin-bottom: var(--space-sm);
-    max-width: 320px;
-  }
-
-  .hud-shell__orb {
-    filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.55));
-  }
-
-  .hud-shell__orb--left {
-    grid-area: left;
-  }
-
-  .hud-shell__orb--right {
-    grid-area: right;
-  }
-
-  .hud-shell__quickbar {
-    grid-area: bar;
-    transform: translateY(18px);
-  }
-
-  .chat-shell {
-    position: relative;
-    display: flex;
-    justify-content: flex-end;
-    width: 100%;
-  }
-
-  .chat-shell--desktop {
-    position: absolute;
-    right: var(--space-xl);
-    bottom: var(--space-2xl);
-    width: auto;
-    pointer-events: none;
-
-    .chatbox {
-      pointer-events: auto;
-    }
-  }
-
-  .chat-shell--expanded:not(.chat-shell--desktop) .chat-shell__toggle {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .chat-shell__toggle {
-    position: fixed;
-    right: var(--space-md);
-    bottom: var(--space-2xl);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: 999px;
-    background: rgba(12, 16, 28, 0.82);
-    color: var(--color-text-primary);
-    border: 1px solid var(--color-border-subtle);
-    cursor: pointer;
-    box-shadow: var(--shadow-soft);
-    z-index: 45;
-  }
-
-  .chat-shell__toggle-label {
-    font-size: var(--font-size-sm);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .chat-shell__badge {
-    min-width: 22px;
-    padding: 2px 6px;
-    border-radius: 999px;
-    background: var(--color-accent);
-    color: #020307;
-    font-weight: 600;
-    font-size: 0.75em;
-    text-align: center;
-  }
-}
-
-@include media('<=tablet') {
-  #app {
-    .hud-shell__row {
-      gap: var(--space-md);
-    }
-
-    .hud-shell__quickbar {
-      transform: translateY(12px);
-    }
-  }
-}
-
-@include media('<=mobile') {
-  #app {
-    .world-shell {
-      padding: var(--space-md);
-    }
-
-    .hud-shell {
-      position: static;
-      transform: none;
-      margin-top: var(--space-lg);
-    }
-
-    .hud-shell__row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-areas:
-        'left right'
-        'bar bar';
-      width: 100%;
-    }
-
-    .hud-shell__quickbar {
-      transform: none;
-    }
-
-    .chat-shell__toggle {
-      bottom: var(--space-xl);
-    }
   }
 }
 </style>

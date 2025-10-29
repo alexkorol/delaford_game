@@ -1,13 +1,64 @@
 <template>
   <div class="flower-pane">
     <div class="flower-pane__tree">
-      <FlowerOfLifeTree
-        :view-box="layout.viewBox"
-        :nodes="renderNodes"
-        :connections="renderConnections"
-        :selected-id="selectedNodeId"
-        @select="handleSelect"
-      />
+      <div class="flower-pane__controls">
+        <input
+          v-model.trim="searchQuery"
+          type="search"
+          class="flower-pane__search-input"
+          placeholder="Search petals or effects..."
+          aria-label="Search Flower of Life nodes"
+        >
+        <div class="flower-pane__filters">
+          <label
+            v-for="type in nodeTypes"
+            :key="type"
+            class="flower-pane__filter"
+          >
+            <input
+              type="checkbox"
+              :checked="typeFilters[type]"
+              @change="toggleTypeFilter(type, $event.target.checked)"
+            >
+            <span>{{ formatNodeType(type) }}</span>
+          </label>
+        </div>
+        <ul
+          v-if="searchActive && searchResults.length"
+          class="flower-pane__search-results"
+        >
+          <li
+            v-for="node in searchResults"
+            :key="node.id"
+          >
+            <button
+              type="button"
+              :class="{
+                'flower-pane__search-result': true,
+                'flower-pane__search-result--allocated': node.allocated,
+                'flower-pane__search-result--available': node.available,
+              }"
+              @click="handleSelect(node.id)"
+            >
+              <span class="flower-pane__search-result-label">{{ node.label }}</span>
+              <span class="flower-pane__search-result-summary">{{ node.summary }}</span>
+            </button>
+          </li>
+        </ul>
+        <p
+          v-else-if="searchActive"
+          class="flower-pane__search-empty"
+        >No nodes match your filters.</p>
+      </div>
+      <div class="flower-pane__tree-visual">
+        <FlowerOfLifeTree
+          :view-box="layout.viewBox"
+          :nodes="renderNodes"
+          :connections="renderConnections"
+          :selected-id="selectedNodeId"
+          @select="handleSelect"
+        />
+      </div>
     </div>
 
     <aside class="flower-pane__sidebar">
@@ -134,6 +185,16 @@
           Remove dependent nodes first: {{ nodeDependents.map(node => node.label).join(', ') }}
         </div>
 
+        <div
+          v-if="actionFeedback"
+          :class="[
+            'flower-pane__feedback',
+            `flower-pane__feedback--${actionFeedbackType}`,
+          ]"
+        >
+          {{ actionFeedback }}
+        </div>
+
         <div class="flower-pane__actions">
           <button
             type="button"
@@ -169,7 +230,9 @@
 </template>
 
 <script>
+import { mapActions, mapStores } from 'pinia';
 import FlowerOfLifeTree from './FlowerOfLifeTree.vue';
+import { useUiStore } from '@/stores/ui.js';
 import {
   FLOWER_OF_LIFE_LAYOUT,
   FLOWER_OF_LIFE_NODES,
@@ -198,18 +261,25 @@ export default {
     return {
       selectedNodeId: 'heart-of-bloom',
       layout: FLOWER_OF_LIFE_LAYOUT,
+      searchQuery: '',
+      typeFilters: {
+        keystone: true,
+        major: true,
+        notable: true,
+        minor: true,
+      },
+      actionFeedback: '',
+      actionFeedbackType: 'info',
+      feedbackTimeoutId: null,
     };
   },
   computed: {
+    ...mapStores(useUiStore),
     player() {
       return this.game && this.game.player ? this.game.player : {};
     },
     flowerProgress() {
-      const passives = this.$store && this.$store.state && this.$store.state.passives;
-      if (!passives || !passives.flowerOfLife) {
-        return FLOWER_OF_LIFE_DEFAULT_PROGRESS;
-      }
-      return passives.flowerOfLife;
+      return this.uiStore?.flowerOfLifeState || FLOWER_OF_LIFE_DEFAULT_PROGRESS;
     },
     allocatedSet() {
       return new Set(this.flowerProgress.allocatedNodes || []);
@@ -223,7 +293,29 @@ export default {
     availablePetals() {
       return Math.max(0, this.petalSummary.total - this.spentPetals);
     },
+    nodeTypes() {
+      return ['keystone', 'major', 'notable', 'minor'];
+    },
+    activeTypeFilters() {
+      return this.nodeTypes.filter(type => this.typeFilters[type]);
+    },
+    filterSignature() {
+      return this.activeTypeFilters.slice().sort().join('|');
+    },
+    searchActive() {
+      return this.searchQuery.trim().length > 0;
+    },
+    filterActive() {
+      const active = this.activeTypeFilters.length;
+      return active > 0 && active < this.nodeTypes.length;
+    },
     renderNodes() {
+      const query = this.searchQuery.trim().toLowerCase();
+      const searchActive = query.length > 0;
+      const activeTypes = new Set(this.activeTypeFilters);
+      const filterActive = this.filterActive;
+      const hasFilterContext = searchActive || filterActive;
+
       return FLOWER_OF_LIFE_NODES.map((node) => {
         const angle = (node.angle || 0) * (Math.PI / 180);
         const radius = (node.ring || 0) * this.layout.ringSpacing;
@@ -250,7 +342,19 @@ export default {
         } else if (!allocated && !hasPetals) {
           blockedReason = 'Earn additional petals to allocate this node.';
         }
+
+        const searchableText = [node.label, node.summary, node.description]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        const matchesQuery = !searchActive || searchableText.includes(query);
+        const matchesType = !filterActive || activeTypes.has(node.type);
+        const matches = matchesQuery && matchesType;
+        const searchIndex = searchActive && matchesQuery ? searchableText.indexOf(query) : -1;
+        const highlighted = matches && hasFilterContext;
+        const dimmed = hasFilterContext && !matches;
         const shortLabel = node.label.replace(/^Petal of\s+/i, '').replace(/^Bloom\s+/i, '').trim() || node.label;
+
         return {
           ...node,
           x,
@@ -265,6 +369,10 @@ export default {
           insufficientPetals: !allocated && prerequisitesMet && gatesSatisfied && !hasPetals,
           cost,
           shortLabel,
+          highlighted,
+          dimmed,
+          searchMatch: matches && searchActive,
+          searchRank: searchIndex >= 0 ? searchIndex : Number.MAX_SAFE_INTEGER,
         };
       });
     },
@@ -289,8 +397,28 @@ export default {
           to,
           active,
           reachable,
+          dimmed: from.dimmed && to.dimmed,
+          highlighted: (!from.dimmed || !to.dimmed) && (from.highlighted || to.highlighted),
         };
       }).filter(Boolean);
+    },
+    searchResults() {
+      if (!this.searchActive) {
+        return [];
+      }
+
+      return this.renderNodes
+        .filter(node => node.searchMatch)
+        .sort((a, b) => {
+          if (a.searchRank !== b.searchRank) {
+            return a.searchRank - b.searchRank;
+          }
+          if (a.type !== b.type) {
+            return this.nodeTypes.indexOf(a.type) - this.nodeTypes.indexOf(b.type);
+          }
+          return a.label.localeCompare(b.label);
+        })
+        .slice(0, 8);
     },
     selectedNode() {
       if (this.renderNodesMap[this.selectedNodeId]) {
@@ -349,18 +477,73 @@ export default {
       });
     },
   },
+  watch: {
+    searchQuery() {
+      this.focusFirstMatch();
+    },
+    filterSignature() {
+      this.focusFirstMatch();
+    },
+  },
+  beforeUnmount() {
+    this.clearFeedbackTimeout();
+  },
   methods: {
-    allocateFlowerNode(payload) {
-      return this.$store.dispatch('allocateFlowerNode', payload);
+    ...mapActions(useUiStore, [
+      'allocateFlowerNode',
+      'refundFlowerNode',
+      'resetFlowerOfLife',
+      'setFlowerManualMilestone',
+    ]),
+    toggleTypeFilter(type, checked) {
+      const next = { ...this.typeFilters, [type]: checked };
+      const active = this.nodeTypes.filter(key => next[key]);
+      if (active.length === 0) {
+        this.nodeTypes.forEach((key) => {
+          next[key] = true;
+        });
+      }
+      this.typeFilters = next;
     },
-    refundFlowerNode(payload) {
-      return this.$store.dispatch('refundFlowerNode', payload);
+    formatNodeType(type) {
+      switch (type) {
+        case 'keystone':
+          return 'Keystone';
+        case 'major':
+          return 'Major';
+        case 'notable':
+          return 'Notable';
+        case 'minor':
+          return 'Minor';
+        default:
+          return type.charAt(0).toUpperCase() + type.slice(1);
+      }
     },
-    resetFlowerOfLife(payload) {
-      return this.$store.dispatch('resetFlowerOfLife', payload);
+    focusFirstMatch() {
+      const current = this.renderNodesMap[this.selectedNodeId];
+      if (current && !current.dimmed) {
+        return;
+      }
+      const first = this.renderNodes.find(node => !node.dimmed);
+      if (first) {
+        this.selectedNodeId = first.id;
+      }
     },
-    setFlowerManualMilestone(payload) {
-      return this.$store.dispatch('setFlowerManualMilestone', payload);
+    clearFeedbackTimeout() {
+      if (this.feedbackTimeoutId) {
+        clearTimeout(this.feedbackTimeoutId);
+        this.feedbackTimeoutId = null;
+      }
+    },
+    setFeedback(message, type = 'info') {
+      this.clearFeedbackTimeout();
+      this.actionFeedback = message;
+      this.actionFeedbackType = type;
+      this.feedbackTimeoutId = setTimeout(() => {
+        this.actionFeedback = '';
+        this.actionFeedbackType = 'info';
+        this.feedbackTimeoutId = null;
+      }, 4000);
     },
     formatRequirement(requirement) {
       if (!requirement) {
@@ -386,22 +569,57 @@ export default {
       }
     },
     allocateSelected() {
-      if (!this.canAllocateSelected || !this.selectedNode) {
+      if (!this.selectedNode) {
+        this.setFeedback('Select a node to allocate.', 'warning');
         return;
       }
-      this.allocateFlowerNode({ nodeId: this.selectedNode.id });
+
+      if (!this.canAllocateSelected) {
+        const reason = this.selectedNode.blockedReason || 'Requirements not met.';
+        const type = this.selectedNode.insufficientPetals ? 'warning' : 'error';
+        this.setFeedback(`Cannot allocate ${this.selectedNode.label}: ${reason}`, type);
+        return;
+      }
+
+      const success = this.allocateFlowerNode({ nodeId: this.selectedNode.id });
+      if (success) {
+        this.setFeedback(`Allocated ${this.selectedNode.label}.`, 'success');
+      } else {
+        const reason = this.selectedNode.blockedReason || 'Requirements not met.';
+        const type = this.selectedNode.insufficientPetals ? 'warning' : 'error';
+        this.setFeedback(`Cannot allocate ${this.selectedNode.label}: ${reason}`, type);
+      }
     },
     refundSelected() {
-      if (!this.canRefundSelected || !this.selectedNode) {
+      if (!this.selectedNode) {
+        this.setFeedback('Select a node to refund.', 'warning');
         return;
       }
-      this.refundFlowerNode({ nodeId: this.selectedNode.id });
+
+      if (!this.canRefundSelected) {
+        const reason = this.selectedNode.allocated
+          ? 'Remove dependent nodes first.'
+          : 'Node is not allocated.';
+        this.setFeedback(`Cannot refund ${this.selectedNode.label}: ${reason}`, 'error');
+        return;
+      }
+
+      const success = this.refundFlowerNode({ nodeId: this.selectedNode.id });
+      if (success) {
+        this.setFeedback(`Refunded ${this.selectedNode.label}.`, 'success');
+      } else {
+        this.setFeedback(`Cannot refund ${this.selectedNode.label}.`, 'error');
+      }
     },
     resetTree() {
       if (!this.canReset) {
+        this.setFeedback('No allocated petals to reset.', 'warning');
         return;
       }
       this.resetFlowerOfLife();
+      this.selectedNodeId = 'heart-of-bloom';
+      this.setFeedback('Flower of Life reset. All petals refunded.', 'success');
+      this.focusFirstMatch();
     },
     toggleManualGate(gate, value) {
       this.setFlowerManualMilestone({ gateId: gate.id, value });
@@ -420,6 +638,118 @@ export default {
 
 .flower-pane__tree {
   min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.flower-pane__controls {
+  background: rgba(12, 12, 24, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.flower-pane__search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  color: #f5f5f5;
+  font-size: 0.9rem;
+}
+
+.flower-pane__search-input:focus {
+  outline: none;
+  border-color: #ffd54f;
+  box-shadow: 0 0 0 2px rgba(255, 213, 79, 0.2);
+}
+
+.flower-pane__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.flower-pane__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.flower-pane__filter input {
+  accent-color: #ffd54f;
+}
+
+.flower-pane__search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.flower-pane__search-result {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.flower-pane__search-result:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flower-pane__search-result--allocated {
+  border-color: rgba(255, 167, 38, 0.6);
+}
+
+.flower-pane__search-result--available {
+  border-color: rgba(139, 195, 74, 0.6);
+}
+
+.flower-pane__search-result-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.flower-pane__search-result-summary {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.flower-pane__search-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+}
+
+.flower-pane__tree-visual {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.flower-pane__tree-visual > * {
+  flex: 1;
 }
 
 .flower-pane__sidebar {
@@ -628,6 +958,32 @@ export default {
 .flower-pane__hint--warning {
   color: #ffab91;
   background: rgba(255, 171, 145, 0.1);
+}
+
+.flower-pane__feedback {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #ffd54f;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.flower-pane__feedback--success {
+  border-color: #8bc34a;
+  background: rgba(139, 195, 74, 0.15);
+}
+
+.flower-pane__feedback--error {
+  border-color: #ef5350;
+  background: rgba(239, 83, 80, 0.15);
+}
+
+.flower-pane__feedback--warning {
+  border-color: #ffb74d;
+  background: rgba(255, 183, 77, 0.15);
+  color: rgba(255, 244, 214, 0.9);
 }
 
 .flower-pane__actions {

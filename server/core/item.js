@@ -68,7 +68,7 @@ class Item {
           : world.getScenePlayers(scene.id);
 
         Socket.broadcast('world:foreground:update', foreground, players);
-        resources.splice(index, 1);
+        world.removeResourceRespawn(resource, scene.id);
       }
     });
   }
@@ -90,7 +90,7 @@ class Item {
           );
 
           respawned.respawnIn = item.respawnIn;
-          world.items.push(respawned);
+          world.addItem(respawned);
 
           Socket.broadcast('world:itemDropped', world.items);
 

@@ -3,13 +3,10 @@ import { armor, jewelry, weapons } from '#server/core/data/respawn/index.js';
 import MapUtils from '#shared/map-utils.js';
 import PF from 'pathfinding';
 import config from '#server/config.js';
-import { createRequire } from 'node:module';
+import surfaceMap from '#server/maps/layers/surface.json' with { type: 'json' };
 import ItemFactory from './items/factory.js';
 import { Shop } from './functions/index.js';
 import world from './world.js';
-
-const require = createRequire(import.meta.url);
-const surfaceMap = require('#server/maps/layers/surface.json');
 
 const DEFAULT_INSTANCE_ROOM_COUNT = 6;
 const DEFAULT_CORRIDOR_WIDTH = 3;
@@ -150,6 +147,60 @@ class Map {
       });
     }
 
+    const monsterSpawns = carvedRooms.slice(1);
+    const roleCycle = ['melee', 'ranged', 'support'];
+    const instanceMonsters = monsterSpawns.map((center, index) => {
+      const role = roleCycle[index % roleCycle.length];
+      const behaviour = {
+        type: role,
+        aggressionRange: role === 'support' ? 6 : 8,
+        pursuitRange: role === 'melee' ? 9 : 11,
+        patrolRadius: 4,
+        attack: {
+          intervalMs: role === 'melee' ? 1500 : 1900,
+          windupMs: role === 'melee' ? 320 : 480,
+          damageMultiplier: role === 'support' ? 0.85 : 1.1,
+          range: role === 'melee' ? 1 : 5,
+          minimumRange: role === 'support' ? 2 : 1,
+        },
+      };
+
+      if (role === 'support') {
+        behaviour.support = {
+          healAmount: 20 + (index * 5),
+          healRange: 6,
+        };
+      }
+
+      const archetype = role === 'ranged' ? 'mystic' : (role === 'support' ? 'mystic' : 'brute');
+      const rarity = index % 3 === 2 ? 'rare' : (index % 3 === 1 ? 'uncommon' : 'common');
+
+      return {
+        id: `instance-${seed}-${index}`,
+        name: role === 'support'
+          ? 'Celestial Channeler'
+          : role === 'ranged'
+            ? 'Ashen Marksman'
+            : 'Dread Vanguard',
+        level: Math.max(4, Math.floor(5 + (index * 0.75))),
+        archetype,
+        rarity,
+        spawn: {
+          x: center.x,
+          y: center.y,
+          radius: 2,
+        },
+        behaviour,
+        rewards: {
+          experience: 30 + (index * 18),
+          coins: 60 + (index * 20),
+        },
+        respawn: {
+          delayMs: 600000,
+        },
+      };
+    });
+
     return {
       map: {
         background,
@@ -159,6 +210,13 @@ class Map {
         seed,
         template,
         spawnPoints: carvedRooms,
+        rewards: {
+          coinsPerPlayer: 120 + (instanceMonsters.length * 20),
+          experience: {
+            skill: 'attack',
+            amount: 40 + (instanceMonsters.length * 10),
+          },
+        },
       },
       respawns: {
         items: [],
@@ -167,7 +225,7 @@ class Map {
       },
       items: [],
       npcs: [],
-      monsters: [],
+      monsters: instanceMonsters,
     };
   }
 
