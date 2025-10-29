@@ -268,7 +268,6 @@ export default {
   padding: clamp(1rem, 3vw, 2.5rem);
   width: 100%;
   min-height: 0;
-  box-sizing: border-box;
   background: radial-gradient(circle at top, rgba(30, 36, 58, 0.92), rgba(10, 12, 22, 0.96));
   overflow: auto;
 }
@@ -295,8 +294,8 @@ export default {
   justify-content: center;
   padding: var(--space-xl);
   gap: var(--space-lg);
-  width: 100%;
-  max-width: min(1400px, 96vw);
+  width: min(var(--world-display-width, 100%), 96vw);
+  max-width: min(var(--world-display-width, 100%), 1400px);
   margin: 0 auto;
   border-radius: var(--radius-lg);
   background: rgba(8, 10, 20, 0.65);
@@ -315,7 +314,7 @@ export default {
 .game-container__world-shell::before {
   content: '';
   display: block;
-  width: min(100%, var(--world-display-width, 100%));
+  width: 100%;
   aspect-ratio: var(--map-aspect-ratio, 16 / 9);
 }
 
@@ -324,7 +323,7 @@ export default {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: var(--world-display-width, 100%);
+  width: min(var(--world-display-width, 100%), 100%);
   height: var(--world-display-height, auto);
   border-radius: var(--radius-md);
   outline: none;
@@ -391,6 +390,8 @@ export default {
 @media (width <= 767px) {
   .game-container__world-shell {
     padding: var(--space-md);
+    width: min(var(--world-display-width, 100%), 100vw);
+    max-width: min(var(--world-display-width, 100%), 100vw);
   }
 
   .chat-shell__toggle {

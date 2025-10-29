@@ -429,10 +429,10 @@ export default {
 div.game {
   position: relative;
   display: block;
-  width: var(--map-display-width, var(--map-native-width, auto));
-  min-width: var(--map-display-width, var(--map-native-width, auto));
-  height: var(--map-display-height, var(--map-native-height, auto));
-  min-height: var(--map-display-height, var(--map-native-height, auto));
+  width: var(--map-display-width, var(--world-display-width, var(--map-native-width, auto)));
+  min-width: var(--map-display-width, var(--world-display-width, var(--map-native-width, auto)));
+  height: var(--map-display-height, var(--world-display-height, var(--map-native-height, auto)));
+  min-height: var(--map-display-height, var(--world-display-height, var(--map-native-height, auto)));
   max-width: none;
   max-height: none;
   background: transparent;
@@ -473,7 +473,6 @@ div.game {
     div {
       height: 100%;
       width: 100%;
-      box-sizing: border-box;
     }
   }
 

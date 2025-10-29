@@ -129,6 +129,13 @@ export default {
       partyLoading: { active: false, state: null },
       partyStatusMessage: '',
       partyStatusTimeout: null,
+      worldDimensions: {
+        width: (config.map?.tileset?.tile?.width || 32) * (config.map?.viewport?.x || 16),
+        height: (config.map?.tileset?.tile?.height || 32) * (config.map?.viewport?.y || 10),
+        scale: 1,
+        displayWidth: ((config.map?.tileset?.tile?.width || 32) * (config.map?.viewport?.x || 16)),
+        displayHeight: ((config.map?.tileset?.tile?.height || 32) * (config.map?.viewport?.y || 10)),
+      },
     };
   },
   computed: {
@@ -259,17 +266,13 @@ export default {
       };
     },
     worldShellStyle() {
-      const mapInstance = this.game && this.game.map ? this.game.map : null;
-      const runtimeConfig = mapInstance && mapInstance.config
-        ? mapInstance.config.map
-        : this.config.map;
-      const { tile } = runtimeConfig.tileset;
-      const { viewport } = runtimeConfig;
-      const width = tile.width * viewport.x;
-      const height = tile.height * viewport.y;
-      const scale = mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1;
-      const displayWidth = width * scale;
-      const displayHeight = height * scale;
+      const fallbackWidth = (this.config.map?.tileset?.tile?.width || 32) * (this.config.map?.viewport?.x || 16);
+      const fallbackHeight = (this.config.map?.tileset?.tile?.height || 32) * (this.config.map?.viewport?.y || 10);
+      const width = this.worldDimensions?.width || fallbackWidth;
+      const height = this.worldDimensions?.height || fallbackHeight;
+      const scale = this.worldDimensions?.scale || 1;
+      const displayWidth = this.worldDimensions?.displayWidth || (width * scale);
+      const displayHeight = this.worldDimensions?.displayHeight || (height * scale);
       return {
         '--map-aspect-ratio': `${width} / ${height}`,
         '--world-internal-width': `${width}px`,
@@ -353,6 +356,7 @@ export default {
 
     bus.$on('show-sidebar', this.showSidebar);
     bus.$on('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$on('game:map:dimensions', this.handleMapDimensions);
 
     // On logout, let's do a few things...
     bus.$on('player:logout', this.logout);
@@ -396,6 +400,10 @@ export default {
     }
 
     bus.$off('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$off('game:map:dimensions', this.handleMapDimensions);
+    bus.$off('show-sidebar', this.showSidebar);
+    bus.$off('player:logout', this.logout);
+    bus.$off('go:main', this.cancelLogin);
 
     if (this.game && this.game.map && typeof this.game.map.destroy === 'function') {
       this.game.map.destroy();
@@ -433,6 +441,7 @@ export default {
       this.game = { exit: true };
       this.layout.activePane = null;
       this.resetChatState();
+      this.updateWorldDimensions();
       this.party = null;
       this.partyInvites = [];
       this.partyLoading = { active: false, state: null };
@@ -451,6 +460,7 @@ export default {
       this.screen = 'main';
       this.layout.activePane = null;
       this.resetChatState();
+      this.updateWorldDimensions();
     },
 
     resetChatState() {
@@ -1126,15 +1136,15 @@ export default {
       // Initialise client state immediately
       this.game = new Client(data);
 
-      // Show the game canvas before building the map so the canvas exists
-      this.loaded = true;
-      this.screen = 'game';
-      this.resetChatState();
-
+      // Ensure the game view is mounted so the canvas exists before building the map
+      if (!this.loaded) {
+        this.loaded = true;
+      }
       await this.$nextTick();
 
       await this.game.buildMap();
       this.game.monsters = this.game.map.monsters;
+      this.updateWorldDimensions();
 
       // Start game engine
       const engine = new Engine(this.game);
@@ -1147,6 +1157,11 @@ export default {
 
       // Clear login procedure
       bus.$emit('login:done');
+      this.screen = 'game';
+      this.resetChatState();
+      if (this.isDesktop) {
+        this.layout.chat.isOpen = true;
+      }
     },
     /**
      * A click-handler event that does nothing, really.
@@ -1173,6 +1188,53 @@ export default {
       if (pane) {
         this.openPane(pane);
       }
+    },
+    updateWorldDimensions(dimensions = null) {
+      const overrides = dimensions || {};
+      const mapInstance = this.game && this.game.map ? this.game.map : null;
+      const configSource = mapInstance && mapInstance.config && mapInstance.config.map
+        ? mapInstance.config.map
+        : this.config.map;
+      const tileConfig = configSource?.tileset?.tile || { width: 32, height: 32 };
+      const viewportConfig = configSource?.viewport || { x: 16, y: 10 };
+      const defaultWidth = (tileConfig.width || 0) * (viewportConfig.x || 0);
+      const defaultHeight = (tileConfig.height || 0) * (viewportConfig.y || 0);
+
+      const width = Number.isFinite(overrides.width)
+        ? overrides.width
+        : (defaultWidth || ((this.config.map?.tileset?.tile?.width || 32) * (this.config.map?.viewport?.x || 16)));
+
+      const height = Number.isFinite(overrides.height)
+        ? overrides.height
+        : (defaultHeight || ((this.config.map?.tileset?.tile?.height || 32) * (this.config.map?.viewport?.y || 10)));
+
+      const scaleFromMap = mapInstance && typeof mapInstance.scale === 'number'
+        ? mapInstance.scale
+        : this.worldDimensions.scale || 1;
+
+      const scale = Number.isFinite(overrides.scale) ? overrides.scale : scaleFromMap;
+
+      const displayWidth = Number.isFinite(overrides.displayWidth)
+        ? overrides.displayWidth
+        : width * scale;
+
+      const displayHeight = Number.isFinite(overrides.displayHeight)
+        ? overrides.displayHeight
+        : height * scale;
+
+      this.worldDimensions = {
+        width,
+        height,
+        scale,
+        displayWidth,
+        displayHeight,
+      };
+    },
+    handleMapDimensions(dimensions) {
+      if (!dimensions) {
+        return;
+      }
+      this.updateWorldDimensions(dimensions);
     },
   },
 };

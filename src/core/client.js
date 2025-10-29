@@ -139,6 +139,7 @@ class Client {
 
     this.map = new Map(data, images);
     this.monsters = this.map.monsters;
+    this.emitMapDimensions();
     return 200;
   }
 
@@ -224,6 +225,7 @@ class Client {
     this.background = scenePayload.map.background;
     this.foreground = scenePayload.map.foreground;
     this.monsters = this.map.monsters;
+    this.emitMapDimensions();
   }
 
   /**
@@ -247,6 +249,34 @@ class Client {
     const images = Object.values(assets).map((asset) => this.constructor.uploadImage(asset));
 
     return images;
+  }
+
+  emitMapDimensions() {
+    if (!this.map || !this.map.config) {
+      return;
+    }
+
+    const mapConfig = this.map.config?.map || null;
+    const tileConfig = mapConfig?.tileset?.tile || { width: 32, height: 32 };
+    const viewportConfig = mapConfig?.viewport || { x: 16, y: 10 };
+
+    const calculatedWidth = (tileConfig.width || 0) * (viewportConfig.x || 0);
+    const calculatedHeight = (tileConfig.height || 0) * (viewportConfig.y || 0);
+
+    const fallbackWidth = 32 * 16;
+    const fallbackHeight = 32 * 10;
+
+    const width = calculatedWidth || fallbackWidth;
+    const height = calculatedHeight || fallbackHeight;
+    const scale = Number.isFinite(this.map.scale) ? this.map.scale : 1;
+
+    bus.$emit('game:map:dimensions', {
+      width,
+      height,
+      scale,
+      displayWidth: width * scale,
+      displayHeight: height * scale,
+    });
   }
 
   /**
