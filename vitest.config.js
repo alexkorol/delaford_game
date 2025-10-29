@@ -21,10 +21,9 @@ export default mergeConfig(viteConfig, defineConfig({
   test: {
     environment: resolveEnvironment(),
     include: ['tests/unit/**/*.spec.js'],
-    exclude: ['tests/e2e/**'],
     globals: true,
     setupFiles: ['./tests/unit/setup.js'],
-    exclude: ['node_modules/**', 'tests/e2e/**', 'dist/**', 'build/**'],
+    exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**', 'build/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
