@@ -96,8 +96,7 @@ class NameValidationService {
           provider: cached.provider,
           metadata: cached.metadata,
         }).catch((error) => {
-          // eslint-disable-next-line no-console
-          console.warn('[name-validation] Failed to persist cached identity binding.', error);
+          process.stderr.write(`[name-validation] Failed to persist cached identity binding. ${error}\n`);
         });
       }
       return job;

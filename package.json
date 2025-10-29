@@ -12,7 +12,7 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "concurrently -c \"cyan,magenta\" \"npm:dev:client\" \"npm:dev:server\"",
+    "dev": "concurrently -c \"cyan,magenta\" \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite",
     "dev:server": "cross-env NODE_ENV=development nodemon --watch server --ext js,json --exec \"node --enable-source-maps server/index.js\"",
     "build": "vite build",

@@ -2,16 +2,15 @@
   <div class="slots">
     <div class="top_slots">
       <div
-        v-for="(slot, i) in slots"
-        v-if="i < 3"
-        :key="i"
-        :class="{ active: selected === i }"
+        v-for="entry in topSlotEntries"
+        :key="entry.key"
+        :class="{ active: selected === entry.index }"
         class="slot inventorySlot"
-        @click="setPane($event, i)"
+        @click="setPane(entry.index)"
       >
         <img
-          :src="svg[slot.toLowerCase()]"
-          :alt="slot"
+          :src="svg[entry.name.toLowerCase()]"
+          :alt="entry.name"
         >
       </div>
     </div>
@@ -49,16 +48,15 @@
 
     <div class="bottom_slots">
       <div
-        v-for="(slot, i) in slots"
-        v-if="i > 2"
-        :key="i"
-        :class="{ active: selected === i }"
+        v-for="entry in bottomSlotEntries"
+        :key="entry.key"
+        :class="{ active: selected === entry.index }"
         class="slot"
-        @click="setPane($event, i)"
+        @click="setPane(entry.index)"
       >
         <img
-          :src="svg[slot.toLowerCase()]"
-          :alt="slot"
+          :src="svg[entry.name.toLowerCase()]"
+          :alt="entry.name"
         >
       </div>
     </div>
@@ -115,13 +113,32 @@ export default {
       },
     };
   },
+  computed: {
+    topSlotEntries() {
+      return this.slots.slice(0, 3).map((name, index) => ({
+        name,
+        index,
+        key: `top-${index}`,
+      }));
+    },
+    bottomSlotEntries() {
+      return this.slots.slice(3).map((name, offset) => {
+        const index = offset + 3;
+        return {
+          name,
+          index,
+          key: `bottom-${index}`,
+        };
+      });
+    },
+  },
   methods: {
     /**
      * Switch to the correct pane upon mouse-click
      *
      * @param {index} index The pane to switch to
      */
-    setPane(event, index) {
+    setPane(index) {
       this.selected = index;
     },
     /**

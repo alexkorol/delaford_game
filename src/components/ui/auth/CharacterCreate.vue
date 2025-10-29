@@ -308,7 +308,6 @@ export default {
 
         this.identity = payload;
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.warn('Failed to refresh identity', error);
       }
     },

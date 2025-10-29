@@ -1123,8 +1123,16 @@ export default {
       // Stop the main menu music
       bus.$emit('music:stop');
 
-      // Start the Client
+      // Initialise client state immediately
       this.game = new Client(data);
+
+      // Show the game canvas before building the map so the canvas exists
+      this.loaded = true;
+      this.screen = 'game';
+      this.resetChatState();
+
+      await this.$nextTick();
+
       await this.game.buildMap();
       this.game.monsters = this.game.map.monsters;
 
@@ -1139,13 +1147,6 @@ export default {
 
       // Clear login procedure
       bus.$emit('login:done');
-
-      // Show the game canvas
-      this.loaded = true;
-
-      // Set screen to 'game' for chatbox reset
-      this.screen = 'game';
-      this.resetChatState();
     },
     /**
      * A click-handler event that does nothing, really.
@@ -1198,4 +1199,3 @@ export default {
   }
 }
 </style>
-

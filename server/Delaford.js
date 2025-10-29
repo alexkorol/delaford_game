@@ -31,6 +31,8 @@ class Delaford {
     this.schedulerLogInterval = Number(process.env.GAME_LOOP_LOG_INTERVAL_MS) || 10000;
     this.schedulerStats = { tickCount: 0, totalDelta: 0, maxDelta: 0, lastLog: performance.now() };
     this.periodicTasks = [];
+    this.handleConnection = this.connection.bind(this);
+    this.loopActive = false;
   }
 
   /**
@@ -57,7 +59,20 @@ class Delaford {
     this.startGameLoop();
 
     // Bind the websocket connection to the `this` context
-    world.socket.ws.on('connection', this.connection.bind(this));
+    if (world.socket?.ws) {
+      if (typeof world.socket.ws.on === 'function') {
+        world.socket.ws.on('connection', this.handleConnection);
+      }
+    }
+  }
+
+  stopGameLoop() {
+    this.loopActive = false;
+
+    if (this.loopHandle) {
+      clearTimeout(this.loopHandle);
+      this.loopHandle = null;
+    }
   }
 
   /**
@@ -123,6 +138,7 @@ class Delaford {
       return;
     }
 
+    this.loopActive = true;
     this.loopLastTick = performance.now();
 
     const tick = () => {
@@ -132,6 +148,10 @@ class Delaford {
 
       this.updatePeriodicTasks(delta);
       this.logSchedulerStats(delta, now);
+
+      if (!this.loopActive) {
+        return;
+      }
 
       this.loopHandle = setTimeout(tick, this.loopInterval);
     };
@@ -227,6 +247,28 @@ class Delaford {
 
     ws.on('error', e => console.log(e, `${ws.id} has left`));
     ws.on('close', () => this.constructor.close(ws));
+  }
+
+  shutdown() {
+    this.stopGameLoop();
+    this.periodicTasks = [];
+
+    if (world.socket?.ws) {
+      const listener = this.handleConnection;
+      if (listener) {
+        if (typeof world.socket.ws.off === 'function') {
+          world.socket.ws.off('connection', listener);
+        } else if (typeof world.socket.ws.removeListener === 'function') {
+          world.socket.ws.removeListener('connection', listener);
+        }
+      }
+    }
+
+    if (world.socket && typeof world.socket.close === 'function') {
+      world.socket.close();
+    }
+
+    this.handleConnection = null;
   }
 }
 

@@ -1,4 +1,5 @@
 @use 'sass:string';
+@use 'sass:map';
 
 $breakpoints: (
   'mobile': 0,
@@ -7,8 +8,8 @@ $breakpoints: (
 );
 
 @function breakpoint-value($name) {
-  @if map-has-key($breakpoints, $name) {
-    @return map-get($breakpoints, $name);
+  @if map.has-key($breakpoints, $name) {
+    @return map.get($breakpoints, $name);
   }
   @error 'Unknown breakpoint: '#{$name};
 }

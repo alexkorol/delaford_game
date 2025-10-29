@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import world from '#server/core/world.js';
-import Map from '#server/core/map.js';
+import GameMap from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import UI from '#shared/ui.js';
@@ -303,7 +303,7 @@ class PartyService {
     this.sendLoadingState(party, 'enter-instance');
 
     try {
-      const generation = await Map.generateInstance({
+      const generation = await GameMap.generateInstance({
         seed: Date.now(),
         template: party.metadata.template,
       });

@@ -111,6 +111,21 @@ app.use((_req, res) => {
 });
 
 const server = http.createServer(app);
+const sockets = new Set();
+
+server.on('connection', (socket) => {
+  sockets.add(socket);
+  socket.on('close', () => sockets.delete(socket));
+});
+
+server.on('error', (error) => {
+  if (error && error.code === 'EADDRINUSE') {
+    process.stderr.write(`[server] Port ${port} is already in use. ${error}\n`);
+    process.exit(1);
+  }
+  throw error;
+});
+
 server.listen(port, () => {
   process.stdout.write(`ENVIRONMENT: ${env} and PORT ${port}\n`);
 });
@@ -118,5 +133,66 @@ server.listen(port, () => {
 const game = new Delaford(server);
 
 game.start();
+
+let isShuttingDown = false;
+
+const gracefulShutdown = (signal, callback) => {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  process.stdout.write(`[server] Received ${signal}. Shutting down...\n`);
+
+  try {
+    game.shutdown();
+  } catch (error) {
+    process.stderr.write(`[server] Failed to stop game loop. ${error}\n`);
+  }
+
+  for (const socket of sockets) {
+    try {
+      socket.destroy();
+    } catch (error) {
+      process.stderr.write(`[server] Failed to destroy socket. ${error}\n`);
+    }
+  }
+
+  const exitAfterClose = (code = 0) => {
+    if (typeof callback === 'function') {
+      callback();
+      return;
+    }
+    process.exit(code);
+  };
+
+  const forceTimeout = setTimeout(() => {
+    process.stderr.write('[server] Forced shutdown after timeout.\n');
+    exitAfterClose(1);
+  }, 5000);
+  forceTimeout.unref();
+
+  server.close((error) => {
+    if (error) {
+      process.stderr.write(`[server] Error closing HTTP server. ${error}\n`);
+      exitAfterClose(1);
+      return;
+    }
+
+    exitAfterClose(0);
+  });
+};
+
+['SIGINT', 'SIGTERM', 'SIGBREAK'].forEach((signal) => {
+  process.on(signal, () => gracefulShutdown(signal));
+});
+
+if (process.platform !== 'win32') {
+  process.once('SIGUSR2', () => {
+    gracefulShutdown('SIGUSR2', () => {
+      process.kill(process.pid, 'SIGUSR2');
+    });
+  });
+}
 
 export default app;

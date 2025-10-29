@@ -12,6 +12,28 @@ class Socket {
     this.clients = world.clients;
   }
 
+  close() {
+    if (!this.ws) {
+      return;
+    }
+
+    for (const client of this.ws.clients) {
+      try {
+        client.terminate();
+      } catch (error) {
+        process.stderr.write(`[socket] Failed to terminate client. ${error}\n`);
+      }
+    }
+
+    try {
+      this.ws.close();
+    } catch (error) {
+      process.stderr.write(`[socket] Failed to close WebSocket server. ${error}\n`);
+    } finally {
+      this.ws = null;
+    }
+  }
+
   /**
    * Emit an event to a single client
    *

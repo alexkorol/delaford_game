@@ -66,7 +66,7 @@ const computeDurationFromDelta = (deltaX, deltaY) => {
 
 class Client {
   constructor(data) {
-    // The map object
+    // The map payload received from server
     this.map = data.map;
     this.background = data.map.background;
     this.foreground = data.map.foreground;
@@ -116,7 +116,11 @@ class Client {
     this.cachedImages = null;
 
     // Tell client to draw mouse on canvas
-    bus.$on('DRAW:MOUSE', ({ x, y }) => this.map.setMouseCoordinates(x, y));
+    bus.$on('DRAW:MOUSE', ({ x, y }) => {
+      if (this.map && typeof this.map.setMouseCoordinates === 'function') {
+        this.map.setMouseCoordinates(x, y);
+      }
+    });
   }
 
   /**

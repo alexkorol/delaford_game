@@ -209,7 +209,7 @@ export default {
       };
     };
 
-    const isItemDragging = (uuid) => inventoryStore.dragState.value.activeItemId === uuid;
+    const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
 
     const ghostPlacement = computed(() => {
       if (!dragState.value.ghostPosition) {

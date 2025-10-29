@@ -60,9 +60,6 @@ export default class Smithing extends Skill {
   }
 
   forge(inventory) {
-    console.log(this.resourceId);
-
-    // eslint-disable-next-line
     const itemToForge = Smithing.getItemsToSmith(this.resourceId.id).find(item => this.resourceId.id === item.id);
     const barToTakeAway = itemToForge.item.split('-')[0];
 
@@ -114,8 +111,6 @@ export default class Smithing extends Skill {
 
       return true;
     };
-
-    console.log(hasEnoughOre());
 
     return new Promise((resolve) => {
       if (hasEnoughOre()) {

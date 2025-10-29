@@ -26,13 +26,11 @@ class IdentityRegistry {
         }
       } else {
         this.persist().catch((error) => {
-          // eslint-disable-next-line no-console
-          console.warn('[identity-registry] Failed to persist initial state.', error);
+          process.stderr.write(`[identity-registry] Failed to persist initial state. ${error}\n`);
         });
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[identity-registry] Failed to load state, starting empty.', error);
+      process.stderr.write(`[identity-registry] Failed to load state, starting empty. ${error}\n`);
       this.state = { accounts: {} };
     }
   }
