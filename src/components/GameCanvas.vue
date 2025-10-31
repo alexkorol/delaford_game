@@ -19,8 +19,6 @@
       id="game-map"
       tabindex="0"
       class="main-canvas gameMap"
-      height="352"
-      width="512"
       @mouseenter="onGame = true"
       @mouseleave="onGame = false"
       @mousemove="mouseSelection"

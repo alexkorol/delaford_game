@@ -101,18 +101,8 @@ class Engine {
     const { bufferCanvas } = this.game.map;
 
     if (mainCtx && bufferCanvas) {
-      mainCtx.clearRect(0, 0, mainCtx.canvas.width, mainCtx.canvas.height);
-      mainCtx.drawImage(
-        bufferCanvas,
-        0,
-        0,
-        bufferCanvas.width,
-        bufferCanvas.height,
-        0,
-        0,
-        mainCtx.canvas.width,
-        mainCtx.canvas.height,
-      );
+      mainCtx.clearRect(0, 0, bufferCanvas.width, bufferCanvas.height);
+      mainCtx.drawImage(bufferCanvas, 0, 0);
     }
   }
 
