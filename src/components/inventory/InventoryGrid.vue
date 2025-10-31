@@ -14,25 +14,33 @@
 
     <transition-group name="inventory-item">
       <div
-        v-for="item in items"
+        v-for="item in displayItems"
         :key="item.uuid"
-        :class="['inventory-item', { 'inventory-item--dragging': isItemDragging(item.uuid) }]"
+        :class="itemClasses(item)"
         :style="itemStyle(item)"
-        @pointerdown.prevent="beginPointerDrag($event, item)"
+        v-on="buildItemListeners(item)"
       >
-        <div
-          class="inventory-item__sprite"
-          :style="itemSpriteStyle(item)"
-        />
-        <span
-          v-if="item.stackable && item.qty > 1"
-          class="inventory-item__quantity"
-        >{{ item.qty }}</span>
+        <div class="inventory-item__body">
+          <div
+            class="inventory-item__sprite"
+            :style="itemSpriteStyle(item)"
+          />
+          <span
+            v-if="item.stackable && item.qty > 1"
+            class="inventory-item__quantity"
+          >{{ item.qty }}</span>
+        </div>
+        <div class="inventory-item__footer">
+          <slot
+            name="item-footer"
+            :item="item"
+          />
+        </div>
       </div>
     </transition-group>
 
     <div
-      v-if="ghostPlacement"
+      v-if="showGhost"
       class="inventory-grid__ghost"
       :class="ghostClasses"
       :style="ghostStyle"
@@ -41,17 +49,25 @@
 </template>
 
 <script>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 
-import { CELL_GAP_PX, CELL_SIZE_PX } from '@/core/inventory/constants.js';
+import { CELL_GAP_PX, CELL_SIZE_PX, ORIENTATION_DEFAULT } from '@/core/inventory/constants.js';
 import { coordsFromIndex } from '@/core/inventory/grid-math.js';
 import { getItemDimensions } from '@/core/inventory/footprint.js';
+import { normaliseInventoryItem } from '@/core/inventory/normalise.js';
 import { useInventoryStore } from '@/stores/inventory.js';
+
+const DEFAULT_DRAG_STATE = Object.freeze({
+  activeItemId: null,
+  ghostPosition: null,
+  orientation: ORIENTATION_DEFAULT,
+  hoverTarget: null,
+});
 
 export default {
   name: 'InventoryGrid',
-  emits: ['commit'],
+  emits: ['commit', 'item-click', 'item-contextmenu', 'item-hover', 'item-leave', 'item-pointerdown'],
   props: {
     images: {
       type: Object,
@@ -65,25 +81,79 @@ export default {
       type: Number,
       required: true,
     },
+    items: {
+      type: Array,
+      default: null,
+    },
+    draggable: {
+      type: Boolean,
+      default: true,
+    },
+    cellSize: {
+      type: Number,
+      default: CELL_SIZE_PX,
+    },
   },
   setup(props, { emit }) {
     const gridRef = ref(null);
     const inventoryStore = useInventoryStore();
     const {
-      items,
-      dragState,
-      isDragging,
-      activeItem,
+      items: storeItems,
+      dragState: storeDragState,
+      isDragging: storeIsDragging,
+      activeItem: storeActiveItem,
     } = storeToRefs(inventoryStore);
 
+    const usesStore = computed(() => props.items === null);
+
+    const externalItems = ref([]);
+    const externalOrientation = ref(new Map());
+
     const gridStyle = computed(() => ({
-      '--cell-size': `${CELL_SIZE_PX}px`,
+      '--cell-size': `${props.cellSize}px`,
       '--cell-gap': `${CELL_GAP_PX}px`,
       gridTemplateColumns: `repeat(${props.columns}, var(--cell-size))`,
       gridAutoRows: 'var(--cell-size)',
     }));
 
     const totalSlots = computed(() => props.columns * props.rows);
+
+    const refreshExternalItems = (list = []) => {
+      const snapshot = new Map(externalOrientation.value);
+      const gridSpec = { columns: props.columns, rows: props.rows };
+
+      const normalised = list.map((entry, index) => {
+        const slot = typeof entry?.slot === 'number' ? entry.slot : index;
+        const base = {
+          ...entry,
+          slot,
+          uuid: entry?.uuid || entry?.instanceId || `${entry?.id || 'item'}-${slot}`,
+        };
+        const mapped = normaliseInventoryItem(base, gridSpec, snapshot);
+        snapshot.set(mapped.uuid, mapped.orientation);
+        return mapped;
+      });
+
+      externalOrientation.value = snapshot;
+      externalItems.value = normalised;
+    };
+
+    watch(() => props.items, (list) => {
+      if (!usesStore.value) {
+        refreshExternalItems(list || []);
+      }
+    }, { immediate: true, deep: true });
+
+    watch([() => props.columns, () => props.rows], () => {
+      if (!usesStore.value) {
+        refreshExternalItems(props.items || []);
+      }
+    });
+
+    const displayItems = computed(() => (usesStore.value ? storeItems.value : externalItems.value));
+    const dragState = computed(() => (usesStore.value ? storeDragState.value : DEFAULT_DRAG_STATE));
+    const isDragging = computed(() => (usesStore.value ? storeIsDragging.value : false));
+    const activeItem = computed(() => (usesStore.value ? storeActiveItem.value : null));
 
     const pointerCellFromEvent = (event) => {
       const element = gridRef.value;
@@ -95,7 +165,7 @@ export default {
       const offsetX = event.clientX - rect.left;
       const offsetY = event.clientY - rect.top;
 
-      const cellSize = CELL_SIZE_PX + CELL_GAP_PX;
+      const cellSize = props.cellSize + CELL_GAP_PX;
       const x = Math.floor(offsetX / cellSize);
       const y = Math.floor(offsetY / cellSize);
 
@@ -107,7 +177,7 @@ export default {
     };
 
     const handlePointerMove = (event) => {
-      if (!isDragging.value) {
+      if (!props.draggable || !usesStore.value || !isDragging.value) {
         return;
       }
 
@@ -120,7 +190,7 @@ export default {
     };
 
     const handlePointerLeave = () => {
-      if (!isDragging.value) {
+      if (!props.draggable || !usesStore.value || !isDragging.value) {
         return;
       }
 
@@ -128,7 +198,7 @@ export default {
     };
 
     const handlePointerUp = (event) => {
-      if (!isDragging.value) {
+      if (!props.draggable || !usesStore.value || !isDragging.value) {
         return;
       }
 
@@ -142,7 +212,11 @@ export default {
       window.removeEventListener('pointerup', handlePointerUp);
     };
 
-    const beginPointerDrag = (event, item) => {
+    const startDrag = (event, item) => {
+      if (!props.draggable || !usesStore.value) {
+        return;
+      }
+
       const cell = pointerCellFromEvent(event) || coordsFromIndex(item.slot, props.columns);
       const offset = {
         x: cell.x - item.position.x,
@@ -154,7 +228,7 @@ export default {
     };
 
     const handleKeyUp = (event) => {
-      if (!isDragging.value) {
+      if (!props.draggable || !usesStore.value || !isDragging.value) {
         return;
       }
 
@@ -212,7 +286,7 @@ export default {
     const isItemDragging = (uuid) => dragState.value?.activeItemId === uuid;
 
     const ghostPlacement = computed(() => {
-      if (!dragState.value.ghostPosition) {
+      if (!props.draggable || !usesStore.value || !dragState.value.ghostPosition) {
         return null;
       }
 
@@ -252,21 +326,67 @@ export default {
       };
     });
 
+    const showGhost = computed(() => ghostPlacement.value !== null);
+
+    const handleItemClick = (event, item) => {
+      emit('item-click', { event, item });
+    };
+
+    const handleItemContextMenu = (event, item) => {
+      event.preventDefault();
+      emit('item-contextmenu', { event, item });
+    };
+
+    const handleItemPointerEnter = (event, item) => {
+      emit('item-hover', { event, item });
+    };
+
+    const handleItemPointerLeave = (event, item) => {
+      emit('item-leave', { event, item });
+    };
+
+    const handleItemPointerDown = (event, item) => {
+      emit('item-pointerdown', { event, item });
+      if (!props.draggable || !usesStore.value) {
+        return;
+      }
+
+      event.preventDefault();
+      startDrag(event, item);
+    };
+
+    const buildItemListeners = (item) => ({
+      pointerdown: (event) => handleItemPointerDown(event, item),
+      click: (event) => handleItemClick(event, item),
+      contextmenu: (event) => handleItemContextMenu(event, item),
+      pointerenter: (event) => handleItemPointerEnter(event, item),
+      pointerleave: (event) => handleItemPointerLeave(event, item),
+    });
+
+    const itemClasses = (item) => ([
+      'inventory-item',
+      {
+        'inventory-item--dragging': isItemDragging(item.uuid),
+        'inventory-item--locked': Boolean(item.isLocked),
+      },
+    ]);
+
     return {
       gridRef,
-      items,
-      dragState,
       gridStyle,
       totalSlots,
-      handlePointerMove,
-      handlePointerLeave,
-      beginPointerDrag,
+      displayItems,
       itemStyle,
       itemSpriteStyle,
       isItemDragging,
       ghostPlacement,
       ghostClasses,
       ghostStyle,
+      showGhost,
+      buildItemListeners,
+      itemClasses,
+      handlePointerMove,
+      handlePointerLeave,
     };
   },
 };
@@ -296,7 +416,7 @@ export default {
 .inventory-item {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   justify-content: flex-end;
   width: 100%;
   height: 100%;
@@ -306,11 +426,20 @@ export default {
   border-radius: 4px;
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.7);
   transition: transform 0.12s ease;
+  overflow: visible;
 }
 
 .inventory-item--dragging {
   opacity: 0.45;
   cursor: grabbing;
+}
+
+.inventory-item__body {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .inventory-item__sprite {
@@ -323,14 +452,32 @@ export default {
 }
 
 .inventory-item__quantity {
-  position: relative;
-  margin: 4px;
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  margin: 0;
   padding: 2px 4px;
   background: rgba(0, 0, 0, 0.6);
   border-radius: 3px;
   font-size: 12px;
   color: #ffe28a;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.inventory-item__footer {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #f0f0f0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.inventory-item__footer:empty {
+  display: none;
+}
+
+.inventory-item--locked .inventory-item__body {
+  filter: contrast(0.35);
 }
 
 .inventory-grid__ghost {

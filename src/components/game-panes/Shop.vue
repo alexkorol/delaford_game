@@ -1,37 +1,58 @@
 <template>
   <div class="shopView">
     <pane-header :text="data.name" />
-    <item-grid
+    <InventoryGrid
       :images="game.map.images"
-      :items="data.inventory"
-      :slots="200"
-      screen="shop"
+      :columns="gridColumns"
+      :rows="gridRows"
+      :items="shopItems"
+      :draggable="false"
+      @item-click="handleItemClick"
+      @item-contextmenu="handleItemContextMenu"
+      @item-hover="handleItemHover"
     />
   </div>
 </template>
 
-<script>
-export default {
-  props: {
-    game: {
-      type: Object,
-      required: true,
-    },
-    data: {
-      type: Object,
-      required: true,
-    },
+<script setup>
+import { computed } from 'vue';
+
+import InventoryGrid from '../inventory/InventoryGrid.vue';
+import { adaptLegacyGridItem } from '@/core/inventory/legacy-adapter.js';
+import useLegacyGridInteractions from '@/core/inventory/useLegacyGridInteractions.js';
+
+const props = defineProps({
+  game: {
+    type: Object,
+    required: true,
   },
-  data() {
-    return {
-      gameData: this.game.player.bank,
-    };
+  data: {
+    type: Object,
+    required: true,
   },
-  computed: {
-    bankItems() {
-      return this.game.player.bank;
-    },
-  },
+});
+
+const GRID_COLUMNS = 11;
+const TOTAL_SLOTS = 200;
+const gridColumns = GRID_COLUMNS;
+const gridRows = Math.ceil(TOTAL_SLOTS / GRID_COLUMNS);
+
+const { emitSelectAction, emitContextMenu } = useLegacyGridInteractions();
+
+const shopItems = computed(() => (
+  (props.data?.inventory || []).map((item, index) => adaptLegacyGridItem(item, index, { uuidPrefix: 'shop' }))
+));
+
+const handleItemClick = ({ event }) => {
+  emitSelectAction(event);
+};
+
+const handleItemContextMenu = ({ event, item }) => {
+  emitContextMenu(event, item.slot);
+};
+
+const handleItemHover = ({ event, item }) => {
+  emitContextMenu(event, item.slot, { firstOnly: true });
 };
 </script>
 

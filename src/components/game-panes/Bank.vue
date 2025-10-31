@@ -1,40 +1,61 @@
 <template>
   <div class="bankView">
     <pane-header text="Bank of Delaford" />
-    <item-grid
+    <InventoryGrid
       :images="game.map.images"
+      :columns="gridColumns"
+      :rows="gridRows"
       :items="bankItems"
-      :slots="200"
-      screen="bank"
+      :draggable="false"
+      @item-click="handleItemClick"
+      @item-contextmenu="handleItemContextMenu"
+      @item-hover="handleItemHover"
     />
   </div>
 </template>
 
-<script>
-import bus from '../../core/utilities/bus.js';
+<script setup>
+import { computed, onMounted } from 'vue';
 
-export default {
-  props: {
-    game: {
-      type: Object,
-      required: true,
-    },
+import InventoryGrid from '../inventory/InventoryGrid.vue';
+import { adaptLegacyGridItem } from '@/core/inventory/legacy-adapter.js';
+import useLegacyGridInteractions from '@/core/inventory/useLegacyGridInteractions.js';
+import bus from '@/core/utilities/bus.js';
+
+const props = defineProps({
+  game: {
+    type: Object,
+    required: true,
   },
-  data() {
-    return {
-      gameData: this.game.player.bank,
-    };
-  },
-  computed: {
-    bankItems() {
-      return this.game.player.bank;
-    },
-  },
-  mounted() {
-    const INVENTORY = 1;
-    bus.$emit('show-sidebar', INVENTORY);
-  },
+});
+
+const GRID_COLUMNS = 11;
+const TOTAL_SLOTS = 200;
+const gridColumns = GRID_COLUMNS;
+const gridRows = Math.ceil(TOTAL_SLOTS / GRID_COLUMNS);
+
+const { emitSelectAction, emitContextMenu } = useLegacyGridInteractions();
+
+const bankItems = computed(() => (
+  (props.game?.player?.bank || []).map((item, index) => adaptLegacyGridItem(item, index, { uuidPrefix: 'bank' }))
+));
+
+const handleItemClick = ({ event }) => {
+  emitSelectAction(event);
 };
+
+const handleItemContextMenu = ({ event, item }) => {
+  emitContextMenu(event, item.slot);
+};
+
+const handleItemHover = ({ event, item }) => {
+  emitContextMenu(event, item.slot, { firstOnly: true });
+};
+
+onMounted(() => {
+  const INVENTORY = 1;
+  bus.$emit('show-sidebar', INVENTORY);
+});
 </script>
 
 <style lang="scss" scoped>

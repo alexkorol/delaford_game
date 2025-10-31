@@ -4,53 +4,74 @@
     <p>
       Select the bar you want to smelt
     </p>
-    <item-grid
-      :images="game.map.images"
-      :items="barItems"
-      :slots="6"
+    <InventoryGrid
       class="furnaceGrid"
-      screen="furnace"
+      :images="game.map.images"
+      :columns="gridColumns"
+      :rows="gridRows"
+      :items="barItems"
+      :draggable="false"
+      @item-click="handleItemClick"
+      @item-contextmenu="handleItemContextMenu"
+      @item-hover="handleItemHover"
     />
   </div>
 </template>
 
-<script>
-export default {
-  props: {
-    game: {
-      type: Object,
-      required: true,
-    },
-    data: {
-      type: Object,
-      required: true,
-    },
+<script setup>
+import { computed } from 'vue';
+
+import InventoryGrid from '../inventory/InventoryGrid.vue';
+import { adaptLegacyGridItem } from '@/core/inventory/legacy-adapter.js';
+import useLegacyGridInteractions from '@/core/inventory/useLegacyGridInteractions.js';
+
+const props = defineProps({
+  game: {
+    type: Object,
+    required: true,
   },
-  data() {
-    return {
-      smithingLevel: this.game.player.skills.smithing.level,
-    };
+  data: {
+    type: Object,
+    required: true,
   },
-  computed: {
-    itemDetail() {
-      return {
-        'bronze-bar': 1,
-        'iron-bar': 19,
-        'silver-bar': 25,
-        'steel-bar': 40,
-        'gold-bar': 47,
-        'jatite-bar': 55,
-      };
-    },
-    barItems() {
-      return this.data.items.map((e, index) => ({
-        qty: 1,
-        slot: index,
-        id: e,
-        isLocked: this.itemDetail[e] <= this.smithingLevel ? '' : 'locked-item',
-      }));
-    },
-  },
+});
+
+const GRID_COLUMNS = 6;
+const TOTAL_SLOTS = 6;
+const gridColumns = GRID_COLUMNS;
+const gridRows = Math.max(1, Math.ceil(TOTAL_SLOTS / GRID_COLUMNS));
+
+const smithingLevel = computed(() => props.game?.player?.skills?.smithing?.level ?? 1);
+
+const barLevelMap = {
+  'bronze-bar': 1,
+  'iron-bar': 19,
+  'silver-bar': 25,
+  'steel-bar': 40,
+  'gold-bar': 47,
+  'jatite-bar': 55,
+};
+
+const { emitSelectAction, emitContextMenu } = useLegacyGridInteractions();
+
+const barItems = computed(() => (
+  (props.data?.items || []).map((id, index) => adaptLegacyGridItem({ id }, index, {
+    uuidPrefix: 'furnace',
+    qty: 1,
+    locked: (barLevelMap[id] || 0) > smithingLevel.value,
+  }))
+));
+
+const handleItemClick = ({ event }) => {
+  emitSelectAction(event);
+};
+
+const handleItemContextMenu = ({ event, item }) => {
+  emitContextMenu(event, item.slot);
+};
+
+const handleItemHover = ({ event, item }) => {
+  emitContextMenu(event, item.slot, { firstOnly: true });
 };
 </script>
 
@@ -67,9 +88,8 @@ p {
 }
 
 .furnaceGrid {
-  display: flex;
-  justify-content: center;
-  height: auto;
+  margin: 0 auto;
+  width: fit-content;
 }
 
 .furnaceView {
