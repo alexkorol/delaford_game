@@ -567,12 +567,10 @@ class Map {
     this.bufferCanvas.width = nativeWidth;
     this.bufferCanvas.height = nativeHeight;
 
-    this.canvas.width = displayWidth;
-    this.canvas.height = displayHeight;
+    this.canvas.width = nativeWidth;
+    this.canvas.height = nativeHeight;
     this.canvas.style.width = `${displayWidth}px`;
     this.canvas.style.height = `${displayHeight}px`;
-    this.canvas.style.maxWidth = `${displayWidth}px`;
-    this.canvas.style.maxHeight = `${displayHeight}px`;
 
     const targetForVariables = shell || container;
     if (targetForVariables) {
@@ -616,8 +614,6 @@ class Map {
     if (this.canvas) {
       this.canvas.style.width = '';
       this.canvas.style.height = '';
-      this.canvas.style.maxWidth = '';
-      this.canvas.style.maxHeight = '';
       const container = this.canvas.parentElement;
       const shell = container && container.parentElement ? container.parentElement : null;
       const target = shell || container;
