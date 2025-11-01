@@ -1,4 +1,4 @@
-import { createWorld } from '../ai/ecs-lite.js';
+import { createWorld } from '../../systems/ecs/factory.js';
 import behaviourRegistry, { resolveBehaviour } from './behaviours/index.js';
 
 const createMonsterAIController = (monster) => {
