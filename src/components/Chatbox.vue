@@ -326,7 +326,9 @@ export default {
   flex-direction: column;
   width: var(--chat-width);
   max-width: 100%;
+
   @include glass-panel(rgba(16, 20, 32, 0.78));
+
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: transform 180ms ease-out, opacity 180ms ease-out;
@@ -443,7 +445,7 @@ export default {
 }
 
 .chatbox__text {
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .chatbox__text--chat {
