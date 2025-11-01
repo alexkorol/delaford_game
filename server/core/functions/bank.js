@@ -119,7 +119,10 @@ export default class Bank {
       this.inventory.slots[this.index.inventory].qty += this.quantity;
     } else {
       // Add item to inventory either once (if stackable) or as many times as needed
-      await this.inventory.add(this.itemId, this.quantity);
+      const addition = await this.inventory.add(this.itemId, this.quantity);
+      if (!addition.success) {
+        throw new Error('Not enough space to withdraw.');
+      }
     }
 
     // Secondly, lets update our bank accordingly

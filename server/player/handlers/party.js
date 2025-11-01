@@ -4,6 +4,7 @@ import GameMap from '#server/core/map.js';
 import Socket from '#server/socket.js';
 import Monster from '#server/core/monster.js';
 import UI from '#shared/ui.js';
+import ItemFactory from '#server/core/items/factory.js';
 
 const INVITE_DURATION_MS = 60 * 1000;
 
@@ -426,11 +427,35 @@ class PartyService {
       };
 
       if (coinsPerPlayer > 0 && player.inventory && typeof player.inventory.add === 'function') {
-        await player.inventory.add('coins', coinsPerPlayer);
-        Socket.emit('core:refresh:inventory', {
-          player: { socket_id: player.socket_id },
-          data: player.inventory.slots,
-        });
+        const addition = await player.inventory.add('coins', coinsPerPlayer);
+
+        if (addition.success) {
+          Socket.emit('core:refresh:inventory', {
+            player: { socket_id: player.socket_id },
+            data: player.inventory.slots,
+          });
+        } else {
+          const baseCoins = ItemFactory.createById('coins', { quantity: coinsPerPlayer });
+          if (baseCoins) {
+            const dropLocation = {
+              x: Number.isFinite(player.x) ? player.x : 0,
+              y: Number.isFinite(player.y) ? player.y : 0,
+            };
+            const dropped = ItemFactory.toWorldInstance(
+              baseCoins,
+              dropLocation,
+              { timestamp: Date.now() },
+            );
+            world.items.push(dropped);
+            Socket.broadcast('world:itemDropped', world.items);
+          }
+
+          Socket.emit('game:send:message', {
+            player: { socket_id: player.socket_id },
+            text: 'Your inventory is full. The coins drop to the ground.',
+          });
+        }
+
         entry.coins = coinsPerPlayer;
       }
 

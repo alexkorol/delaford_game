@@ -4,6 +4,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import { shops } from '#server/core/data/foreground/index.js';
 import world from '#server/core/world.js';
+import ItemFactory from '#server/core/items/factory.js';
 
 const { player } = config;
 
@@ -49,6 +50,39 @@ class Shop {
 
     // The item we are acting on
     this.item = this.source.find(e => e.id === this.itemId);
+  }
+
+  dropToGround(itemId, quantity, message) {
+    const player = world.players[this.playerIndex];
+    if (!player) {
+      return;
+    }
+
+    const baseItem = ItemFactory.createById(itemId, { quantity });
+    if (!baseItem) {
+      return;
+    }
+
+    const dropLocation = {
+      x: Number.isFinite(player.x) ? player.x : 0,
+      y: Number.isFinite(player.y) ? player.y : 0,
+    };
+
+    const dropped = ItemFactory.toWorldInstance(
+      baseItem,
+      dropLocation,
+      { timestamp: Date.now() },
+    );
+
+    world.items.push(dropped);
+    Socket.broadcast('world:itemDropped', world.items);
+
+    if (message) {
+      Socket.emit('game:send:message', {
+        player: { socket_id: player.socket_id },
+        text: message,
+      });
+    }
   }
 
   /**
@@ -192,7 +226,7 @@ class Shop {
   /**
    * Sell an item to the shop
    */
-  sell() {
+  async sell() {
     const { price } = Query.getItemData(this.itemId);
 
     if (this.canWeSell()) {
@@ -219,9 +253,16 @@ class Shop {
       // Add coins to our coins in inventory
       if (this.hasCoinsInInventory()) {
         this.inventory.slots[this.coinIndex].qty += price * rounds;
-      } else {
+      } else if (rounds > 0) {
         // If not, lets give them their coins to the inventory
-        this.inventory.add('coins', price * rounds);
+        const addition = await this.inventory.add('coins', price * rounds);
+        if (!addition.success) {
+          this.dropToGround(
+            'coins',
+            price * rounds,
+            'Your inventory is full. The coins drop to the ground.',
+          );
+        }
       }
     }
 
@@ -243,7 +284,7 @@ class Shop {
   /**
    * Buy an item from the shop
    */
-  buy() {
+  async buy() {
     // Get price of item
     const { price } = Query.getItemData(this.itemId);
     // How many items can we buy based on inventory space
@@ -266,11 +307,17 @@ class Shop {
     // then we are not buying anything
     if (this.insufficient.funds) rounds = 0;
 
-    // Add item to inventory
-    this.inventory.add(this.itemId, rounds);
-
     // Save quantity before a purchase
     const qtyBeforePurchase = this.shop[this.shopItemIndex].qty;
+
+    if (rounds > 0) {
+      const addition = await this.inventory.add(this.itemId, rounds);
+      if (!addition.success) {
+        this.insufficient.space = true;
+        this.checkPurchase(qtyBeforePurchase);
+        return undefined;
+      }
+    }
 
     // If we completed one round of purchasing
     if (rounds > 0) {
@@ -316,7 +363,7 @@ class Shop {
     } else if (this.insufficient.funds) {
       msg = 'Not enough gold to purchase.';
     } else if (this.insufficient.space) {
-      msg = 'You were not able to buy all of the items.';
+      msg = 'Not enough space in inventory.';
     }
 
     if (msg !== '') {

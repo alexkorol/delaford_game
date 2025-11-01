@@ -16,55 +16,70 @@ export default class Inventory {
    * @param {string} itemId - The ID of the item
    * @param {integer} qty - The number of quantity for that item
    */
-  add(itemId, qty = 1, options = {}) {
-    // TODO
-    // Drop items on floor if no space (functionality in shop)
-    return new Promise((resolve) => {
-      const baseItem = Query.getItemData(itemId) || { id: itemId };
-      const stackable = !!baseItem.stackable;
-      const rounds = stackable ? 1 : qty; // How many times to iterate on inventory?
-      const { existingItem = null, uuid: incomingUuid = null } = options;
-      const player = world.players[this.playerIndex];
-      const playerUuid = player ? player.uuid : null;
+  async add(itemId, qty = 1, options = {}) {
+    const baseItem = Query.getItemData(itemId) || { id: itemId };
+    const stackable = !!baseItem.stackable;
+    const rounds = stackable ? 1 : qty; // How many times to iterate on inventory?
+    const { existingItem = null, uuid: incomingUuid = null } = options;
+    const player = world.players[this.playerIndex];
+    const playerUuid = player ? player.uuid : null;
 
-      for (let index = 0; index < rounds; index += 1) {
-        const openSlot = UI.getOpenSlot(this.slots);
-        if (openSlot === false && openSlot !== 0) {
-          continue;
-        }
+    const result = {
+      success: false,
+      added: [],
+      requestedQuantity: qty,
+      remaining: qty,
+      reason: null,
+    };
 
-        let instance = null;
-
-        if (existingItem) {
-          instance = ItemFactory.adoptExisting(existingItem, {
-            uuid: incomingUuid,
-            quantity: stackable ? qty : existingItem.qty || 1,
-            bindTo: playerUuid,
-            baseItem,
-          });
-        } else {
-          instance = ItemFactory.createById(itemId, {
-            uuid: incomingUuid,
-            quantity: stackable ? qty : 1,
-            bindTo: playerUuid,
-          });
-        }
-
-        if (!instance) {
-          continue;
-        }
-
-        instance.slot = openSlot;
-        instance.context = 'item';
-
-        if (stackable) {
-          instance.qty = qty;
-        }
-
-        this.slots.push(instance);
+    for (let index = 0; index < rounds; index += 1) {
+      const openSlot = UI.getOpenSlot(this.slots);
+      if (openSlot === false && openSlot !== 0) {
+        result.reason = result.reason || 'inventory_full';
+        break;
       }
 
-      resolve(200);
-    });
+      let instance = null;
+
+      if (existingItem) {
+        instance = ItemFactory.adoptExisting(existingItem, {
+          uuid: incomingUuid,
+          quantity: stackable ? qty : existingItem.qty || 1,
+          bindTo: playerUuid,
+          baseItem,
+        });
+      } else {
+        instance = ItemFactory.createById(itemId, {
+          uuid: incomingUuid,
+          quantity: stackable ? qty : 1,
+          bindTo: playerUuid,
+        });
+      }
+
+      if (!instance) {
+        result.reason = result.reason || 'item_creation_failed';
+        continue;
+      }
+
+      instance.slot = openSlot;
+      instance.context = 'item';
+
+      if (stackable) {
+        instance.qty = qty;
+        result.remaining = 0;
+      } else {
+        result.remaining = Math.max(0, result.remaining - 1);
+      }
+
+      this.slots.push(instance);
+      result.added.push(instance);
+    }
+
+    if (!result.added.length && !result.reason) {
+      result.reason = 'no_items_added';
+    }
+
+    result.success = result.remaining === 0 && result.added.length > 0;
+    return result;
   }
 }
