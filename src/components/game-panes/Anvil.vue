@@ -1,9 +1,14 @@
 <template>
-  <div class="anvilView">
-    <pane-header text="Anvil" />
-    <p>What would you like to make?</p>
+  <PaneCard
+    class="anvil-pane"
+    title="Anvil"
+    aria-label="Anvil panel"
+    dismissible
+    @dismiss="closePane"
+  >
+    <p class="anvil-pane__intro">What would you like to make?</p>
     <InventoryGrid
-      class="anvilGrid"
+      class="anvil-pane__grid"
       :images="game.map.images"
       :columns="gridColumns"
       :rows="gridRows"
@@ -15,28 +20,30 @@
       @item-hover="handleItemHover"
     >
       <template #item-footer="{ item }">
-        <div class="anvilGrid__name">{{ formatDisplayName(item.name) }}</div>
+        <div class="anvil-pane__name">{{ formatDisplayName(item.name) }}</div>
         <div
-          class="anvilGrid__bars"
+          class="anvil-pane__bars"
           :class="{
-            canSmith: item.metadata?.hasBars && item.metadata?.hasLevel,
-            notEnoughBars: !item.metadata?.hasBars,
-            levelNeeded: !item.metadata?.hasLevel
+            'anvil-pane__bars--ready': item.metadata?.hasBars && item.metadata?.hasLevel,
+            'anvil-pane__bars--bars': !item.metadata?.hasBars,
+            'anvil-pane__bars--level': !item.metadata?.hasLevel
           }"
         >
           {{ item.metadata?.barsNeeded }} bar{{ item.metadata?.barsNeeded === 1 ? '' : 's' }}
         </div>
       </template>
     </InventoryGrid>
-  </div>
+  </PaneCard>
 </template>
 
 <script setup>
 import { computed } from 'vue';
 
-import InventoryGrid from '../inventory/InventoryGrid.vue';
+import PaneCard from '@/components/ui/panes/PaneCard.vue';
+import InventoryGrid from '@/components/inventory/InventoryGrid.vue';
 import { adaptLegacyGridItem } from '@/core/inventory/legacy-adapter.js';
 import useLegacyGridInteractions from '@/core/inventory/useLegacyGridInteractions.js';
+import bus from '@/core/utilities/bus.js';
 
 const props = defineProps({
   game: {
@@ -99,28 +106,38 @@ const handleItemContextMenu = ({ event, item }) => {
 const handleItemHover = ({ event, item }) => {
   emitContextMenu(event, item.slot, { firstOnly: true });
 };
+
+const closePane = () => {
+  bus.$emit('screen:close');
+};
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
+@use '@/assets/scss/abstracts/tokens' as *;
 
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
-p {
-  font-size: 0.6em;
-  margin: 1em 0;
+.anvil-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  text-align: center;
 }
 
-.anvilGrid {
+.anvil-pane__intro {
+  margin: 0;
+  font-size: clamp(13px, 1.2vw, 15px);
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.04em;
+}
+
+.anvil-pane__grid {
   margin: 0 auto;
   width: fit-content;
+  max-width: 100%;
 
   :deep(.inventory-item) {
     align-items: center;
     text-align: center;
-    padding: 8px 10px;
+    padding: var(--space-sm) var(--space-md);
     width: 75px;
   }
 
@@ -130,51 +147,28 @@ p {
   }
 }
 
-.anvilGrid__name {
-  font-size: 0.55em;
-  margin-top: 0.5em;
+.anvil-pane__name {
+  font-size: clamp(11px, 1vw, 13px);
+  margin-top: var(--space-xs);
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: capitalize;
 }
 
-.anvilGrid__bars {
-  font-size: 0.5em;
-  margin-top: 0.6em;
+.anvil-pane__bars {
+  font-size: clamp(10px, 0.95vw, 12px);
+  margin-top: var(--space-xs);
+  letter-spacing: 0.04em;
 }
 
-.levelNeeded {
-  color: #901313 !important;
+.anvil-pane__bars--level {
+  color: #f66;
 }
 
-.notEnoughBars {
-  color: #ffb42a;
+.anvil-pane__bars--bars {
+  color: #ffb85c;
 }
 
-.canSmith {
-  color: #14ff14;
-}
-
-.anvilView {
-  background-color: $color;
-  font-family: "GameFont", serif;
-  border: 5px solid color.adjust($color, $lightness: -10%);
-
-  .header {
-    background: color.adjust($color, $lightness: 10%);
-    height: 30px;
-
-    .close {
-      float: right;
-      width: 30px;
-      box-sizing: border-box;
-      height: 30px;
-      background-color: color.adjust(red, $lightness: -10%);
-      color: white;
-      font-size: 1em;
-      padding: 5px 2px 5px 5px;
-    }
-  }
-
-  .main {
-    padding: 0.5em;
-  }
+.anvil-pane__bars--ready {
+  color: #3dff8a;
 }
 </style>
