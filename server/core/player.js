@@ -10,7 +10,6 @@ import createPlayerCombatController from '#server/core/entities/player/combat-co
 import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
 import createPlayerMovementHandler, {
   broadcastAnimation as broadcastPlayerAnimation,
-  broadcastMovement as broadcastPlayerMovement,
   directionDelta as movementDirectionDelta,
   queueEmpty as movementQueueEmpty,
 } from '#server/core/entities/player/movement-handler.js';
@@ -51,9 +50,24 @@ const buildPlayerComponents = (player) => ({
     socketId: player.socket_id,
     emit: Socket.emit.bind(Socket),
     broadcast: Socket.broadcast.bind(Socket),
+    events: {
+      movement: 'player:movement',
+    },
+    broadcastKey: player.uuid,
+    resolveRecipients: () => world.getScenePlayers(player.sceneId),
+    movementPayload: () => player,
+    movementMeta: () => ({
+      movementStep: player.movementStep,
+      animation: player.animation,
+      sentAt: Date.now(),
+    }),
+    forceBroadcast: true,
   },
   persistence: {
     save: () => player.update(),
+    dirty: false,
+    cooldownMs: 5_000,
+    autoClearDirty: true,
   },
   'inventory-manager': {
     ref: player.inventoryManager,
@@ -319,8 +333,8 @@ class Player {
     return this.movement.stopMovement(data);
   }
 
-  static broadcastMovement(player, players = null) {
-    return broadcastPlayerMovement(player, players);
+  static broadcastMovement(player, _players = null) {
+    return world.requestActorMovementBroadcast(player);
   }
 
   static broadcastAnimation(player, players = null) {

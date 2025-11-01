@@ -30,6 +30,48 @@ const buildNpcComponents = (npc) => ({
   'action-queue': {
     queue: [],
   },
+  networking: {
+    broadcast: Socket.broadcast.bind(Socket),
+    events: {
+      movement: 'npc:movement',
+    },
+    broadcastKey: () => `npc:${npc.sceneId || world.defaultTownId}`,
+    movementPayload: () => {
+      const scene = world.getScene(npc.sceneId);
+      return Array.isArray(scene?.npcs) ? scene.npcs : [];
+    },
+    movementMeta: () => {
+      const scene = world.getScene(npc.sceneId);
+      const npcsInScene = Array.isArray(scene?.npcs) ? scene.npcs : [];
+      return {
+        movements: npcsInScene.map(entry => ({
+          id: entry.id,
+          uuid: entry.uuid || null,
+          movementStep: entry.movementStep,
+        })),
+        animations: npcsInScene.map(entry => ({
+          id: entry.id,
+          uuid: entry.uuid || null,
+          animation: entry.animation || null,
+        })),
+        sentAt: Date.now(),
+      };
+    },
+    movementSignature: () => {
+      const scene = world.getScene(npc.sceneId);
+      const npcsInScene = Array.isArray(scene?.npcs) ? scene.npcs : [];
+      return npcsInScene.map(entry => [
+        entry.uuid || entry.id || 'npc',
+        entry.movementStep ? entry.movementStep.sequence : 'step:none',
+        entry.x ?? 'x:none',
+        entry.y ?? 'y:none',
+        entry.facing || 'facing:none',
+        entry.animation ? entry.animation.sequence : 'anim:none',
+      ].join(':')).join('|');
+    },
+    resolveRecipients: () => null,
+    forceBroadcast: true,
+  },
   lifecycle: {
     state: 'active',
     dirty: true,
@@ -152,22 +194,6 @@ class NPC {
         console.error(`[npc] controller update failed for ${id}`, error);
       }
     });
-
-    const meta = {
-      movements: world.npcs.map((npc) => ({
-        id: npc.id,
-        uuid: npc.uuid || null,
-        movementStep: npc.movementStep,
-      })),
-      animations: world.npcs.map((npc) => ({
-        id: npc.id,
-        uuid: npc.uuid || null,
-        animation: npc.animation || null,
-      })),
-    };
-
-    // Tell the clients of the new NPCs
-    Socket.broadcast('npc:movement', world.npcs, null, { meta });
   }
 }
 

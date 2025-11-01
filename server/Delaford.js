@@ -147,6 +147,7 @@ class Delaford {
       this.loopLastTick = now;
 
       this.updatePeriodicTasks(delta);
+      this.tickSceneWorlds(delta);
       this.logSchedulerStats(delta, now);
 
       if (!this.loopActive) {
@@ -157,6 +158,17 @@ class Delaford {
     };
 
     this.loopHandle = setTimeout(tick, this.loopInterval);
+  }
+
+  tickSceneWorlds(delta) {
+    const now = Date.now();
+    world.forEachScene((scene) => {
+      const sceneWorld = world.getSceneWorld(scene.id);
+      if (!sceneWorld || typeof sceneWorld.update !== 'function') {
+        return;
+      }
+      sceneWorld.update(delta, { now, scene });
+    });
   }
 
   updatePeriodicTasks(delta) {

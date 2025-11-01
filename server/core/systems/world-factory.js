@@ -1,6 +1,7 @@
 import { createWorld } from './ecs/factory.js';
 import createActionQueueSystem from './action-queue-system.js';
 import createMovementSystem from './movement-system.js';
+import createPersistenceSystem from './persistence-system.js';
 
 const ensureRegistry = (world) => {
   if (!world.context) {
@@ -36,6 +37,13 @@ const registerWorldSystems = (world, options = {}) => {
       || createMovementSystem(options.movementOptions || {});
     world.addSystem(system);
     registry.set('movement', system);
+  }
+
+  if (!options.skipPersistence && !registry.has('persistence')) {
+    const system = options.persistenceSystem
+      || createPersistenceSystem(options.persistenceOptions || {});
+    world.addSystem(system);
+    registry.set('persistence', system);
   }
 
   const extraSystems = options.additionalSystems || options.systems || [];

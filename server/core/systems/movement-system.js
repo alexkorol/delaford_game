@@ -1,5 +1,174 @@
 const MOVEMENT_COMPONENTS = ['transform', 'movement-state', 'movement-intent'];
 
+const defaultMovementSignature = (transform) => {
+  if (!transform) {
+    return 'transform:none';
+  }
+
+  const movementStep = transform.movementStep || {};
+  const animation = transform.animation || {};
+
+  return [
+    transform.sceneId || 'scene:none',
+    Number.isFinite(transform.x) ? transform.x : 'x:none',
+    Number.isFinite(transform.y) ? transform.y : 'y:none',
+    transform.facing || 'facing:none',
+    movementStep.sequence ?? 'step:none',
+    movementStep.startedAt ?? 'stepStarted:none',
+    movementStep.direction || 'stepDir:none',
+    animation.sequence ?? 'anim:none',
+    animation.state || 'animState:none',
+  ].join('|');
+};
+
+const buildDefaultMovementMeta = (transform) => {
+  const meta = { sentAt: Date.now() };
+  if (transform && transform.movementStep) {
+    meta.movementStep = transform.movementStep;
+  }
+  if (transform && transform.animation) {
+    meta.animation = transform.animation;
+  }
+  return meta;
+};
+
+const defaultMovementPayload = ({ transform, identity }) => {
+  if (transform && transform.ref) {
+    return transform.ref;
+  }
+
+  if (identity) {
+    return {
+      id: identity.id || identity.uuid || null,
+      uuid: identity.uuid || identity.id || null,
+      type: identity.type || 'entity',
+      x: transform?.x ?? null,
+      y: transform?.y ?? null,
+      facing: transform?.facing ?? null,
+    };
+  }
+
+  return transform || null;
+};
+
+const resolveMovementEvent = ({ identity, networking }) => {
+  if (networking && networking.events && networking.events.movement) {
+    return networking.events.movement;
+  }
+  if (networking && networking.movementEvent) {
+    return networking.movementEvent;
+  }
+  if (identity && identity.type) {
+    return `${identity.type}:movement`;
+  }
+  return 'entity:movement';
+};
+
+const resolveBroadcastKey = ({ entity, networking, identity }) => {
+  const customKey = networking && networking.broadcastKey;
+  if (typeof customKey === 'function') {
+    return customKey({ entity, identity });
+  }
+  if (typeof customKey === 'string') {
+    return customKey;
+  }
+  return entity.id || identity?.uuid || identity?.id || `entity:${Date.now()}`;
+};
+
+const resolveMovementSignature = ({ entity, transform, networking, identity }) => {
+  if (networking && typeof networking.movementSignature === 'function') {
+    return networking.movementSignature({ entity, transform, identity });
+  }
+  return defaultMovementSignature(transform);
+};
+
+const resolveMovementPayload = ({ entity, transform, networking, identity, world, context }) => {
+  if (networking && typeof networking.movementPayload === 'function') {
+    return networking.movementPayload({ entity, transform, identity, world, context });
+  }
+  return defaultMovementPayload({ transform, identity });
+};
+
+const resolveMovementMeta = ({ entity, transform, networking, identity, world, context }) => {
+  if (networking && typeof networking.movementMeta === 'function') {
+    return networking.movementMeta({ entity, transform, identity, world, context }) || {};
+  }
+  return buildDefaultMovementMeta(transform);
+};
+
+const resolveRecipients = ({ networking, entity, identity, transform, world, context }) => {
+  if (networking && typeof networking.resolveRecipients === 'function') {
+    return networking.resolveRecipients({ entity, identity, transform, world, context });
+  }
+  return null;
+};
+
+const handleNetworking = ({
+  entity,
+  world,
+  context,
+  movementCache,
+}) => {
+  const transform = entity.getComponent('transform');
+  const networking = entity.getComponent('networking');
+  if (!networking || typeof networking.broadcast !== 'function') {
+    return;
+  }
+
+  const identity = entity.getComponent('identity') || null;
+  const key = resolveBroadcastKey({ entity, networking, identity });
+  const signature = resolveMovementSignature({
+    entity,
+    transform,
+    networking,
+    identity,
+  });
+
+  const lastSignature = movementCache.get(key);
+  const forceBroadcast = Boolean(networking.forceBroadcast);
+  if (!forceBroadcast && lastSignature === signature) {
+    return;
+  }
+
+  const payload = resolveMovementPayload({
+    entity,
+    transform,
+    networking,
+    identity,
+    world,
+    context,
+  });
+
+  if (payload === null || payload === undefined) {
+    movementCache.set(key, signature);
+    networking.forceBroadcast = false;
+    return;
+  }
+
+  const recipients = resolveRecipients({
+    networking,
+    entity,
+    identity,
+    transform,
+    world,
+    context,
+  });
+
+  const event = resolveMovementEvent({ identity, networking });
+  const meta = resolveMovementMeta({
+    entity,
+    transform,
+    networking,
+    identity,
+    world,
+    context,
+  });
+
+  networking.broadcast(event, payload, recipients, { meta });
+  movementCache.set(key, signature);
+  networking.forceBroadcast = false;
+};
+
 const toArray = (value) => (Array.isArray(value) ? value : (value ? [value] : []));
 
 const ensureQueue = (component, key = 'queue') => {
@@ -167,12 +336,20 @@ const createMovementSystem = (options = {}) => {
     id: options.id || 'movement-system',
   };
 
+  const movementCache = new Map();
+
   return (world, delta, context = {}) => {
     const now = Number.isFinite(context.now) ? context.now : Date.now();
     const runtimeContext = { ...context, now, system: systemContext };
     const entities = world.query(MOVEMENT_COMPONENTS);
     entities.forEach((entity) => {
       processEntityMovement(entity, world, delta, runtimeContext);
+      handleNetworking({
+        entity,
+        world,
+        context: runtimeContext,
+        movementCache,
+      });
     });
   };
 };

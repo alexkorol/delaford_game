@@ -4,6 +4,7 @@ import {
   DEFAULT_ANIMATION_HOLDS,
   DEFAULT_FACING_DIRECTION,
 } from '#shared/combat.js';
+import { markActorStateDirty } from '#server/core/entities/utils/entity-flags.js';
 
 const BASE_MOVE_DURATION = 150;
 
@@ -102,6 +103,8 @@ const updateMovementStep = (npc, step) => {
     blocked: step.blocked,
   };
 
+  markActorStateDirty(npc, { forceBroadcast: true });
+
   return npc.movementStep;
 };
 
@@ -193,6 +196,9 @@ const performRandomMovement = (npc, worldRef) => {
   }
 
   npc.lastAction = now;
+  if (moved || blockedAttempt) {
+    markActorStateDirty(npc, { forceBroadcast: true });
+  }
   return true;
 };
 

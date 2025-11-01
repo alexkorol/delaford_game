@@ -527,6 +527,83 @@ class WorldManager {
     this.sceneWorlds.delete(id);
   }
 
+  ensureActorInRegistry(actor, sceneId, identity = null) {
+    if (!actor) {
+      return;
+    }
+
+    const type = identity?.type || actor.type || null;
+    const scene = this.getScene(sceneId || actor.sceneId);
+
+    if (type === 'player') {
+      if (!this._players.includes(actor)) {
+        this._players.push(actor);
+      }
+      if (scene) {
+        if (!Array.isArray(scene.players)) {
+          scene.players = [];
+        }
+        if (!scene.players.includes(actor)) {
+          scene.players.push(actor);
+        }
+      }
+      return;
+    }
+
+    if (type === 'npc') {
+      if (scene) {
+        if (!Array.isArray(scene.npcs)) {
+          scene.npcs = [];
+        }
+        if (!scene.npcs.includes(actor)) {
+          scene.npcs.push(actor);
+        }
+      }
+      return;
+    }
+
+    if (type === 'monster') {
+      if (scene) {
+        if (!Array.isArray(scene.monsters)) {
+          scene.monsters = [];
+        }
+        if (!scene.monsters.includes(actor)) {
+          scene.monsters.push(actor);
+        }
+      }
+    }
+  }
+
+  pruneActorFromRegistry(actor, sceneId, identity = null) {
+    if (!actor) {
+      return;
+    }
+
+    const type = identity?.type || actor.type || null;
+    const scene = this.getScene(sceneId || actor.sceneId);
+
+    if (type === 'player') {
+      this._players = this._players.filter(entry => entry !== actor);
+      if (scene && Array.isArray(scene.players)) {
+        scene.players = scene.players.filter(entry => entry !== actor);
+      }
+      return;
+    }
+
+    if (type === 'npc') {
+      if (scene && Array.isArray(scene.npcs)) {
+        scene.npcs = scene.npcs.filter(entry => entry !== actor);
+      }
+      return;
+    }
+
+    if (type === 'monster') {
+      if (scene && Array.isArray(scene.monsters)) {
+        scene.monsters = scene.monsters.filter(entry => entry !== actor);
+      }
+    }
+  }
+
   registerActorEntity(actor, options = {}) {
     if (!actor) {
       return null;
@@ -569,6 +646,10 @@ class WorldManager {
     this.entityIndex.set(actorId, record);
     actor.entityId = actorId;
     actor.entity = entity;
+    const identity = components && components.identity
+      ? components.identity
+      : entity.getComponent('identity');
+    this.ensureActorInRegistry(actor, sceneId, identity);
     return record;
   }
 
@@ -623,10 +704,59 @@ class WorldManager {
 
     this.entityIndex.delete(actorId);
 
+    const identity = record.entity && typeof record.entity.getComponent === 'function'
+      ? record.entity.getComponent('identity')
+      : null;
+    this.pruneActorFromRegistry(record.actor || actorOrId, record.sceneId, identity);
+
     if (typeof actorOrId === 'object' && actorOrId !== null) {
       actorOrId.entity = null;
       actorOrId.entityId = null;
     }
+  }
+
+  requestActorMovementBroadcast(actorOrId) {
+    const record = this.getActorEntity(actorOrId);
+    if (!record || !record.entity) {
+      return false;
+    }
+
+    const networking = record.entity.getComponent('networking');
+    if (!networking) {
+      return false;
+    }
+
+    networking.forceBroadcast = true;
+    return true;
+  }
+
+  requestSceneMovementBroadcast(sceneId, options = {}) {
+    const id = sceneId || this.defaultTownId;
+    const sceneWorld = this.getSceneWorld(id);
+    if (!sceneWorld || !(sceneWorld.entities instanceof Map)) {
+      return 0;
+    }
+
+    const typeFilter = options.type || null;
+    let count = 0;
+    sceneWorld.entities.forEach((entity) => {
+      if (!entity || typeof entity.getComponent !== 'function') {
+        return;
+      }
+      if (typeFilter) {
+        const identity = entity.getComponent('identity');
+        if (!identity || identity.type !== typeFilter) {
+          return;
+        }
+      }
+      const networking = entity.getComponent('networking');
+      if (!networking) {
+        return;
+      }
+      networking.forceBroadcast = true;
+      count += 1;
+    });
+    return count;
   }
 
   getActorEntity(actorOrId) {
