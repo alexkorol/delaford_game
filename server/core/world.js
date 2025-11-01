@@ -1,3 +1,5 @@
+import createSceneWorld from './systems/world-factory.js';
+
 const DEFAULT_TOWN_ID = 'town:delaford';
 
 const isObject = value => value && typeof value === 'object';
@@ -79,6 +81,8 @@ class WorldManager {
     this.towns = new Map();
     this.instances = new Map();
     this.scenes = new Map();
+    this.sceneWorlds = new Map();
+    this.entityIndex = new Map();
 
     const townScene = new WorldScene({
       id: DEFAULT_TOWN_ID,
@@ -97,6 +101,7 @@ class WorldManager {
       return;
     }
     this.scenes.set(scene.id, scene);
+    this.ensureSceneWorld(scene.id);
   }
 
   getScene(sceneId) {
@@ -131,6 +136,7 @@ class WorldManager {
     }
 
     this.assignPlayerToScene(player, player.sceneId || sceneId);
+    this.registerActorEntity(player, { sceneId: player.sceneId });
   }
 
   assignPlayerToScene(player, sceneId) {
@@ -150,6 +156,7 @@ class WorldManager {
     }
 
     player.sceneId = nextScene.id;
+    this.relocateActorEntity(player, nextScene.id);
   }
 
   removePlayer(player) {
@@ -166,6 +173,8 @@ class WorldManager {
     if (scene && scene.players) {
       scene.players = scene.players.filter(p => p.uuid !== player.uuid);
     }
+
+    this.unregisterActor(player);
   }
 
   removePlayerBySocket(socketId) {
@@ -287,6 +296,16 @@ class WorldManager {
     }
 
     const [removed] = scene.npcs.splice(index, 1);
+    if (removed && removed.controller && typeof removed.controller.destroy === 'function') {
+      try {
+        removed.controller.destroy();
+      } catch (error) {
+        console.error('[world] Failed to destroy NPC controller', error);
+      }
+    }
+    if (removed && removed.uuid) {
+      this.unregisterActor(removed);
+    }
     return removed || null;
   }
 
@@ -441,6 +460,7 @@ class WorldManager {
     scene.players = [];
     this.instances.delete(partyId);
     this.scenes.delete(scene.id);
+    this.destroySceneWorld(scene.id);
   }
 
   applyTownMutation(townId, updater) {
@@ -466,6 +486,171 @@ class WorldManager {
     this.scenes.forEach((scene, id) => {
       iterator(scene, id);
     });
+  }
+
+  ensureSceneWorld(sceneId, options = {}) {
+    const id = sceneId || this.defaultTownId;
+    if (!this.sceneWorlds.has(id)) {
+      const worldInstance = createSceneWorld({
+        worldOptions: {
+          context: {
+            sceneId: id,
+            ...options.context,
+          },
+        },
+        systemOptions: options.systemOptions || options,
+      });
+      this.sceneWorlds.set(id, worldInstance);
+    }
+    return this.sceneWorlds.get(id);
+  }
+
+  getSceneWorld(sceneId) {
+    const id = sceneId || this.defaultTownId;
+    return this.sceneWorlds.get(id) || this.ensureSceneWorld(id);
+  }
+
+  destroySceneWorld(sceneId) {
+    const id = sceneId || this.defaultTownId;
+    const worldInstance = this.sceneWorlds.get(id);
+    if (worldInstance && typeof worldInstance.entities === 'object') {
+      const actorIds = Array.from((worldInstance.entities || new Map()).keys());
+      actorIds.forEach((actorId) => {
+        const record = this.entityIndex.get(actorId);
+        if (record && record.actor) {
+          record.actor.entity = null;
+          record.actor.entityId = null;
+        }
+        this.entityIndex.delete(actorId);
+      });
+    }
+    this.sceneWorlds.delete(id);
+  }
+
+  registerActorEntity(actor, options = {}) {
+    if (!actor) {
+      return null;
+    }
+
+    const actorId = actor.uuid || actor.id;
+    if (!actorId) {
+      return null;
+    }
+
+    const sceneId = options.sceneId || actor.sceneId || this.defaultTownId;
+    const sceneWorld = this.getSceneWorld(sceneId);
+    if (!sceneWorld || typeof sceneWorld.createEntity !== 'function') {
+      return null;
+    }
+
+    const existing = this.entityIndex.get(actorId);
+    const entity = existing && existing.entity
+      ? existing.entity
+      : sceneWorld.createEntity(actorId);
+
+    if (!existing) {
+      sceneWorld.addEntity(entity);
+    }
+
+    const components = options.components || actor.__ecsComponents;
+    if (components && typeof components === 'object') {
+      Object.entries(components).forEach(([type, payload]) => {
+        if (!type) {
+          return;
+        }
+        entity.addComponent(type, payload);
+      });
+      if (!actor.__ecsComponents) {
+        actor.__ecsComponents = components;
+      }
+    }
+
+    const record = { entity, world: sceneWorld, sceneId, actor };
+    this.entityIndex.set(actorId, record);
+    actor.entityId = actorId;
+    actor.entity = entity;
+    return record;
+  }
+
+  relocateActorEntity(actor, nextSceneId) {
+    if (!actor) {
+      return null;
+    }
+
+    const actorId = actor.uuid || actor.id;
+    if (!actorId) {
+      return null;
+    }
+
+    const record = this.entityIndex.get(actorId);
+    if (!record) {
+      return this.registerActorEntity(actor, { sceneId: nextSceneId });
+    }
+
+    if (record.sceneId === nextSceneId) {
+      return record;
+    }
+
+    if (record.world && typeof record.world.removeEntity === 'function') {
+      record.world.removeEntity(actorId);
+    }
+
+    this.entityIndex.delete(actorId);
+    return this.registerActorEntity(actor, { sceneId: nextSceneId });
+  }
+
+  unregisterActor(actorOrId) {
+    if (!actorOrId) {
+      return;
+    }
+
+    const actorId = typeof actorOrId === 'string'
+      ? actorOrId
+      : (actorOrId.uuid || actorOrId.id);
+
+    if (!actorId) {
+      return;
+    }
+
+    const record = this.entityIndex.get(actorId);
+    if (!record) {
+      return;
+    }
+
+    if (record.world && typeof record.world.removeEntity === 'function') {
+      record.world.removeEntity(actorId);
+    }
+
+    this.entityIndex.delete(actorId);
+
+    if (typeof actorOrId === 'object' && actorOrId !== null) {
+      actorOrId.entity = null;
+      actorOrId.entityId = null;
+    }
+  }
+
+  getActorEntity(actorOrId) {
+    if (!actorOrId) {
+      return null;
+    }
+
+    const actorId = typeof actorOrId === 'string'
+      ? actorOrId
+      : (actorOrId.uuid || actorOrId.id);
+
+    if (!actorId) {
+      return null;
+    }
+
+    return this.entityIndex.get(actorId) || null;
+  }
+
+  updateSceneWorld(sceneId, delta, context = {}) {
+    const worldInstance = this.getSceneWorld(sceneId);
+    if (!worldInstance || typeof worldInstance.update !== 'function') {
+      return;
+    }
+    worldInstance.update(delta, context);
   }
 }
 

@@ -3,6 +3,8 @@ import UI from '#shared/ui.js';
 import axios from 'axios';
 import config from '#server/config.js';
 import * as emoji from 'node-emoji';
+import Socket from '#server/socket.js';
+import createPlayerAIController from '#server/core/systems/controllers/player-ai-controller.js';
 import world from './world.js';
 import createPlayerCombatController from '#server/core/entities/player/combat-controller.js';
 import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
@@ -15,6 +17,57 @@ import createPlayerMovementHandler, {
 import createPlayerStatsManager, {
   broadcastStats as broadcastPlayerStats,
 } from '#server/core/entities/player/stats-manager.js';
+
+const buildPlayerComponents = (player) => ({
+  identity: {
+    uuid: player.uuid,
+    type: 'player',
+    name: player.username,
+  },
+  transform: {
+    ref: player,
+    sceneId: player.sceneId || world.defaultTownId,
+    x: player.x || 0,
+    y: player.y || 0,
+    facing: player.facing || null,
+    animation: player.animation || null,
+  },
+  'movement-state': {
+    handler: player.movement,
+    actor: player,
+    playerIndex: null,
+  },
+  'movement-intent': {
+    queue: [],
+  },
+  'action-queue': {
+    queue: [],
+  },
+  lifecycle: {
+    state: 'active',
+    dirty: true,
+  },
+  networking: {
+    socketId: player.socket_id,
+    emit: Socket.emit.bind(Socket),
+    broadcast: Socket.broadcast.bind(Socket),
+  },
+  persistence: {
+    save: () => player.update(),
+  },
+  'inventory-manager': {
+    ref: player.inventoryManager,
+    actor: player,
+  },
+  'combat-controller': {
+    ref: player.combatController,
+    actor: player,
+  },
+  'stats-manager': {
+    ref: player.statsManager,
+    actor: player,
+  },
+});
 
 class Player {
   constructor(data, token, socketId) {
@@ -142,6 +195,18 @@ class Player {
       const skill = this.skills[skillName];
       skill.exp = skill.exp > 0 ? skill.exp : 0;
       skill.level = UI.getLevel(skill.exp);
+    });
+
+    this.__ecsComponents = buildPlayerComponents(this);
+    const ecsRecord = world.registerActorEntity(this, {
+      sceneId: this.sceneId,
+      components: this.__ecsComponents,
+    });
+    this.ecs = ecsRecord || null;
+    const ecsWorld = ecsRecord ? ecsRecord.world : world.getSceneWorld(this.sceneId);
+    this.controller = createPlayerAIController(this, {
+      world: ecsWorld,
+      systemOptions: {},
     });
 
     console.log(
