@@ -147,6 +147,34 @@ describe('ContextMenu strategies', () => {
     expect(takeActions[0].type).toBe('item');
   });
 
+  it('returns an empty shop inventory when interacting with an NPC without a shop', () => {
+    player.objectId = 'npc-1';
+    world.shops = [];
+
+    const miscData = {
+      clickedOn: {
+        0: 'gameMap',
+        1: 'inventorySlot',
+        2: 'bankSlot',
+        3: 'shopSlot',
+      },
+      slot: 0,
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const menu = new ContextMenu(player, tile, miscData);
+
+    let inventory;
+    expect(() => {
+      inventory = menu.getShopInventory();
+    }).not.toThrow();
+    expect(inventory).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith('ContextMenu: no shop found for NPC npc-1');
+
+    warnSpy.mockRestore();
+  });
+
   it('generates bank quantity options while on the bank pane', async () => {
     player.currentPane = 'bank';
     player.inventory.slots = [{ slot: 0, id: 3 }];
