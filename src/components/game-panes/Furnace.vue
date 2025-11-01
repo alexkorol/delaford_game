@@ -1,11 +1,16 @@
 <template>
-  <div class="furnaceView">
-    <pane-header text="Furnace" />
-    <p>
+  <PaneCard
+    class="furnace-pane"
+    title="Furnace"
+    aria-label="Furnace panel"
+    dismissible
+    @dismiss="closePane"
+  >
+    <p class="furnace-pane__intro">
       Select the bar you want to smelt
     </p>
     <InventoryGrid
-      class="furnaceGrid"
+      class="furnace-pane__grid"
       :images="game.map.images"
       :columns="gridColumns"
       :rows="gridRows"
@@ -15,15 +20,17 @@
       @item-contextmenu="handleItemContextMenu"
       @item-hover="handleItemHover"
     />
-  </div>
+  </PaneCard>
 </template>
 
 <script setup>
 import { computed } from 'vue';
 
-import InventoryGrid from '../inventory/InventoryGrid.vue';
+import PaneCard from '@/components/ui/panes/PaneCard.vue';
+import InventoryGrid from '@/components/inventory/InventoryGrid.vue';
 import { adaptLegacyGridItem } from '@/core/inventory/legacy-adapter.js';
 import useLegacyGridInteractions from '@/core/inventory/useLegacyGridInteractions.js';
+import bus from '@/core/utilities/bus.js';
 
 const props = defineProps({
   game: {
@@ -73,48 +80,32 @@ const handleItemContextMenu = ({ event, item }) => {
 const handleItemHover = ({ event, item }) => {
   emitContextMenu(event, item.slot, { firstOnly: true });
 };
+
+const closePane = () => {
+  bus.$emit('screen:close');
+};
 </script>
 
 <style lang="scss" scoped>
-@use 'sass:color';
+@use '@/assets/scss/abstracts/tokens' as *;
 
-$color: #706559;
-$background_color: #ededed;
-$default_color: #383838;
-
-p {
-  font-size: .6em;
-  margin: 1em 0;
+.furnace-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  text-align: center;
 }
 
-.furnaceGrid {
+.furnace-pane__intro {
+  margin: 0;
+  font-size: clamp(13px, 1.2vw, 15px);
+  color: rgba(255, 255, 255, 0.78);
+  letter-spacing: 0.04em;
+}
+
+.furnace-pane__grid {
   margin: 0 auto;
   width: fit-content;
-}
-
-.furnaceView {
-  background-color: $color;
-  font-family: "GameFont", serif;
-  border: 5px solid color.adjust($color, $lightness: -10%);
-
-  .header {
-    background: color.adjust($color, $lightness: 10%);
-    height: 30px;
-
-    .close {
-      float: right;
-      width: 30px;
-      box-sizing: border-box;
-      height: 30px;
-      background-color: color.adjust(red, $lightness: -10%);
-      color: white;
-      font-size: 1em;
-      padding: 5px 2px 5px 5px;
-    }
-  }
-
-  .main {
-    padding: .5em;
-  }
+  max-width: 100%;
 }
 </style>
