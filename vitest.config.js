@@ -20,9 +20,12 @@ const resolveEnvironment = () => {
 export default mergeConfig(viteConfig, defineConfig({
   test: {
     environment: resolveEnvironment(),
-    include: ['tests/unit/**/*.spec.js'],
+    include: ['tests/unit/**/*.spec.js', 'tests/server/**/*.spec.js'],
     globals: true,
     setupFiles: ['./tests/unit/setup.js'],
+    environmentMatchGlobs: [
+      ['tests/server/**/*.spec.js', 'node'],
+    ],
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**', 'build/**'],
     coverage: {
       provider: 'v8',
