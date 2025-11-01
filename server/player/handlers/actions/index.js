@@ -185,7 +185,7 @@ export default {
     world.players[playerIndex].inventory.slots = world.players[
       playerIndex
     ].inventory.slots.filter(v => v.slot !== data.data.miscData.slot);
-    Player.broadcastMovement(player);
+    world.requestActorMovementBroadcast(player);
 
     const dropped = ItemFactory.toWorldInstance(itemInventory, {
       x: player.x,

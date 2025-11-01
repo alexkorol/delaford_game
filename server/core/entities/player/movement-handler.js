@@ -4,6 +4,7 @@ import UI from '#shared/ui.js';
 import config from '#server/config.js';
 import playerEvent from '#server/player/handlers/actions/index.js';
 import world from '#server/core/world.js';
+import { markActorStateDirty } from '#server/core/entities/utils/entity-flags.js';
 import {
   DEFAULT_FACING_DIRECTION,
   DEFAULT_ANIMATION_DURATIONS,
@@ -65,20 +66,12 @@ const clearAnimationTimer = (player) => {
   }
 };
 
-export const broadcastMovement = (player, players = null) => {
+export const broadcastMovement = (player, _players = null) => {
   if (!player) {
     return;
   }
 
-  const meta = {};
-  if (player.movementStep) {
-    meta.movementStep = player.movementStep;
-  }
-  if (player.animation) {
-    meta.animation = player.animation;
-  }
-  const recipients = players || world.getScenePlayers(player.sceneId);
-  Socket.broadcast('player:movement', player, recipients, { meta });
+  world.requestActorMovementBroadcast(player);
 };
 
 export const broadcastAnimation = (player, players = null) => {
@@ -176,6 +169,8 @@ const registerMovementStep = (player, step = {}) => {
     blocked: Boolean(step.blocked),
     interrupted: interruption,
   };
+
+  markActorStateDirty(player, { forceBroadcast: true });
 
   return player.movementStep;
 };
