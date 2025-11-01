@@ -176,15 +176,38 @@ export default {
     });
   },
   'player:inventory-drop': (data) => {
-    const itemInventory = data.player.inventory.slots.find(
-      s => s.slot === data.data.miscData.slot,
-    );
+    const payload = data && data.data ? data.data : {};
+    const miscData = payload && typeof payload === 'object' ? payload.miscData : null;
+    const slotReference = miscData && Object.prototype.hasOwnProperty.call(miscData, 'slot')
+      ? miscData.slot
+      : null;
+
+    if (slotReference === null || typeof slotReference === 'undefined') {
+      return;
+    }
 
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+    if (playerIndex === -1) {
+      return;
+    }
+
     const player = world.players[playerIndex];
-    world.players[playerIndex].inventory.slots = world.players[
-      playerIndex
-    ].inventory.slots.filter(v => v.slot !== data.data.miscData.slot);
+    const inventorySlots = player
+      && player.inventory
+      && Array.isArray(player.inventory.slots)
+      ? player.inventory.slots
+      : null;
+
+    if (!inventorySlots) {
+      return;
+    }
+
+    const itemInventory = inventorySlots.find(slot => slot.slot === slotReference);
+    if (!itemInventory) {
+      return;
+    }
+
+    player.inventory.slots = inventorySlots.filter(slot => slot.slot !== slotReference);
     world.requestActorMovementBroadcast(player);
 
     const dropped = ItemFactory.toWorldInstance(itemInventory, {
@@ -197,9 +220,7 @@ export default {
     world.items.push(dropped);
 
     console.log(
-      `Dropping: ${data.item.id} (${itemInventory.qty || 0}) at ${
-        world.players[playerIndex].x
-      }, ${world.players[playerIndex].x}`,
+      `Dropping: ${itemInventory.id} (${itemInventory.qty || 0}) at ${player.x}, ${player.y}`,
     );
 
     Socket.broadcast('world:itemDropped', world.items);
