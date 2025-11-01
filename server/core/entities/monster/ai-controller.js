@@ -1,8 +1,16 @@
-import { createWorld } from '../../systems/ecs/factory.js';
+import { createSceneWorld } from '../../systems/world-factory.js';
 import behaviourRegistry, { resolveBehaviour } from './behaviours/index.js';
 
 const createMonsterAIController = (monster) => {
-  const world = createWorld();
+  const world = createSceneWorld({
+    worldOptions: {
+      context: {
+        actorType: 'monster',
+        sceneId: monster.sceneId || null,
+        controller: 'monster-ai',
+      },
+    },
+  });
   const entity = world.createEntity(monster.uuid);
 
   entity.addComponent('monster', { ref: monster });
