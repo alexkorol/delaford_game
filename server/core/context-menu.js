@@ -313,7 +313,17 @@ class ContextMenu {
       q => q.npcId === this.player.objectId,
     );
 
-    return world.shops[shopIndex].inventory;
+    if (shopIndex === -1) {
+      console.warn(`ContextMenu: no shop found for NPC ${this.player.objectId}`);
+      return [];
+    }
+
+    const shop = world.shops[shopIndex];
+    if (!shop || !Array.isArray(shop.inventory)) {
+      return [];
+    }
+
+    return shop.inventory;
   }
 
   /**
