@@ -45,32 +45,40 @@ export default class Skill {
    *
    * @param {object} getItem The resource we are gathering
    */
-  extractResource(getItem) {
-    const openSlot = UI.getOpenSlot(world.players[this.playerIndex].inventory.slots);
+  async extractResource(getItem) {
+    const player = world.players[this.playerIndex];
+    if (!player || !player.inventory) {
+      return;
+    }
 
-    // Do we have an open slot for the newly-mined resource?
-    if (openSlot === false) {
-      // If not, we let it fall on the ground
+    const addition = await player.inventory.add(getItem.resources, 1);
+
+    if (addition.success) {
+      Socket.emit('core:refresh:inventory', {
+        player: { socket_id: player.socket_id },
+        data: player.inventory.slots,
+      });
+      return;
+    }
+
+    const baseItem = ItemFactory.createById(getItem.id);
+    if (baseItem) {
       const dropped = ItemFactory.toWorldInstance(
-        ItemFactory.createById(getItem.id),
+        baseItem,
         {
-          x: world.players[this.playerIndex].x,
-          y: world.players[this.playerIndex].y,
+          x: Number.isFinite(player.x) ? player.x : 0,
+          y: Number.isFinite(player.y) ? player.y : 0,
         },
         { timestamp: Date.now() },
       );
 
       world.addItem(dropped);
-
       Socket.broadcast('world:itemDropped', world.items);
-    } else {
-      // If so, we add it to our inventory
-      world.players[this.playerIndex].inventory.add(getItem.resources, 1);
-
-      Socket.emit('core:refresh:inventory', {
-        player: { socket_id: world.players[this.playerIndex].socket_id },
-        data: world.players[this.playerIndex].inventory.slots,
-      });
     }
+
+    Socket.sendMessageToPlayer(
+      this.playerIndex,
+      'Your inventory is full. The resource drops to the ground.',
+    );
   }
 }

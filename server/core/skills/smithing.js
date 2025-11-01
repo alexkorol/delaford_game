@@ -1,6 +1,7 @@
 import world from '#server/core/world.js';
 import { smithing, weapons } from '#server/core/data/items/index.js';
 import Socket from '#server/socket.js';
+import ItemFactory from '#server/core/items/factory.js';
 // import Query from '#server/core/data/query.js';
 
 import Skill from './index.js';
@@ -13,6 +14,36 @@ export default class Smithing extends Skill {
     this.type = type; // bar | ore
     this.columnId = 'smithing';
     this.inventory = this.player.inventory.slots;
+  }
+
+  dropItemToGround(itemId, quantity = 1, message = null) {
+    const player = world.players[this.playerIndex];
+    if (!player) {
+      return;
+    }
+
+    const baseItem = ItemFactory.createById(itemId, { quantity });
+    if (!baseItem) {
+      return;
+    }
+
+    const dropLocation = {
+      x: Number.isFinite(player.x) ? player.x : 0,
+      y: Number.isFinite(player.y) ? player.y : 0,
+    };
+
+    const dropped = ItemFactory.toWorldInstance(
+      baseItem,
+      dropLocation,
+      { timestamp: Date.now() },
+    );
+
+    world.items.push(dropped);
+    Socket.broadcast('world:itemDropped', world.items);
+
+    if (message) {
+      Socket.sendMessageToPlayer(this.playerIndex, message);
+    }
   }
 
   static ores() {
@@ -59,7 +90,7 @@ export default class Smithing extends Skill {
     };
   }
 
-  forge(inventory) {
+  async forge(inventory) {
     const itemToForge = Smithing.getItemsToSmith(this.resourceId.id).find(item => this.resourceId.id === item.id);
     const barToTakeAway = itemToForge.item.split('-')[0];
 
@@ -76,11 +107,19 @@ export default class Smithing extends Skill {
       }
 
       world.players[this.playerIndex].inventory.slots = this.inventory;
-      world.players[this.playerIndex].inventory.add(this.resourceId.id, 1);
+      const addition = await world.players[this.playerIndex].inventory.add(this.resourceId.id, 1);
       Socket.sendMessageToPlayer(
         this.playerIndex,
         `You successfully smithed a ${weapons.find(i => i.id === this.resourceId.id).name}.`,
       );
+
+      if (!addition.success) {
+        this.dropItemToGround(
+          this.resourceId.id,
+          1,
+          'Your inventory is full. The item drops to the ground.',
+        );
+      }
 
       Socket.emit('core:refresh:inventory', {
         player: { socket_id: world.players[this.playerIndex].socket_id },
@@ -112,7 +151,7 @@ export default class Smithing extends Skill {
       return true;
     };
 
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       if (hasEnoughOre()) {
         // Let's take away the needed ores from inventory
         const reqs = Object.keys(barToSmelt.requires);
@@ -129,7 +168,7 @@ export default class Smithing extends Skill {
         }
 
         world.players[this.playerIndex].inventory.slots = this.inventory;
-        world.players[this.playerIndex].inventory.add(this.resourceId, 1);
+        const addition = await world.players[this.playerIndex].inventory.add(this.resourceId, 1);
 
         // Tell user of successful resource gathering
         const resource = smithing.find(i => i.id === this.resourceId);
@@ -137,6 +176,14 @@ export default class Smithing extends Skill {
           this.playerIndex,
           `You successfully smelted a ${resource.name}.`,
         );
+
+        if (!addition.success) {
+          this.dropItemToGround(
+            this.resourceId,
+            1,
+            'Your inventory is full. The item drops to the ground.',
+          );
+        }
 
         // Tell client of their new experience in that skill
         Socket.emit('resource:skills:update', {

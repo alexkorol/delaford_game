@@ -303,7 +303,7 @@ export default {
     action.do(incoming.data.data, incoming.data.queueItem);
   },
 
-  'player:resource:smelt:anvil:action': (data) => {
+  'player:resource:smelt:anvil:action': async (data) => {
     // Forge bar to item (weapon/shield/armor)
     // Check for smithing level and return appropriate response
     const playerIndex = world.players.findIndex(
@@ -313,7 +313,7 @@ export default {
 
     const smith = new Smithing(playerIndex, itemClickedOn, 'forge');
     const { player } = data;
-    smith.forge(player.inventory.slots);
+    await smith.forge(player.inventory.slots);
 
     // Update the experience
     smith.updateExperience(itemClickedOn.expGained);
@@ -449,7 +449,7 @@ export default {
     });
   },
 
-  'player:take': (data) => {
+  'player:take': async (data) => {
     const { playerIndex, todo } = data;
     const { id } = Query.getItemData(todo.item.id);
     const itemToTake = world.items.findIndex(
@@ -468,18 +468,28 @@ export default {
 
       // If qty not specified, we are picking up 1 item.
       const quantity = worldItem.qty || 1;
-      world.items.splice(itemToTake, 1);
+      const [removedItem] = world.items.splice(itemToTake, 1);
+
+      const addition = await world.players[playerIndex].inventory.add(id, quantity, {
+        uuid: todo.item.uuid,
+        existingItem: worldItem,
+      });
+
+      if (!addition.success) {
+        world.items.push(removedItem);
+        Socket.broadcast('item:change', world.items);
+        Socket.sendMessageToPlayer(
+          playerIndex,
+          'You do not have enough space in your inventory.',
+        );
+        return;
+      }
 
       Socket.broadcast('item:change', world.items);
 
       console.log(
         `Picking up: ${todo.item.id} (${todo.item.uuid.substr(0, 5)}...)`,
       );
-
-      world.players[playerIndex].inventory.add(id, quantity, {
-        uuid: todo.item.uuid,
-        existingItem: worldItem,
-      });
 
       // Add respawn timer on item (if is a respawn)
       const resetItemIndex = world.respawns.items.findIndex(
@@ -536,7 +546,7 @@ export default {
   /**
    * A player wants to buy or sell an item (and sometimes check its value)
    */
-  'player:screen:npc:trade:action': (data) => {
+  'player:screen:npc:trade:action': async (data) => {
     const quantity = data.item.params ? data.item.params.quantity : 0;
     const shop = new Shop(
       data.player.objectId,
@@ -547,7 +557,7 @@ export default {
     );
 
     // We will be buying or selling an item
-    const response = shop[data.doing]();
+    const response = await shop[data.doing]();
 
     /** UPDATE PLAYER DATA */
     if (Shop.successfulSale(response)) {
@@ -651,7 +661,7 @@ export default {
       );
 
       // Extract resource and either add to inventory or drop it
-      mining.extractResource(rockMined);
+      await mining.extractResource(rockMined);
 
       const player = world.players[data.playerIndex];
       const activeScene = player
