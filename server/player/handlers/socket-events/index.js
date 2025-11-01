@@ -85,10 +85,15 @@ export default {
   'player:move': (data) => {
     const playerIndex = world.players.findIndex(player => player.uuid === data.data.id);
     const player = world.players[playerIndex];
+    if (!player || !player.controller) {
+      return;
+    }
     const startedAt = Date.now();
-    player.move(data.data.direction, { startedAt, direction: data.data.direction });
-
-    Player.broadcastMovement(player);
+    player.controller.enqueueMovement(data.data.direction, {
+      options: { startedAt, direction: data.data.direction },
+      meta: { source: 'socket:player:move' },
+    });
+    player.controller.update(startedAt, { worldRef: world, actor: player });
   },
 
   'player:skill:trigger': (data) => {
@@ -124,9 +129,28 @@ export default {
    */
   'player:queueAction': (data) => {
     const playerIndex = world.players.findIndex(p => p.socket_id === data.player.socket_id);
+    const player = world.players[playerIndex];
+    if (!player) {
+      return;
+    }
 
-    world.players[playerIndex].queue.push(data);
-    world.players[playerIndex].action = data.actionToQueue;
+    const enqueueLegacyAction = () => {
+      player.queue.push({ ...data });
+      player.action = data.actionToQueue;
+      return true;
+    };
+
+    if (player.controller) {
+      player.controller.enqueueAction({
+        type: 'ai',
+        handler: enqueueLegacyAction,
+        meta: { source: 'socket:player:queueAction' },
+      });
+      player.controller.update(Date.now(), { worldRef: world, actor: player });
+      return;
+    }
+
+    enqueueLegacyAction();
   },
 
   'player:pane:close': (data) => {
