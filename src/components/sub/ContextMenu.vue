@@ -30,7 +30,6 @@
 <script>
 import { omit } from 'lodash';
 import bus from '../../core/utilities/bus.js';
-import Socket from '../../core/utilities/socket.js';
 
 export default {
   props: {
@@ -104,37 +103,23 @@ export default {
      */
     async selectAction(event, item) {
       // Data to perform action
-      const tilePayload = this.getTilePayload();
-      const data = {
-        item,
-        tile: tilePayload,
-      };
-
-      // Data for queued action
-      const queueItem = {
-        item: {
-          uuid: item.uuid,
-          id: item.id,
-        },
-        tile: tilePayload,
-        action: item.action,
-        at: item.at || false,
-        coordinates: item.coordinates || false,
-        queueable: item.action.queueable,
-      };
-
-      if (tilePayload.world) {
-        queueItem.world = { ...tilePayload.world };
+      if (!item) {
+        this.closeMenu();
+        window.focusOnGame();
+        return;
       }
 
-      // Tell server to do action
-      Socket.emit('player:context-menu:action', {
-        data,
-        queueItem,
-        player: {
-          socket_id: this.game.player.socket_id,
-        },
-      });
+      const tilePayload = this.getTilePayload();
+      const isWalkAction = item
+        && item.action
+        && (item.action.actionId === 'player:walk-here'
+          || (item.action.name && item.action.name.toLowerCase() === 'walk here'));
+
+      if (this.game && typeof this.game.walkTo === 'function' && isWalkAction) {
+        this.game.walkTo(item, tilePayload);
+      } else if (this.game && typeof this.game.performActionAt === 'function') {
+        this.game.performActionAt(item, tilePayload);
+      }
 
       // Close menu and focus back on game
       this.closeMenu();
@@ -203,15 +188,14 @@ export default {
       );
 
       // Tell server to start building context menu
-      Socket.emit('player:context-menu:build', {
-        miscData,
-        tile: this.getTilePayload(),
-        viewport: this.viewport,
-        center: this.center,
-        player: {
-          socket_id: this.game.player.socket_id,
-        },
-      });
+      if (this.game && typeof this.game.requestContextMenu === 'function') {
+        this.game.requestContextMenu({
+          miscData,
+          tile: this.getTilePayload(),
+          viewport: this.viewport,
+          center: this.center,
+        });
+      }
     },
 
     /**

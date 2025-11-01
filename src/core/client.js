@@ -379,6 +379,199 @@ class Client {
     return this.player;
   }
 
+  getPlayerSocketIdentity() {
+    if (!this.player) {
+      return {};
+    }
+
+    const socketId = this.player.socket_id
+      || this.player.socketId
+      || this.player.uuid
+      || null;
+
+    if (!socketId) {
+      return {};
+    }
+
+    return { socket_id: socketId };
+  }
+
+  normaliseTilePayload(tile = {}) {
+    if (!tile || typeof tile !== 'object') {
+      return {};
+    }
+
+    const payload = {};
+
+    if (Number.isFinite(tile.x)) {
+      payload.x = tile.x;
+    }
+
+    if (Number.isFinite(tile.y)) {
+      payload.y = tile.y;
+    }
+
+    if (tile.world && Number.isFinite(tile.world.x) && Number.isFinite(tile.world.y)) {
+      payload.world = { x: tile.world.x, y: tile.world.y };
+    }
+
+    if (tile.viewport && Number.isFinite(tile.viewport.x) && Number.isFinite(tile.viewport.y)) {
+      payload.viewport = { x: tile.viewport.x, y: tile.viewport.y };
+    }
+
+    if (tile.center && Number.isFinite(tile.center.x) && Number.isFinite(tile.center.y)) {
+      payload.center = { x: tile.center.x, y: tile.center.y };
+    }
+
+    return payload;
+  }
+
+  createQueueItem(actionItem = {}, tile = {}) {
+    const itemMeta = {};
+
+    if (actionItem && typeof actionItem.uuid !== 'undefined') {
+      itemMeta.uuid = actionItem.uuid;
+    }
+
+    if (actionItem && typeof actionItem.id !== 'undefined') {
+      itemMeta.id = actionItem.id;
+    }
+
+    const queueItem = {
+      item: itemMeta,
+      tile: { ...tile },
+      action: actionItem && actionItem.action ? { ...actionItem.action } : {},
+      queueable: Boolean(actionItem && actionItem.action && actionItem.action.queueable),
+    };
+
+    if (actionItem && Object.prototype.hasOwnProperty.call(actionItem, 'at')) {
+      queueItem.at = actionItem.at;
+    } else {
+      queueItem.at = false;
+    }
+
+    if (actionItem && actionItem.coordinates) {
+      queueItem.coordinates = { ...actionItem.coordinates };
+    } else {
+      queueItem.coordinates = false;
+    }
+
+    if (tile && tile.world) {
+      queueItem.world = { ...tile.world };
+    }
+
+    return queueItem;
+  }
+
+  isWalkAction(item = {}) {
+    if (!item || !item.action) {
+      return false;
+    }
+
+    const actionId = typeof item.action.actionId === 'string'
+      ? item.action.actionId.toLowerCase()
+      : '';
+    const actionName = typeof item.action.name === 'string'
+      ? item.action.name.toLowerCase()
+      : '';
+
+    return actionId === 'player:walk-here' || actionName === 'walk here';
+  }
+
+  recordPendingWalk(tile = {}) {
+    const actor = this.getOptimisticActor();
+    if (!actor) {
+      return;
+    }
+
+    const resolved = {};
+    if (tile.world && Number.isFinite(tile.world.x) && Number.isFinite(tile.world.y)) {
+      resolved.x = tile.world.x;
+      resolved.y = tile.world.y;
+    } else if (Number.isFinite(tile.x) && Number.isFinite(tile.y)) {
+      const baseActor = this.player || actor;
+      const center = tile.center && Number.isFinite(tile.center.x) && Number.isFinite(tile.center.y)
+        ? tile.center
+        : null;
+
+      if (center && Number.isFinite(baseActor.x) && Number.isFinite(baseActor.y)) {
+        resolved.x = baseActor.x - center.x + tile.x;
+        resolved.y = baseActor.y - center.y + tile.y;
+      }
+    }
+
+    if (Number.isFinite(resolved.x) && Number.isFinite(resolved.y)) {
+      actor.optimisticTarget = { x: resolved.x, y: resolved.y };
+    }
+
+    actor.lastMouseCommandAt = now();
+  }
+
+  requestContextMenu(options = {}) {
+    if (!this.player) {
+      return false;
+    }
+
+    const tile = this.normaliseTilePayload(options.tile || {});
+    const payload = {
+      miscData: options.miscData || {},
+      tile,
+      player: this.getPlayerSocketIdentity(),
+    };
+
+    if (options.viewport && Number.isFinite(options.viewport.x) && Number.isFinite(options.viewport.y)) {
+      payload.viewport = { x: options.viewport.x, y: options.viewport.y };
+    }
+
+    if (options.center && Number.isFinite(options.center.x) && Number.isFinite(options.center.y)) {
+      payload.center = { x: options.center.x, y: options.center.y };
+    }
+
+    Socket.emit('player:context-menu:build', payload);
+    return true;
+  }
+
+  performActionAt(actionItem, tilePayload = {}, options = {}) {
+    if (!this.player || !actionItem) {
+      return false;
+    }
+
+    const tile = this.normaliseTilePayload(tilePayload);
+    const queueItem = options.queueItem || this.createQueueItem(actionItem, tile);
+
+    const payload = {
+      data: {
+        item: actionItem,
+        tile,
+      },
+      queueItem,
+      player: this.getPlayerSocketIdentity(),
+    };
+
+    Socket.emit('player:context-menu:action', payload);
+
+    if (options.expectWalk || this.isWalkAction(actionItem)) {
+      this.recordPendingWalk(tile);
+    }
+
+    if (queueItem && queueItem.queueable) {
+      const actor = this.getOptimisticActor();
+      if (actor) {
+        actor.pendingQueuedAction = {
+          issuedAt: now(),
+          actionId: queueItem.action && queueItem.action.actionId,
+          tile: queueItem.tile ? { ...queueItem.tile } : null,
+        };
+      }
+    }
+
+    return true;
+  }
+
+  walkTo(actionItem, tilePayload = {}, options = {}) {
+    return this.performActionAt(actionItem, tilePayload, { ...options, expectWalk: true });
+  }
+
   move(direction, options = {}) {
     if (!direction || !this.player) {
       return;
