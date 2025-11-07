@@ -20,7 +20,7 @@ const resolveEnvironment = () => {
 export default mergeConfig(viteConfig, defineConfig({
   test: {
     environment: resolveEnvironment(),
-    include: ['tests/unit/**/*.spec.js', 'tests/server/**/*.spec.js'],
+    include: ['tests/unit/**/*.spec.{js,ts}', 'tests/server/**/*.spec.js'],
     globals: true,
     setupFiles: ['./tests/unit/setup.js'],
     environmentMatchGlobs: [
