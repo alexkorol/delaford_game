@@ -20,7 +20,7 @@ export const MONSTERS = [
       defense: 6,
       speed: 1.2,
     },
-    abilityIds: ['cleaving-strike'],
+    abilityIds: ['poison-cloud'],
     lootTable: [
       { itemId: 'iron-longblade', chance: 0.05 },
       { itemId: 'spell-healing-mist', chance: 0.12 },
@@ -46,7 +46,7 @@ export const MONSTERS = [
       defense: 8,
       speed: 1.6,
     },
-    abilityIds: ['arcane-bolt'],
+    abilityIds: ['fireball'],
     lootTable: [
       { itemId: 'apprentice-focus', chance: 0.08 },
       { itemId: 'spell-fireball', chance: 0.18 },

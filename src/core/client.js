@@ -17,7 +17,8 @@ import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
 import { createCharacterState, syncShortcuts } from '@shared/stats/index.js';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
-import { hydrateMonsters } from './config/combat/index.js';
+import { hydrateMonsters, getAbilityDefinition } from './config/combat/index.js';
+import AbilityManager, { ensureCombatState } from './ability-manager.js';
 
 import Map from './map.js';
 
@@ -106,12 +107,20 @@ class Client {
     });
 
     syncShortcuts(statsState, playerData);
+    ensureCombatState(playerData);
 
     this.player = playerData;
     this.players = [];
     this.droppedItems = data.droppedItems;
     this.npcs = data.npcs;
     this.monsters = hydrateMonsters(data.monsters || []);
+    this.monsters.forEach((monster) => ensureCombatState(monster));
+    this.abilityManager = new AbilityManager({
+      resolveAbility: getAbilityDefinition,
+      bus,
+    });
+    this.abilityManager.registerEntity(this.player);
+    this.monsters.forEach((monster) => this.abilityManager.registerEntity(monster));
     this.sceneId = (data.scene && data.scene.id) || data.sceneId || null;
     this.sceneMetadata = data.scene && data.scene.metadata ? data.scene.metadata : {};
     this.cachedImages = null;
@@ -140,6 +149,7 @@ class Client {
 
     this.map = new Map(data, images);
     this.monsters = this.map.monsters;
+    this.syncCombatants();
     return 200;
   }
 
@@ -173,7 +183,9 @@ class Client {
     this.map.setPlayer(this.player);
     this.map.setNPCs(this.npcs);
     this.map.setMonsters(this.monsters);
+    this.monsters = this.map.monsters;
     this.map.setDroppedItems(this.droppedItems);
+    this.syncCombatants();
   }
 
   async loadScene(scenePayload, playerState = {}) {
@@ -198,6 +210,7 @@ class Client {
     this.droppedItems = scenePayload.droppedItems || [];
     this.npcs = scenePayload.npcs || [];
     this.monsters = hydrateMonsters(scenePayload.monsters || []);
+    this.monsters.forEach((monster) => ensureCombatState(monster));
 
     if (!this.player.movement) {
       this.player.movement = new MovementController().initialise(this.player.x, this.player.y);
@@ -225,6 +238,7 @@ class Client {
     this.background = scenePayload.map.background;
     this.foreground = scenePayload.map.foreground;
     this.monsters = this.map.monsters;
+    this.syncCombatants();
   }
 
   /**
@@ -704,6 +718,30 @@ class Client {
       }, delay);
     } else if (!controller.isMoving()) {
       this.setLocalIdle(actor.optimisticFacing || this.getFacingDirection(actor));
+    }
+  }
+
+  update(deltaSeconds) {
+    if (this.abilityManager) {
+      this.abilityManager.update(deltaSeconds);
+    }
+  }
+
+  syncCombatants() {
+    if (!this.abilityManager) {
+      return;
+    }
+
+    if (this.player) {
+      ensureCombatState(this.player);
+      this.abilityManager.registerEntity(this.player);
+    }
+
+    if (Array.isArray(this.monsters)) {
+      this.monsters.forEach((monster) => {
+        ensureCombatState(monster);
+        this.abilityManager.registerEntity(monster);
+      });
     }
   }
 

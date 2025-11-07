@@ -16,7 +16,7 @@ export const WEAPONS = [
     attackSpeed: 1800,
     weight: 6,
     twoHanded: false,
-    abilityIds: ['cleaving-strike'],
+    abilityIds: ['melee-combo'],
     graphics: {
       tileset: 'weapons',
       column: 1,
@@ -36,7 +36,7 @@ export const WEAPONS = [
     attackSpeed: 2200,
     weight: 4,
     range: 6,
-    abilityIds: ['pinning-shot'],
+    abilityIds: ['poison-cloud'],
     graphics: {
       tileset: 'weapons',
       column: 7,
@@ -55,7 +55,7 @@ export const WEAPONS = [
     damageRange: [8, 14],
     attackSpeed: 1600,
     weight: 2,
-    abilityIds: ['arcane-bolt', 'vital-surge'],
+    abilityIds: ['fireball', 'poison-cloud'],
     graphics: {
       tileset: 'weapons',
       column: 10,
