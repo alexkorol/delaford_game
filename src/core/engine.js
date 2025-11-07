@@ -52,6 +52,14 @@ class Engine {
 
     this.sampleFps(deltaMs);
 
+    if (this.game) {
+      if (typeof this.game.update === 'function') {
+        this.game.update(deltaSeconds);
+      } else if (this.game.abilityManager && typeof this.game.abilityManager.update === 'function') {
+        this.game.abilityManager.update(deltaSeconds);
+      }
+    }
+
     // Paint the map
     this.paintCanvas(deltaSeconds);
 

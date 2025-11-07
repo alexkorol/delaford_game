@@ -15,7 +15,7 @@ export const SPELLS = [
     cooldown: 8000,
     resourceCost: { mana: 30 },
     range: 7,
-    abilityIds: ['arcane-bolt'],
+    abilityIds: ['fireball'],
     effects: [
       {
         id: 'fireball-impact',
@@ -51,7 +51,7 @@ export const SPELLS = [
     cooldown: 12000,
     resourceCost: { mana: 35 },
     range: 5,
-    abilityIds: ['vital-surge'],
+    abilityIds: ['poison-cloud'],
     effects: [
       {
         id: 'healing-mist-heal',

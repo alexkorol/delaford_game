@@ -2,6 +2,7 @@ import ABILITIES from './abilities.js';
 import MONSTERS from './monsters.js';
 import SPELLS from './spells.js';
 import WEAPONS from './weapons.js';
+import { buildCombatState, applyCombatState } from '../../utilities/combat-state.js';
 
 /** @typedef {import('./schema.js').AbilityDefinition} AbilityDefinition */
 /** @typedef {import('./schema.js').MonsterDefinition} MonsterDefinition */
@@ -118,7 +119,7 @@ export const hydrateMonster = (monster) => {
     .map((abilityId) => abilityMap.get(abilityId))
     .filter((ability) => ability);
 
-  return {
+  const hydrated = {
     ...(base ? { ...base } : {}),
     ...monster,
     abilityIds,
@@ -137,6 +138,11 @@ export const hydrateMonster = (monster) => {
         ? base.lootTable.map((entry) => ({ ...entry }))
         : [],
   };
+
+  const combatState = buildCombatState(hydrated, hydrated.stats || {});
+  applyCombatState(hydrated, combatState);
+
+  return hydrated;
 };
 
 export const hydrateMonsters = (monsters = []) => monsters.map((monster) => hydrateMonster(monster));

@@ -9,6 +9,7 @@ import SpriteAnimator from './utilities/sprite-animator.js';
 import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { now } from './config/movement.js';
 import { getItemDefinition, hydrateMonsters } from './config/combat/index.js';
+import { mergeCombatState, applyCombatState } from './utilities/combat-state.js';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
@@ -243,6 +244,11 @@ class Map {
       animationController: animator,
     };
 
+    if ((existing && existing.combatState) || player.combatState) {
+      const mergedCombat = mergeCombatState(existing && existing.combatState, player.combatState);
+      applyCombatState(this.player, mergedCombat);
+    }
+
     this.ensureAnimation(this.player);
   }
 
@@ -398,6 +404,11 @@ class Map {
         movement: controller,
         animationController: animator,
       };
+
+      if ((previous && previous.combatState) || monster.combatState) {
+        const mergedCombat = mergeCombatState(previous && previous.combatState, monster.combatState);
+        applyCombatState(updated, mergedCombat);
+      }
 
       const animationState = animationLookup.has(key)
         ? animationLookup.get(key)
