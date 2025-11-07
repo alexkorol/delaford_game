@@ -1,3 +1,4 @@
+import { getSkillDefinition } from '@shared/skills/index.js';
 import bus from './utilities/bus.js';
 import {
   buildCombatState,
@@ -108,6 +109,28 @@ const cloneEffectDescriptor = (abilityId, effect, overrides = {}) => {
   };
 };
 
+const createAbilityFromSkill = (skill) => {
+  if (!skill) {
+    return null;
+  }
+
+  const cooldownFromSkill = Number.isFinite(skill.cooldown) ? skill.cooldown * 1000 : 0;
+  const cooldownFromModifiers = Number.isFinite(skill.modifiers?.globalCooldownMs)
+    ? skill.modifiers.globalCooldownMs
+    : 0;
+
+  return {
+    id: skill.id,
+    name: skill.name || skill.label || skill.id,
+    description: skill.description || '',
+    category: skill.category || 'active',
+    cooldown: Math.max(0, cooldownFromSkill, cooldownFromModifiers),
+    resourceCost: clone(skill.resourceCost || {}),
+    effects: [],
+    tags: Array.isArray(skill.tags) ? [...skill.tags] : [],
+  };
+};
+
 class AbilityManager {
   constructor(options = {}) {
     const abilityResolver = options.resolveAbility;
@@ -121,15 +144,17 @@ class AbilityManager {
     this.tickAccumulatorMs = 0;
 
     this.abilityLookup = ensureAbilityMap(abilityCollection);
-    this.resolveAbility = typeof abilityResolver === 'function'
+    this.baseResolveAbility = typeof abilityResolver === 'function'
       ? abilityResolver
       : (id) => this.abilityLookup.get(id) || null;
+    this.fallbackAbilityCache = new Map();
 
     this.defaultCooldownMs = Math.max(0, normaliseNumber(options.defaultCooldownMs, 0));
   }
 
   registerAbilityCollection(collection) {
     this.abilityLookup = ensureAbilityMap(collection);
+    this.fallbackAbilityCache.clear();
   }
 
   registerEntity(entity) {
@@ -167,22 +192,96 @@ class AbilityManager {
     this.entities.delete(entityId);
   }
 
-  queueAbility(casterId, abilityId, payload = {}) {
-    const resolvedCasterId = resolveEntityId(casterId);
+  resolveAbilityDefinition(abilityId) {
     const resolvedAbilityId = resolveAbilityId(abilityId);
+    if (!resolvedAbilityId) {
+      return null;
+    }
 
-    if (!resolvedCasterId || !resolvedAbilityId) {
-      return false;
+    const direct = this.baseResolveAbility(resolvedAbilityId);
+    if (direct) {
+      return direct;
+    }
+
+    if (this.fallbackAbilityCache.has(resolvedAbilityId)) {
+      return this.fallbackAbilityCache.get(resolvedAbilityId);
+    }
+
+    const skill = getSkillDefinition(resolvedAbilityId);
+    if (!skill) {
+      return null;
+    }
+
+    const ability = createAbilityFromSkill(skill);
+    this.fallbackAbilityCache.set(resolvedAbilityId, ability);
+    return ability;
+  }
+
+  resolveEntityRecord(entity) {
+    const id = resolveEntityId(entity);
+    if (!id) {
+      return null;
+    }
+    return this.entities.get(id) || null;
+  }
+
+  evaluateAbility(casterId, abilityId) {
+    const record = this.resolveEntityRecord(casterId);
+    if (!record) {
+      return { allowed: false, reason: 'unknown-caster', record: null, ability: null };
+    }
+
+    const ability = this.resolveAbilityDefinition(abilityId);
+    if (!ability) {
+      return { allowed: false, reason: 'unknown-ability', record, ability: null };
+    }
+
+    if (this.isAbilityOnCooldown(record, ability.id)) {
+      return { allowed: false, reason: 'cooldown', record, ability };
+    }
+
+    if (!this.canPayResourceCosts(record, ability)) {
+      return { allowed: false, reason: 'resources', record, ability };
+    }
+
+    return { allowed: true, reason: null, record, ability };
+  }
+
+  enqueueAbility(record, ability, payload = {}) {
+    if (!record || !ability) {
+      return;
     }
 
     this.queue.push({
-      casterId: resolvedCasterId,
-      abilityId: resolvedAbilityId,
+      casterId: record.id,
+      abilityId: ability.id,
       payload: { ...payload },
       enqueuedAt: Date.now(),
     });
+  }
 
-    return true;
+  tryQueueAbility(casterId, abilityId, payload = {}) {
+    const evaluation = this.evaluateAbility(casterId, abilityId);
+    if (!evaluation.allowed) {
+      return {
+        queued: false,
+        reason: evaluation.reason,
+        ability: evaluation.ability,
+        caster: evaluation.record ? evaluation.record.entity : null,
+      };
+    }
+
+    this.enqueueAbility(evaluation.record, evaluation.ability, payload);
+    return {
+      queued: true,
+      reason: null,
+      ability: evaluation.ability,
+      caster: evaluation.record.entity,
+    };
+  }
+
+  queueAbility(casterId, abilityId, payload = {}) {
+    return this.tryQueueAbility(casterId, abilityId, payload).queued;
   }
 
   canPayResourceCosts(record, ability) {
@@ -262,7 +361,7 @@ class AbilityManager {
         return;
       }
 
-      const ability = this.resolveAbility(entry.abilityId);
+      const ability = this.resolveAbilityDefinition(entry.abilityId);
       if (!ability || this.isAbilityOnCooldown(record, ability.id)) {
         return;
       }

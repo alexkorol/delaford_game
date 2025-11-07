@@ -1,58 +1,32 @@
+import { DEFAULT_INPUT_LAYOUTS, normaliseInputLayout } from '../input/input-layout.js';
+
+const DEFAULT_LAYOUT = normaliseInputLayout(DEFAULT_INPUT_LAYOUTS['keyboard-wasd-mouse']);
+
 export const MOVEMENT_BINDINGS = {
-  up: ['w', 'arrowup'],
-  down: ['s', 'arrowdown'],
-  left: ['a', 'arrowleft'],
-  right: ['d', 'arrowright'],
+  up: [...DEFAULT_LAYOUT.movement.up],
+  down: [...DEFAULT_LAYOUT.movement.down],
+  left: [...DEFAULT_LAYOUT.movement.left],
+  right: [...DEFAULT_LAYOUT.movement.right],
 };
 
-export const DIAGONAL_BINDINGS = [
-  ['up', 'right', 'up-right'],
-  ['down', 'right', 'down-right'],
-  ['up', 'left', 'up-left'],
-  ['down', 'left', 'down-left'],
-];
+export const DIAGONAL_BINDINGS = DEFAULT_LAYOUT.diagonals.map((entry) => [...entry]);
 
-export const SKILL_BINDINGS = [
-  {
-    id: 'primary-attack',
-    keys: [' '],
-    type: 'press',
-  },
-  {
-    id: 'dash',
-    keys: ['shift'],
-    type: 'press',
-  },
-  {
-    id: 'ability-1',
-    keys: ['q'],
-    type: 'press',
-  },
-  {
-    id: 'ability-2',
-    keys: ['e'],
-    type: 'press',
-  },
-  {
-    id: 'ability-3',
-    keys: ['r'],
-    type: 'press',
-  },
-  {
-    id: 'ability-4',
-    keys: ['f'],
-    type: 'press',
-  },
-];
+export const SKILL_BINDINGS = DEFAULT_LAYOUT.actions
+  .filter((action) => action.actionType === 'ability')
+  .map((action) => ({
+    id: action.abilityId || action.id,
+    keys: [...(action.inputs.keys || [])],
+    type: action.trigger,
+  }));
 
-export const MOVEMENT_REPEAT = {
-  initialDelayMs: 150,
-  repeatDelayMs: 110,
-};
+export const MOVEMENT_REPEAT = { ...DEFAULT_LAYOUT.repeat };
+
+export const DEFAULT_INPUT_SCHEMES = DEFAULT_INPUT_LAYOUTS;
 
 export default {
   MOVEMENT_BINDINGS,
   DIAGONAL_BINDINGS,
   SKILL_BINDINGS,
   MOVEMENT_REPEAT,
+  DEFAULT_INPUT_SCHEMES,
 };

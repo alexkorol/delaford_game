@@ -1,132 +1,162 @@
-import {
-  MOVEMENT_BINDINGS,
-  DIAGONAL_BINDINGS,
-  SKILL_BINDINGS,
-  MOVEMENT_REPEAT,
-} from '../config/controls.js';
+import InputMapper from '../input/input-mapper.js';
+import { DEFAULT_INPUT_LAYOUTS } from '../input/input-layout.js';
 
-const NORMALISED_SPECIAL_KEYS = {
-  space: ' ',
-  spacebar: ' ',
+const DEFAULT_LAYOUT_ID = 'keyboard-wasd-mouse';
+
+const resolveLayoutOption = (options = {}) => {
+  if (options.layoutJson) {
+    return options.layoutJson;
+  }
+
+  if (options.layoutId && DEFAULT_INPUT_LAYOUTS[options.layoutId]) {
+    return DEFAULT_INPUT_LAYOUTS[options.layoutId];
+  }
+
+  if (options.layout) {
+    return options.layout;
+  }
+
+  return null;
 };
-
-const MOVEMENT_KEYS = new Set(
-  Object.values(MOVEMENT_BINDINGS)
-    .reduce((acc, keys) => acc.concat(keys), [])
-    .map((key) => key.toLowerCase()),
-);
-
-const SKILL_KEY_LOOKUP = SKILL_BINDINGS.reduce((acc, binding) => {
-  binding.keys.forEach((key) => {
-    acc.set(key.toLowerCase(), binding);
-  });
-  return acc;
-}, new Map());
 
 class InputController {
   constructor(options = {}) {
-    this.onMove = options.onMove || null;
-    this.onStop = options.onStop || null;
-    this.onSkill = options.onSkill || null;
+    this.onMove = typeof options.onMove === 'function' ? options.onMove : null;
+    this.onStop = typeof options.onStop === 'function' ? options.onStop : null;
+    this.onSkill = typeof options.onSkill === 'function' ? options.onSkill : null;
+    this.onAction = typeof options.onAction === 'function' ? options.onAction : null;
 
-    this.pressedKeys = new Set();
+    const layoutDescriptor = resolveLayoutOption(options);
+    this.mapper = new InputMapper(layoutDescriptor || DEFAULT_INPUT_LAYOUTS[DEFAULT_LAYOUT_ID]);
+
     this.activeDirection = null;
+    this.lastMovementSource = 'keyboard';
     this.repeatTimeout = null;
     this.repeatInterval = null;
   }
 
   destroy() {
     this.clearRepeat();
-    this.pressedKeys.clear();
+    if (this.mapper && typeof this.mapper.destroy === 'function') {
+      this.mapper.destroy();
+    }
+    this.activeDirection = null;
+    this.lastMovementSource = 'keyboard';
   }
 
-  normaliseKey(rawKey) {
-    if (!rawKey) {
-      return '';
+  setLayout(layout) {
+    if (!this.mapper) {
+      this.mapper = new InputMapper(layout || DEFAULT_INPUT_LAYOUTS[DEFAULT_LAYOUT_ID]);
+      return;
     }
-    const lower = rawKey.toLowerCase();
-    if (NORMALISED_SPECIAL_KEYS[lower] !== undefined) {
-      return NORMALISED_SPECIAL_KEYS[lower];
+    this.mapper.applyLayout(layout);
+    this.resetMovementState();
+  }
+
+  setLayoutById(layoutId) {
+    if (DEFAULT_INPUT_LAYOUTS[layoutId]) {
+      this.setLayout(DEFAULT_INPUT_LAYOUTS[layoutId]);
     }
-    return lower;
+  }
+
+  loadLayoutFromJSON(layoutJson) {
+    this.setLayout(layoutJson);
+  }
+
+  getActiveLayout() {
+    return this.mapper ? this.mapper.layout : null;
   }
 
   handleKeyDown(event) {
-    const key = this.normaliseKey(event.key);
-    if (!key) {
+    if (!this.mapper) {
       return false;
     }
 
-    if (this.isMovementKey(key)) {
-      if (!this.pressedKeys.has(key)) {
-        this.pressedKeys.add(key);
-        this.updateMovement(true);
-      }
-      return true;
-    }
-
-    const binding = this.getSkillBinding(key);
-    if (binding) {
-      if (event && event.repeat) {
-        return true;
-      }
-      this.triggerSkill(binding, 'start', event);
-      return true;
-    }
-
-    return false;
+    const result = this.mapper.handleKeyboardEvent('down', event.key, { repeat: Boolean(event?.repeat) });
+    return this.applyMapperResult(result, event);
   }
 
   handleKeyUp(event) {
-    const key = this.normaliseKey(event.key);
-    if (!key) {
+    if (!this.mapper) {
       return false;
     }
 
-    let handled = false;
-    if (this.pressedKeys.has(key)) {
-      this.pressedKeys.delete(key);
-      this.updateMovement(false);
+    const result = this.mapper.handleKeyboardEvent('up', event.key, { repeat: Boolean(event?.repeat) });
+    return this.applyMapperResult(result, event);
+  }
+
+  handleButtonDown(button, options = {}) {
+    if (!this.mapper) {
+      return false;
+    }
+
+    const result = this.mapper.handleButtonEvent('down', button, options);
+    return this.applyMapperResult(result, options.event || null);
+  }
+
+  handleButtonUp(button, options = {}) {
+    if (!this.mapper) {
+      return false;
+    }
+
+    const result = this.mapper.handleButtonEvent('up', button, options);
+    return this.applyMapperResult(result, options.event || null);
+  }
+
+  handleAnalogMove(vector = {}, options = {}) {
+    if (!this.mapper) {
+      return false;
+    }
+
+    const result = this.mapper.handleAnalogEvent(vector, options);
+    return this.applyMapperResult(result, options.event || null);
+  }
+
+  applyMapperResult(result, originalEvent) {
+    if (!result) {
+      return false;
+    }
+
+    let handled = Boolean(result.handled);
+
+    if (result.movementChanged) {
+      this.applyMovement(result.movementDirection, {
+        source: result.movementSource,
+      });
+      handled = true;
+    } else if (result.movementDirection && result.movementDirection === this.activeDirection) {
+      this.ensureRepeat();
+    } else if (!result.movementDirection && this.activeDirection && result.eventType === 'down') {
+      this.applyMovement(null, { source: result.movementSource });
       handled = true;
     }
 
-    const binding = this.getSkillBinding(key);
-    if (binding && binding.type === 'hold') {
-      this.triggerSkill(binding, 'end', event);
-      handled = true;
-    }
-
-    if (binding && binding.type !== 'hold') {
+    if (Array.isArray(result.actions) && result.actions.length) {
+      result.actions.forEach((action) => {
+        this.dispatchAction(action, originalEvent);
+      });
       handled = true;
     }
 
     return handled;
   }
 
-  isMovementKey(key) {
-    return MOVEMENT_KEYS.has(key);
-  }
-
-  getSkillBinding(key) {
-    return SKILL_KEY_LOOKUP.get(key) || null;
-  }
-
-  updateMovement(initialTrigger = false) {
-    const direction = this.computeDirection();
-
+  applyMovement(direction, meta = {}) {
     if (!direction) {
       if (this.activeDirection && typeof this.onStop === 'function') {
-        this.onStop(this.activeDirection);
+        this.onStop(this.activeDirection, { source: this.lastMovementSource });
       }
       this.activeDirection = null;
+      this.lastMovementSource = meta.source || this.lastMovementSource || 'keyboard';
       this.clearRepeat();
       return;
     }
 
-    if (direction !== this.activeDirection || initialTrigger) {
+    if (direction !== this.activeDirection) {
       this.activeDirection = direction;
+      this.lastMovementSource = meta.source || this.lastMovementSource || 'keyboard';
       if (typeof this.onMove === 'function') {
-        this.onMove(direction, { initial: true });
+        this.onMove(direction, { initial: true, source: this.lastMovementSource });
       }
       this.restartRepeat();
       return;
@@ -135,40 +165,30 @@ class InputController {
     this.ensureRepeat();
   }
 
-  computeDirection() {
-    const has = (keys) => keys.some((key) => this.pressedKeys.has(key));
-
-    const up = has(MOVEMENT_BINDINGS.up);
-    const down = has(MOVEMENT_BINDINGS.down);
-    const left = has(MOVEMENT_BINDINGS.left);
-    const right = has(MOVEMENT_BINDINGS.right);
-
-    if ((up && down) || (left && right)) {
-      return null;
+  dispatchAction(action, event) {
+    if (!action) {
+      return;
     }
 
-    for (let i = 0; i < DIAGONAL_BINDINGS.length; i += 1) {
-      const [vertical, horizontal, diagonal] = DIAGONAL_BINDINGS[i];
-      if (vertical === 'up' && horizontal === 'right' && up && right) {
-        return diagonal;
+    if (action.type === 'ability' && action.abilityId) {
+      if (typeof this.onSkill === 'function') {
+        this.onSkill({
+          skillId: action.abilityId,
+          abilityId: action.abilityId,
+          phase: action.phase || 'start',
+          trigger: action.trigger,
+          source: action.source,
+          input: action.inputId,
+          repeat: action.repeat,
+          event,
+        });
       }
-      if (vertical === 'down' && horizontal === 'right' && down && right) {
-        return diagonal;
-      }
-      if (vertical === 'up' && horizontal === 'left' && up && left) {
-        return diagonal;
-      }
-      if (vertical === 'down' && horizontal === 'left' && down && left) {
-        return diagonal;
-      }
+      return;
     }
 
-    if (up) return 'up';
-    if (down) return 'down';
-    if (left) return 'left';
-    if (right) return 'right';
-
-    return null;
+    if (typeof this.onAction === 'function') {
+      this.onAction({ ...action }, event);
+    }
   }
 
   restartRepeat() {
@@ -177,23 +197,33 @@ class InputController {
       return;
     }
 
+    const repeat = this.mapper ? this.mapper.getMovementRepeat() : { initialDelayMs: 150, repeatDelayMs: 110 };
+    const initialDelay = Math.max(0, Number(repeat.initialDelayMs) || 0);
+    const repeatDelay = Math.max(0, Number(repeat.repeatDelayMs) || 0);
+
     this.repeatTimeout = setTimeout(() => {
       if (!this.activeDirection) {
         return;
       }
+
       if (typeof this.onMove === 'function') {
-        this.onMove(this.activeDirection, { repeated: true });
+        this.onMove(this.activeDirection, { repeated: true, source: this.lastMovementSource });
       }
+
+      if (repeatDelay <= 0) {
+        return;
+      }
+
       this.repeatInterval = setInterval(() => {
         if (!this.activeDirection) {
           this.clearRepeat();
           return;
         }
         if (typeof this.onMove === 'function') {
-          this.onMove(this.activeDirection, { repeated: true });
+          this.onMove(this.activeDirection, { repeated: true, source: this.lastMovementSource });
         }
-      }, MOVEMENT_REPEAT.repeatDelayMs);
-    }, MOVEMENT_REPEAT.initialDelayMs);
+      }, repeatDelay);
+    }, initialDelay);
   }
 
   ensureRepeat() {
@@ -208,28 +238,17 @@ class InputController {
       clearTimeout(this.repeatTimeout);
       this.repeatTimeout = null;
     }
+
     if (this.repeatInterval !== null) {
       clearInterval(this.repeatInterval);
       this.repeatInterval = null;
     }
   }
 
-  triggerSkill(binding, phase, event) {
-    if (!binding) {
-      return;
-    }
-
-    if (binding.type !== 'hold' && phase !== 'start') {
-      return;
-    }
-
-    if (typeof this.onSkill === 'function') {
-      this.onSkill({
-        skillId: binding.id,
-        phase,
-        event,
-      });
-    }
+  resetMovementState() {
+    this.clearRepeat();
+    this.activeDirection = null;
+    this.lastMovementSource = 'keyboard';
   }
 }
 

@@ -41,6 +41,7 @@ import ClientUI from '../core/utilities/client-ui.js';
 import bus from '../core/utilities/bus.js';
 import Socket from '../core/utilities/socket.js';
 import InputController from '../core/utilities/input-controller.js';
+import { DEFAULT_INPUT_LAYOUTS, parseInputLayout } from '../core/input/input-layout.js';
 
 export default {
   name: 'Game',
@@ -116,10 +117,36 @@ export default {
       }
 
       this.inputController = new InputController({
+        layout: this.resolveInputLayout(),
         onMove: (direction) => this.onMoveIntent(direction),
         onStop: () => this.onMoveStop(),
         onSkill: (payload) => this.onSkillIntent(payload),
       });
+    },
+    resolveInputLayout() {
+      const defaultLayout = DEFAULT_INPUT_LAYOUTS['keyboard-wasd-mouse'];
+
+      let storedLayout = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const saved = window.localStorage.getItem('delaford.inputLayout');
+          if (saved) {
+            storedLayout = parseInputLayout(saved);
+          }
+        } catch (_error) {
+          // Ignore storage access errors and fall back to defaults.
+        }
+      }
+
+      if (!storedLayout && this.game && this.game.inputLayout) {
+        storedLayout = parseInputLayout(this.game.inputLayout);
+      }
+
+      if (!storedLayout && this.game && this.game.config && this.game.config.inputLayout) {
+        storedLayout = parseInputLayout(this.game.config.inputLayout);
+      }
+
+      return storedLayout || defaultLayout;
     },
     onMoveIntent(direction) {
       if (!direction) {
@@ -399,13 +426,35 @@ export default {
           ? this.game.getFacingDirection()
           : (this.game.player.animation && this.game.player.animation.direction) || 'down');
 
-      const payload = {
-        id: this.game.player.uuid,
-        skillId,
+      const abilityPayload = {
         direction: facing,
         issuedAt: Date.now(),
         modifiers: options.modifiers || {},
         phase: options.phase || 'start',
+      };
+
+      if (this.game.abilityManager) {
+        const manager = this.game.abilityManager;
+        if (typeof manager.tryQueueAbility === 'function') {
+          const result = manager.tryQueueAbility(this.game.player, skillId, abilityPayload);
+          if (!result.queued && result.reason !== 'unknown-ability' && result.reason !== 'unknown-caster') {
+            return;
+          }
+        } else if (typeof manager.queueAbility === 'function') {
+          const queued = manager.queueAbility(this.game.player, skillId, abilityPayload);
+          if (!queued) {
+            return;
+          }
+        }
+      }
+
+      const payload = {
+        id: this.game.player.uuid,
+        skillId,
+        direction: facing,
+        issuedAt: abilityPayload.issuedAt,
+        modifiers: abilityPayload.modifiers,
+        phase: abilityPayload.phase,
       };
 
       Socket.emit('player:skill:trigger', payload);
