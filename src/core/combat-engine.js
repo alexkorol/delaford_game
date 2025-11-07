@@ -1,5 +1,6 @@
 import bus from './utilities/bus.js';
-import { getMonsterDefinition } from './config/combat/index.js';
+import { getMonsterDefinition, getAbilityDefinition } from './config/combat/index.js';
+import { createMonsterBehavior } from './ai/monster-behavior.js';
 
 const DEFAULT_TICK_INTERVAL = 1000;
 const DEFAULT_RESISTANCE_VALUE = 0.25;
@@ -160,6 +161,48 @@ const computeHitChance = (attack, defense) => {
   return Math.min(0.95, Math.max(0.05, Math.round(ratio * 1000) / 1000));
 };
 
+const createLogger = (label = 'CombatEngine') => {
+  if (typeof console === 'undefined') {
+    return null;
+  }
+
+  const prefix = `[${label}]`;
+
+  return {
+    log: (...args) => {
+      if (typeof console.debug === 'function') {
+        console.debug(prefix, ...args);
+        return;
+      }
+      if (typeof console.log === 'function') {
+        console.log(prefix, ...args);
+      }
+    },
+    warn: (...args) => {
+      if (typeof console.warn === 'function') {
+        console.warn(prefix, ...args);
+        return;
+      }
+      if (typeof console.log === 'function') {
+        console.log(prefix, ...args);
+      }
+    },
+    error: (...args) => {
+      if (typeof console.error === 'function') {
+        console.error(prefix, ...args);
+        return;
+      }
+      if (typeof console.warn === 'function') {
+        console.warn(prefix, ...args);
+        return;
+      }
+      if (typeof console.log === 'function') {
+        console.log(prefix, ...args);
+      }
+    },
+  };
+};
+
 class CombatEngine {
   constructor(options = {}) {
     this.options = {
@@ -172,6 +215,26 @@ class CombatEngine {
     this.bus = options.bus || bus;
     this.entities = new Map();
     this.effects = new Map();
+    this.behaviors = new Map();
+
+    this.resolveAbilityDefinition = typeof options.resolveAbility === 'function'
+      ? options.resolveAbility
+      : (id) => getAbilityDefinition(id);
+
+    this.behaviorFactory = typeof options.behaviorFactory === 'function'
+      ? options.behaviorFactory
+      : (behaviorId, behaviorOptions = {}) => createMonsterBehavior(behaviorId, {
+        resolveAbility: this.resolveAbilityDefinition,
+        random: this.random,
+        ...behaviorOptions,
+      });
+
+    this.logger = options.logger || createLogger('CombatEngineAI');
+    this.enableBehaviorLogs = Boolean(options.enableBehaviorLogs);
+
+    this.defaultAttackCooldownMs = Math.max(300, normaliseNumber(options.defaultAttackCooldownMs, 1200));
+    this.defaultMoveCooldownMs = Math.max(200, normaliseNumber(options.defaultMoveCooldownMs, 600));
+    this.defaultCastCooldownMs = Math.max(400, normaliseNumber(options.defaultCastCooldownMs, 1500));
   }
 
   registerEntity(entity) {
@@ -187,6 +250,12 @@ class CombatEngine {
     const stats = buildBaseStats(base, entity);
     const health = createHealthState(entity, base?.stats || {});
     const resistances = createResistanceProfile(base, entity, this.options);
+    const abilityIds = Array.isArray(entity.abilityIds)
+      ? entity.abilityIds.filter((id) => typeof id === 'string')
+      : Array.isArray(base?.abilityIds)
+        ? base.abilityIds.filter((id) => typeof id === 'string')
+        : [];
+    const behaviorId = entity.behavior || base?.behavior || null;
 
     const record = {
       id: entity.id,
@@ -198,9 +267,14 @@ class CombatEngine {
       health,
       state: entity.state || 'alive',
       metadata: clone(entity.metadata || {}),
+      abilityIds,
+      behavior: behaviorId,
     };
 
     this.entities.set(record.id, record);
+    if (record.kind === 'monster' && behaviorId) {
+      this.attachBehavior(record, { behaviorId, definition: base });
+    }
     this.emitEntityUpdate(record);
     return this.getEntity(record.id);
   }
@@ -211,6 +285,7 @@ class CombatEngine {
     }
 
     this.entities.delete(entityId);
+    this.behaviors.delete(entityId);
     [...this.effects.values()].forEach((instance) => {
       if (instance.targetId === entityId || instance.sourceId === entityId) {
         this.effects.delete(instance.instanceId);
@@ -235,11 +310,59 @@ class CombatEngine {
       health: clone(entity.health),
       state: entity.state,
       metadata: clone(entity.metadata),
+      abilityIds: Array.isArray(entity.abilityIds) ? [...entity.abilityIds] : [],
+      behavior: entity.behavior || null,
     };
   }
 
   listEntities() {
     return [...this.entities.keys()].map((id) => this.getEntity(id));
+  }
+
+  getOpponents(entityId) {
+    const source = this.entities.get(entityId);
+    if (!source) {
+      return [];
+    }
+
+    return [...this.entities.values()]
+      .filter((entry) => entry.id !== entityId && entry.state !== 'dead' && entry.kind !== source.kind)
+      .map((entry) => this.getEntity(entry.id));
+  }
+
+  attachBehavior(record, context = {}) {
+    if (!record || typeof this.behaviorFactory !== 'function') {
+      return null;
+    }
+
+    const behaviorId = context.behaviorId || record.behavior;
+    if (!behaviorId) {
+      return null;
+    }
+
+    try {
+      const controller = this.behaviorFactory(behaviorId, {
+        entityId: record.id,
+        definition: context.definition || null,
+      });
+
+      if (!controller || typeof controller.update !== 'function') {
+        return null;
+      }
+
+      this.behaviors.set(record.id, controller);
+
+      if (this.enableBehaviorLogs && this.logger?.log) {
+        this.logger.log(`Attached behavior '${behaviorId}' to entity '${record.id}'`);
+      }
+
+      return controller;
+    } catch (error) {
+      if (this.logger?.error) {
+        this.logger.error('Failed to attach behavior', behaviorId, error);
+      }
+      return null;
+    }
   }
 
   listActiveEffects(targetId = null) {
@@ -546,7 +669,7 @@ class CombatEngine {
     }
   }
 
-  advanceTime(deltaMs) {
+  advanceTime(deltaMs, context = {}) {
     if (!Number.isFinite(deltaMs) || deltaMs <= 0) {
       return [];
     }
@@ -572,7 +695,224 @@ class CombatEngine {
       this.handleEffectExpiry(instance);
     });
 
+    this.processBehaviors(deltaMs, context);
+
     return expired.map((instance) => ({ ...instance }));
+  }
+
+  processBehaviors(deltaMs, context = {}) {
+    if (!this.behaviors.size) {
+      return;
+    }
+
+    this.behaviors.forEach((controller, entityId) => {
+      const record = this.entities.get(entityId);
+      if (!record || record.state === 'dead' || !controller || typeof controller.update !== 'function') {
+        return;
+      }
+
+      try {
+        const action = controller.update({
+          deltaMs,
+          entity: this.getEntity(entityId),
+          context,
+          engine: this,
+          getOpponents: () => this.getOpponents(entityId),
+          resolveAbility: this.resolveAbilityDefinition,
+          random: this.random,
+        });
+
+        if (!action) {
+          return;
+        }
+
+        this.applyBehaviorAction(record, action, controller);
+      } catch (error) {
+        if (this.logger?.error) {
+          this.logger.error('AI behavior update failed', entityId, error);
+        }
+
+        this.emitEvent({
+          kind: 'ai-error',
+          entityId,
+          message: error?.message || 'behavior-update-failed',
+        });
+      }
+    });
+  }
+
+  applyBehaviorAction(record, action, controller) {
+    if (!record || !action) {
+      return;
+    }
+
+    const resolution = { success: false };
+
+    switch (action.type) {
+    case 'attack': {
+      if (!action.targetId) {
+        resolution.reason = 'invalid-target';
+        resolution.cooldownMs = this.defaultAttackCooldownMs;
+        break;
+      }
+
+      const baseDamage = Number.isFinite(action.baseDamage)
+        ? action.baseDamage
+        : this.getEffectiveStat(record, 'attack');
+
+      const result = this.performAttack({
+        attackerId: record.id,
+        defenderId: action.targetId,
+        damageType: action.damageType || 'physical',
+        baseDamage,
+      });
+
+      resolution.success = Boolean(result.hit);
+      resolution.targetId = action.targetId;
+      resolution.cooldownMs = Number.isFinite(action.cooldownMs)
+        ? action.cooldownMs
+        : this.defaultAttackCooldownMs;
+
+      this.emitEvent({
+        kind: 'ai-action',
+        action: 'attack',
+        sourceId: record.id,
+        targetId: action.targetId,
+        result,
+        reason: action.reason || null,
+      });
+      break;
+    }
+    case 'cast': {
+      const castResult = this.executeAbilityAction(record, action);
+      resolution.success = castResult.success;
+      resolution.targetId = castResult.targetId || action.targetId || null;
+      resolution.cooldownMs = Number.isFinite(action.cooldownMs)
+        ? action.cooldownMs
+        : (Number.isFinite(castResult.cooldownMs)
+          ? castResult.cooldownMs
+          : this.defaultCastCooldownMs);
+      resolution.abilityCooldownMs = Number.isFinite(action.abilityCooldownMs)
+        ? action.abilityCooldownMs
+        : castResult.abilityCooldownMs;
+      break;
+    }
+    case 'move': {
+      record.metadata = record.metadata || {};
+      record.metadata.intent = {
+        type: 'move',
+        targetId: action.targetId || null,
+        destination: action.destination || null,
+        reason: action.reason || null,
+        distance: Number.isFinite(action.distance) ? action.distance : null,
+        timestamp: Date.now(),
+      };
+
+      resolution.success = true;
+      resolution.targetId = action.targetId || null;
+      resolution.cooldownMs = Number.isFinite(action.cooldownMs)
+        ? action.cooldownMs
+        : this.defaultMoveCooldownMs;
+
+      this.emitEntityUpdate(record);
+      this.emitEvent({
+        kind: 'ai-action',
+        action: 'move',
+        sourceId: record.id,
+        targetId: action.targetId || null,
+        destination: action.destination || null,
+        reason: action.reason || null,
+        distance: Number.isFinite(action.distance) ? action.distance : null,
+      });
+      break;
+    }
+    default:
+      return;
+    }
+
+    if (controller && typeof controller.onActionResolved === 'function') {
+      controller.onActionResolved(action, resolution);
+    }
+  }
+
+  executeAbilityAction(record, action) {
+    const abilityId = action?.abilityId;
+    if (!abilityId) {
+      return { success: false, reason: 'missing-ability' };
+    }
+
+    const ability = this.resolveAbilityDefinition(abilityId);
+    if (!ability) {
+      if (this.logger?.warn) {
+        this.logger.warn(`Unknown ability '${abilityId}' used by ${record.id}`);
+      }
+      return { success: false, reason: 'unknown-ability' };
+    }
+
+    const targetId = action.targetId || record.id;
+    const target = this.entities.get(targetId);
+    if (!target || target.state === 'dead') {
+      return { success: false, reason: 'invalid-target' };
+    }
+
+    const effects = Array.isArray(ability.effects) ? ability.effects : [];
+    effects.forEach((effect) => {
+      const descriptor = this.normaliseAbilityEffect(ability, effect, action);
+      if (!descriptor) {
+        return;
+      }
+
+      this.applyEffect({
+        effect: descriptor,
+        sourceId: record.id,
+        targetId,
+        stacking: descriptor.stacking || action.stacking || 'refresh',
+        tickInterval: descriptor.tickInterval,
+      });
+    });
+
+    this.emitEvent({
+      kind: 'ai-action',
+      action: 'cast',
+      sourceId: record.id,
+      targetId,
+      abilityId: ability.id,
+      abilityName: ability.name,
+      reason: action.reason || null,
+    });
+
+    const cooldown = Number.isFinite(ability.cooldown) ? ability.cooldown : this.defaultCastCooldownMs;
+
+    return {
+      success: true,
+      ability,
+      targetId,
+      cooldownMs: cooldown,
+      abilityCooldownMs: cooldown,
+    };
+  }
+
+  normaliseAbilityEffect(ability, effect, action = {}) {
+    if (!ability || !effect) {
+      return null;
+    }
+
+    const magnitude = resolveResistanceValue(effect.magnitude ?? effect.amount, 0);
+    const duration = resolveResistanceValue(effect.duration ?? effect.durationMs, 0);
+    const tickInterval = resolveResistanceValue(
+      effect.tickInterval ?? effect.tickIntervalMs ?? (duration > 0 ? DEFAULT_TICK_INTERVAL : 0),
+      duration > 0 ? DEFAULT_TICK_INTERVAL : 0,
+    );
+
+    return {
+      id: `${ability.id}:${effect.id || effect.type}`,
+      type: effect.type || 'generic',
+      magnitude,
+      duration,
+      damageType: effect.damageType,
+      tickInterval: duration > 0 ? Math.max(250, tickInterval) : 0,
+      stacking: effect.stacking || action.stacking || 'refresh',
+    };
   }
 
   resolveEffectTick(instance) {
@@ -663,6 +1003,9 @@ class CombatEngine {
         health: clone(entity.health),
         resistances: new Map(entity.resistances),
         state: entity.state,
+        abilityIds: Array.isArray(entity.abilityIds) ? [...entity.abilityIds] : [],
+        metadata: clone(entity.metadata),
+        behavior: entity.behavior || null,
       },
     });
   }
