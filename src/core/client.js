@@ -17,6 +17,7 @@ import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { DEFAULT_FACING_DIRECTION } from '@shared/combat.js';
 import { createCharacterState, syncShortcuts } from '@shared/stats/index.js';
 import { DEFAULT_MOVE_DURATION_MS, now } from './config/movement.js';
+import { hydrateMonsters } from './config/combat/index.js';
 
 import Map from './map.js';
 
@@ -110,7 +111,7 @@ class Client {
     this.players = [];
     this.droppedItems = data.droppedItems;
     this.npcs = data.npcs;
-    this.monsters = data.monsters || [];
+    this.monsters = hydrateMonsters(data.monsters || []);
     this.sceneId = (data.scene && data.scene.id) || data.sceneId || null;
     this.sceneMetadata = data.scene && data.scene.metadata ? data.scene.metadata : {};
     this.cachedImages = null;
@@ -196,7 +197,7 @@ class Client {
 
     this.droppedItems = scenePayload.droppedItems || [];
     this.npcs = scenePayload.npcs || [];
-    this.monsters = scenePayload.monsters || [];
+    this.monsters = hydrateMonsters(scenePayload.monsters || []);
 
     if (!this.player.movement) {
       this.player.movement = new MovementController().initialise(this.player.x, this.player.y);

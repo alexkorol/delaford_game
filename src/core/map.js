@@ -8,6 +8,7 @@ import MovementController, { centerOfTile } from './utilities/movement-controlle
 import SpriteAnimator from './utilities/sprite-animator.js';
 import { PLAYER_SPRITE_CONFIG } from './config/animation.js';
 import { now } from './config/movement.js';
+import { getItemDefinition, hydrateMonsters } from './config/combat/index.js';
 
 const INITIAL_VIEWPORT = {
   x: config.map.viewport.x,
@@ -340,6 +341,8 @@ class Map {
         .filter((entry) => entry !== null),
     );
 
+    const incoming = hydrateMonsters(monsters || []);
+
     const movementEntries = Array.isArray(meta.movements) ? meta.movements : [];
     const movementLookup = new window.Map(
       movementEntries
@@ -366,7 +369,7 @@ class Map {
         .filter((entry) => entry !== null),
     );
 
-    this.monsters = (monsters || []).map((monster) => {
+    this.monsters = incoming.map((monster) => {
       const key = monster && (monster.uuid || monster.id);
       const previous = key ? existing.get(key) : null;
       const controller = previous && previous.movement
@@ -747,7 +750,10 @@ class Map {
       const screenPosition = this.worldToScreen(topLeft, metrics);
 
       // Get item information and get proper quantity index for graphic
-      const info = UI.getItemData(item.id);
+      const info = getItemDefinition(item.id) || UI.getItemData(item.id);
+      if (!info || !info.graphics) {
+        return;
+      }
       let qtyIndex = 0;
       if (item.qty > 1 && info.graphics.quantityLevel) {
         const qLevels = info.graphics.quantityLevel;

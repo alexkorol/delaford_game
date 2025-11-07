@@ -1,4 +1,5 @@
 import UI from '@shared/ui.js';
+import { getItemDefinition } from '../config/combat/index.js';
 
 const ensureSlot = (item, fallbackSlot) => {
   if (item && typeof item.slot === 'number') {
@@ -47,7 +48,7 @@ export const adaptLegacyGridItem = (source, slotIndex, options = {}) => {
   const slot = typeof options.slot === 'number' ? options.slot : ensureSlot(source, slotIndex);
   const itemId = options.id || source?.id || source;
   const qty = typeof options.qty === 'number' ? options.qty : (typeof source?.qty === 'number' ? source.qty : 1);
-  const itemData = itemId ? UI.getItemData(itemId) : null;
+  const itemData = itemId ? (getItemDefinition(itemId) || UI.getItemData(itemId)) : null;
   const graphicsSource = options.graphics || source?.graphics || itemData?.graphics || {};
 
   const graphics = cloneGraphics(graphicsSource, qty);
