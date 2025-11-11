@@ -97,6 +97,24 @@ const defaultPaneAssignments = {
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
 const DEFAULT_CHAT_AUTOHIDE_SECONDS = 8;
 
+const getInitialMapDimensions = (mapConfig = {}) => {
+  const tileWidth = mapConfig?.tileset?.tile?.width || 0;
+  const tileHeight = mapConfig?.tileset?.tile?.height || 0;
+  const viewportX = mapConfig?.viewport?.x || 0;
+  const viewportY = mapConfig?.viewport?.y || 0;
+
+  const width = tileWidth * viewportX;
+  const height = tileHeight * viewportY;
+
+  return {
+    width,
+    height,
+    displayWidth: width,
+    displayHeight: height,
+    scale: 1,
+  };
+};
+
 export default {
   name: 'Delaford',
   components: {
@@ -129,13 +147,7 @@ export default {
       partyLoading: { active: false, state: null },
       partyStatusMessage: '',
       partyStatusTimeout: null,
-      worldDimensions: {
-        width: (config.map?.tileset?.tile?.width || 32) * (config.map?.viewport?.x || 16),
-        height: (config.map?.tileset?.tile?.height || 32) * (config.map?.viewport?.y || 10),
-        scale: 1,
-        displayWidth: ((config.map?.tileset?.tile?.width || 32) * (config.map?.viewport?.x || 16)),
-        displayHeight: ((config.map?.tileset?.tile?.height || 32) * (config.map?.viewport?.y || 10)),
-      },
+      mapDimensions: getInitialMapDimensions(config.map),
     };
   },
   computed: {
@@ -266,13 +278,22 @@ export default {
       };
     },
     worldShellStyle() {
-      const fallbackWidth = (this.config.map?.tileset?.tile?.width || 32) * (this.config.map?.viewport?.x || 16);
-      const fallbackHeight = (this.config.map?.tileset?.tile?.height || 32) * (this.config.map?.viewport?.y || 10);
-      const width = this.worldDimensions?.width || fallbackWidth;
-      const height = this.worldDimensions?.height || fallbackHeight;
-      const scale = this.worldDimensions?.scale || 1;
-      const displayWidth = this.worldDimensions?.displayWidth || (width * scale);
-      const displayHeight = this.worldDimensions?.displayHeight || (height * scale);
+      const mapInstance = this.game && this.game.map ? this.game.map : null;
+      const runtimeConfig = mapInstance && mapInstance.config
+        ? mapInstance.config.map
+        : this.config.map;
+      const fallbackDimensions = getInitialMapDimensions(runtimeConfig);
+      const resolvedDimensions = {
+        ...fallbackDimensions,
+        ...this.mapDimensions,
+      };
+      const width = resolvedDimensions.width || fallbackDimensions.width || 1;
+      const height = resolvedDimensions.height || fallbackDimensions.height || 1;
+      const scale = typeof resolvedDimensions.scale === 'number'
+        ? resolvedDimensions.scale
+        : (mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1);
+      const displayWidth = resolvedDimensions.displayWidth || (width * scale);
+      const displayHeight = resolvedDimensions.displayHeight || (height * scale);
       return {
         '--map-aspect-ratio': `${width} / ${height}`,
         '--world-internal-width': `${width}px`,
@@ -281,6 +302,7 @@ export default {
         '--world-display-height': `${displayHeight}px`,
         '--map-display-width': `${displayWidth}px`,
         '--map-display-height': `${displayHeight}px`,
+        '--world-display-scale': `${scale}`,
       };
     },
   },
@@ -443,7 +465,7 @@ export default {
       this.game = { exit: true };
       this.layout.activePane = null;
       this.resetChatState();
-      this.updateWorldDimensions();
+      this.handleMapDimensions();
       this.party = null;
       this.partyInvites = [];
       this.partyLoading = { active: false, state: null };
@@ -462,7 +484,7 @@ export default {
       this.screen = 'main';
       this.layout.activePane = null;
       this.resetChatState();
-      this.updateWorldDimensions();
+      this.handleMapDimensions();
     },
 
     resetChatState() {
@@ -1146,7 +1168,7 @@ export default {
 
       await this.game.buildMap();
       this.game.monsters = this.game.map.monsters;
-      this.updateWorldDimensions();
+      this.syncMapDimensionsFromGame();
 
       // Start game engine
       const engine = new Engine(this.game);
@@ -1191,52 +1213,54 @@ export default {
         this.openPane(pane);
       }
     },
-    updateWorldDimensions(dimensions = null) {
-      const overrides = dimensions || {};
-      const mapInstance = this.game && this.game.map ? this.game.map : null;
-      const configSource = mapInstance && mapInstance.config && mapInstance.config.map
-        ? mapInstance.config.map
-        : this.config.map;
-      const tileConfig = configSource?.tileset?.tile || { width: 32, height: 32 };
-      const viewportConfig = configSource?.viewport || { x: 16, y: 10 };
-      const defaultWidth = (tileConfig.width || 0) * (viewportConfig.x || 0);
-      const defaultHeight = (tileConfig.height || 0) * (viewportConfig.y || 0);
-
-      const width = Number.isFinite(overrides.width)
-        ? overrides.width
-        : (defaultWidth || ((this.config.map?.tileset?.tile?.width || 32) * (this.config.map?.viewport?.x || 16)));
-
-      const height = Number.isFinite(overrides.height)
-        ? overrides.height
-        : (defaultHeight || ((this.config.map?.tileset?.tile?.height || 32) * (this.config.map?.viewport?.y || 10)));
-
-      const scaleFromMap = mapInstance && typeof mapInstance.scale === 'number'
-        ? mapInstance.scale
-        : this.worldDimensions.scale || 1;
-
-      const scale = Number.isFinite(overrides.scale) ? overrides.scale : scaleFromMap;
-
-      const displayWidth = Number.isFinite(overrides.displayWidth)
-        ? overrides.displayWidth
-        : width * scale;
-
-      const displayHeight = Number.isFinite(overrides.displayHeight)
-        ? overrides.displayHeight
-        : height * scale;
-
-      this.worldDimensions = {
-        width,
-        height,
-        scale,
-        displayWidth,
-        displayHeight,
-      };
-    },
-    handleMapDimensions(dimensions) {
+    handleMapDimensions(dimensions = null) {
       if (!dimensions) {
+        this.mapDimensions = getInitialMapDimensions(this.config.map);
         return;
       }
-      this.updateWorldDimensions(dimensions);
+      this.syncMapDimensionsFromPayload(dimensions);
+    },
+    syncMapDimensionsFromPayload(dimensions = {}) {
+      const fallback = getInitialMapDimensions(this.config.map);
+      const width = Number.isFinite(dimensions.width) ? dimensions.width : fallback.width;
+      const height = Number.isFinite(dimensions.height) ? dimensions.height : fallback.height;
+      const scale = Number.isFinite(dimensions.scale) ? dimensions.scale : fallback.scale;
+      const displayWidth = Number.isFinite(dimensions.displayWidth)
+        ? dimensions.displayWidth
+        : width * scale;
+      const displayHeight = Number.isFinite(dimensions.displayHeight)
+        ? dimensions.displayHeight
+        : height * scale;
+
+      this.mapDimensions = {
+        width,
+        height,
+        displayWidth,
+        displayHeight,
+        scale,
+      };
+    },
+    syncMapDimensionsFromGame() {
+      const mapInstance = this.game && this.game.map ? this.game.map : null;
+      if (!mapInstance || !mapInstance.config || !mapInstance.config.map) {
+        this.handleMapDimensions();
+        return;
+      }
+
+      const mapConfig = mapInstance.config.map;
+      const tile = mapConfig?.tileset?.tile || { width: 32, height: 32 };
+      const viewport = mapConfig?.viewport || { x: 16, y: 10 };
+      const width = (tile.width || 0) * (viewport.x || 0);
+      const height = (tile.height || 0) * (viewport.y || 0);
+      const scale = typeof mapInstance.scale === 'number' ? mapInstance.scale : 1;
+
+      this.syncMapDimensionsFromPayload({
+        width,
+        height,
+        displayWidth: width * scale,
+        displayHeight: height * scale,
+        scale,
+      });
     },
   },
 };
