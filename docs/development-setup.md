@@ -58,6 +58,16 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
 - `npm run preview` - Serve the production build locally for smoke testing.
 - `npm run dev:server` - Run the Express/WebSocket backend with nodemon reloading.
 
+## Game UI layout guardrails
+
+The new Delaford shell layers several responsive systems on top of the map renderer. Keep these rules in mind when tweaking layout components:
+
+1. **Canvas dimensions are real pixels.** `GameCanvas.vue` sets both the `<canvas>` attributes and the `--map-native-*` CSS vars from the active map config. If you stretch the canvas with CSS without updating the attributes, you will reintroduce sprite flicker/blur.
+2. **`GameContainer` owns the stage grid.** The `game-container__world-shell` grid exposes `--world-*` custom props (width, height, aspect ratio) that downstream components consume. Add new overlays/HUD pieces inside this grid so they inherit the same sizing.
+3. **PaneHost breakpoints are only `desktop`, `tablet`, `mobile`.** Desktop (≥1200px) shows both left/right panes, tablets collapse to two columns, and mobile stacks everything. When editing breakpoints, verify that inventory/stats remain reachable on intermediate widths.
+4. **Chat and HUD share the stage width.** Any change to chat placement must preserve `width: min(var(--world-display-width), 100%)` so the chat rail never drifts over the map.
+5. **Verification checklist.** After layout changes run `npm run dev`, open the client at 1440px, 1024px, and 768px widths, and walk around for ~30 seconds to ensure the player sprite no longer flickers or clips behind UI layers.
+
 ## Troubleshooting Tips
 
 - After switching Node versions, remove `node_modules` and run `npm install` to refresh native bindings.

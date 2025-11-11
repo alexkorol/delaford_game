@@ -279,6 +279,8 @@ export default {
         '--world-internal-height': `${height}px`,
         '--world-display-width': `${displayWidth}px`,
         '--world-display-height': `${displayHeight}px`,
+        '--map-display-width': `${displayWidth}px`,
+        '--map-display-height': `${displayHeight}px`,
       };
     },
   },

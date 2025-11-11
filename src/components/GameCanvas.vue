@@ -1,5 +1,8 @@
 <template>
-  <div class="game">
+  <div
+    class="game"
+    :style="canvasStyle"
+  >
     <div
       class="first-action"
       v-html="action"
@@ -19,8 +22,8 @@
       id="game-map"
       tabindex="0"
       class="main-canvas gameMap"
-      height="352"
-      width="512"
+      :height="canvasDimensions.height"
+      :width="canvasDimensions.width"
       @mouseenter="onGame = true"
       @mouseleave="onGame = false"
       @mousemove="mouseSelection"
@@ -66,6 +69,24 @@ export default {
   },
   computed: {
     ...mapStores(useUiStore),
+    canvasDimensions() {
+      const tile = this.resolveTileDimensions();
+      const viewport = this.resolveViewportDimensions();
+      const width = (tile.width || 0) * (viewport.x || 0);
+      const height = (tile.height || 0) * (viewport.y || 0);
+
+      return {
+        width: Number.isFinite(width) && width > 0 ? width : 512,
+        height: Number.isFinite(height) && height > 0 ? height : 352,
+      };
+    },
+    canvasStyle() {
+      const { width, height } = this.canvasDimensions;
+      return {
+        '--map-native-width': `${width}px`,
+        '--map-native-height': `${height}px`,
+      };
+    },
     getPaneDimensions() {
       switch (this.current) {
       default:
@@ -112,6 +133,29 @@ export default {
     }
   },
   methods: {
+    resolveTileDimensions() {
+      const fallback = (config && config.map && config.map.tileset && config.map.tileset.tile) || {};
+      const runtime = this.game
+        && this.game.map
+        && this.game.map.config
+        && this.game.map.config.map
+        && this.game.map.config.map.tileset
+        && this.game.map.config.map.tileset.tile;
+      const width = (runtime && runtime.width) || fallback.width || 32;
+      const height = (runtime && runtime.height) || fallback.height || 32;
+      return { width, height };
+    },
+    resolveViewportDimensions() {
+      const fallback = (config && config.map && config.map.viewport) || {};
+      const runtime = this.game
+        && this.game.map
+        && this.game.map.config
+        && this.game.map.config.map
+        && this.game.map.config.map.viewport;
+      const x = (runtime && runtime.x) || fallback.x || 16;
+      const y = (runtime && runtime.y) || fallback.y || 10;
+      return { x, y };
+    },
     initialiseInputController() {
       if (this.inputController) {
         this.inputController.destroy();
@@ -429,10 +473,10 @@ export default {
 div.game {
   position: relative;
   display: block;
-  width: var(--map-display-width, var(--world-display-width, var(--map-native-width, auto)));
-  min-width: var(--map-display-width, var(--world-display-width, var(--map-native-width, auto)));
-  height: var(--map-display-height, var(--world-display-height, var(--map-native-height, auto)));
-  min-height: var(--map-display-height, var(--world-display-height, var(--map-native-height, auto)));
+  width: min(100%, var(--map-display-width, var(--world-display-width, var(--map-native-width, auto))));
+  min-width: min(100%, var(--map-display-width, var(--world-display-width, var(--map-native-width, auto))));
+  height: min(100%, var(--map-display-height, var(--world-display-height, var(--map-native-height, auto))));
+  min-height: min(100%, var(--map-display-height, var(--world-display-height, var(--map-native-height, auto))));
   max-width: none;
   max-height: none;
   background: transparent;
