@@ -85,6 +85,8 @@ export default {
       return {
         '--map-native-width': `${width}px`,
         '--map-native-height': `${height}px`,
+        '--map-display-width': `${width}px`,
+        '--map-display-height': `${height}px`,
       };
     },
     getPaneDimensions() {

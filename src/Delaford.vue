@@ -103,14 +103,17 @@ const getInitialMapDimensions = (mapConfig = {}) => {
   const viewportX = mapConfig?.viewport?.x || 0;
   const viewportY = mapConfig?.viewport?.y || 0;
 
-  const width = tileWidth * viewportX;
-  const height = tileHeight * viewportY;
+  const computedWidth = tileWidth * viewportX;
+  const computedHeight = tileHeight * viewportY;
+
+  const fallbackWidth = computedWidth > 0 ? computedWidth : 512;
+  const fallbackHeight = computedHeight > 0 ? computedHeight : 352;
 
   return {
-    width,
-    height,
-    displayWidth: width,
-    displayHeight: height,
+    width: fallbackWidth,
+    height: fallbackHeight,
+    displayWidth: fallbackWidth,
+    displayHeight: fallbackHeight,
     scale: 1,
   };
 };
@@ -1222,13 +1225,13 @@ export default {
     },
     syncMapDimensionsFromPayload(dimensions = {}) {
       const fallback = getInitialMapDimensions(this.config.map);
-      const width = Number.isFinite(dimensions.width) ? dimensions.width : fallback.width;
-      const height = Number.isFinite(dimensions.height) ? dimensions.height : fallback.height;
-      const scale = Number.isFinite(dimensions.scale) ? dimensions.scale : fallback.scale;
-      const displayWidth = Number.isFinite(dimensions.displayWidth)
+      const width = Number.isFinite(dimensions.width) && dimensions.width > 0 ? dimensions.width : fallback.width;
+      const height = Number.isFinite(dimensions.height) && dimensions.height > 0 ? dimensions.height : fallback.height;
+      const scale = Number.isFinite(dimensions.scale) && dimensions.scale > 0 ? dimensions.scale : fallback.scale;
+      const displayWidth = Number.isFinite(dimensions.displayWidth) && dimensions.displayWidth > 0
         ? dimensions.displayWidth
         : width * scale;
-      const displayHeight = Number.isFinite(dimensions.displayHeight)
+      const displayHeight = Number.isFinite(dimensions.displayHeight) && dimensions.displayHeight > 0
         ? dimensions.displayHeight
         : height * scale;
 
@@ -1252,7 +1255,7 @@ export default {
       const viewport = mapConfig?.viewport || { x: 16, y: 10 };
       const width = (tile.width || 0) * (viewport.x || 0);
       const height = (tile.height || 0) * (viewport.y || 0);
-      const scale = typeof mapInstance.scale === 'number' ? mapInstance.scale : 1;
+      const scale = typeof mapInstance.scale === 'number' && mapInstance.scale > 0 ? mapInstance.scale : 1;
 
       this.syncMapDimensionsFromPayload({
         width,

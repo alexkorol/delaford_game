@@ -21,27 +21,31 @@
         >
           <div class="game-container__stage-shell">
             <GameCanvas ref="canvasRef" :game="game" />
+            <PartyPanel
+              v-if="playerId"
+              class="game-container__party"
+              :player-id="playerId"
+              :party="party"
+              :invites="partyInvites"
+              :loading="partyLoading"
+              :status-message="partyStatusMessage"
+              @create="$emit('party-create')"
+              @leave="$emit('party-leave')"
+              @toggle-ready="$emit('party-toggle-ready')"
+              @start-instance="$emit('party-start-instance')"
+              @return-to-town="$emit('party-return-to-town')"
+              @invite="$emit('party-invite', $event)"
+              @accept-invite="$emit('party-accept-invite', $event)"
+              @decline-invite="$emit('party-decline-invite', $event)"
+            />
           </div>
           <GameHUD
             class="game-container__hud"
-            :player-id="playerId"
-            :party="party"
-            :party-invites="partyInvites"
-            :party-loading="partyLoading"
-            :party-status-message="partyStatusMessage"
             :player-vitals="playerVitals"
             :quick-slots="quickSlots"
             :quickbar-active-index="quickbarActiveIndex"
             @quick-slot="handleQuickSlot"
             @request-remap="handleQuickbarRemap"
-            @party-create="$emit('party-create')"
-            @party-leave="$emit('party-leave')"
-            @party-toggle-ready="$emit('party-toggle-ready')"
-            @party-start-instance="$emit('party-start-instance')"
-            @party-return-to-town="$emit('party-return-to-town')"
-            @party-invite="$emit('party-invite', $event)"
-            @party-accept-invite="$emit('party-accept-invite', $event)"
-            @party-decline-invite="$emit('party-decline-invite', $event)"
           />
         </div>
 
@@ -50,7 +54,6 @@
           :class="chatShellClasses"
         >
           <button
-            v-if="!isDesktop"
             type="button"
             class="chat-shell__toggle"
             @click="$emit('toggle-chat')"
@@ -94,6 +97,7 @@ import GameCanvas from '../GameCanvas.vue';
 import Chatbox from '../Chatbox.vue';
 import ContextMenu from '../sub/ContextMenu.vue';
 import GameHUD from './GameHUD.vue';
+import PartyPanel from '../ui/world/PartyPanel.vue';
 
 export default {
   name: 'GameContainer',
@@ -103,6 +107,7 @@ export default {
     Chatbox,
     ContextMenu,
     GameHUD,
+    PartyPanel,
   },
   props: {
     game: {
@@ -332,6 +337,21 @@ export default {
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45);
 }
 
+.game-container__party {
+  position: absolute;
+  top: var(--space-lg);
+  left: var(--space-lg);
+  max-width: min(320px, 26vw);
+  pointer-events: auto;
+  z-index: 5;
+}
+
+@media (width <= 1023px) {
+  .game-container__party {
+    max-width: min(360px, 50vw);
+  }
+}
+
 .game-container__stage-shell :deep(.game) {
   position: relative;
   width: 100%;
@@ -352,30 +372,31 @@ export default {
 .chat-shell {
   position: relative;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: flex-end;
   width: min(var(--world-display-width, 100%), 100%);
   margin: clamp(var(--space-lg), 3vw, var(--space-2xl)) auto 0;
+  gap: var(--space-sm);
   pointer-events: auto;
 }
 
 .chat-shell--desktop {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: clamp(var(--space-lg), 4vw, var(--space-2xl));
-  padding: 0 clamp(var(--space-lg), 3vw, var(--space-2xl));
-  width: min(var(--world-display-width, 100%), 100%);
-  pointer-events: none;
+  position: relative;
+  left: auto;
+  transform: none;
+  bottom: auto;
+  padding: 0;
+  width: 100%;
+  pointer-events: auto;
 }
 
 .chat-shell--desktop :deep(.chatbox) {
   pointer-events: auto;
+  width: min(100%, 420px);
 }
 
 .chat-shell__toggle {
-  position: absolute;
-  right: clamp(var(--space-md), 4vw, var(--space-xl));
-  bottom: clamp(var(--space-lg), 4vw, var(--space-2xl));
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
@@ -387,10 +408,6 @@ export default {
   cursor: pointer;
   box-shadow: var(--shadow-soft);
   z-index: 45;
-}
-
-.chat-shell--desktop .chat-shell__toggle {
-  display: none;
 }
 
 .chat-shell--expanded:not(.chat-shell--desktop) .chat-shell__toggle {
@@ -433,8 +450,17 @@ export default {
   }
 
   .chat-shell__toggle {
+    position: fixed;
     right: var(--space-md);
     bottom: var(--space-md);
+  }
+
+  .game-container__party {
+    top: var(--space-md);
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - (2 * var(--space-md)));
+    max-width: none;
   }
 }
 </style>

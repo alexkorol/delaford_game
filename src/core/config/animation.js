@@ -4,11 +4,14 @@ import {
   DEFAULT_ANIMATION_HOLDS,
 } from '@shared/combat.js';
 
+// The current human sprite sheet only exposes a single 32x32 frame, so every
+// facing direction must point to the same row (0). Once multi-directional
+// sprites land we can restore distinct row indexes.
 const baseRows = {
   down: 0,
-  left: 1,
-  right: 2,
-  up: 3,
+  left: 0,
+  right: 0,
+  up: 0,
 };
 
 const baseFrames = [0, 1, 2, 1];
@@ -19,7 +22,7 @@ export const PLAYER_SPRITE_CONFIG = {
   defaultDirection: DEFAULT_FACING_DIRECTION,
   states: {
     idle: {
-      frames: [1],
+      frames: [0],
       frameDuration: 480,
       rows: baseRows,
       loop: true,

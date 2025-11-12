@@ -1,22 +1,5 @@
 <template>
   <div class="hud-shell">
-    <PartyPanel
-      v-if="playerId"
-      class="hud-shell__party"
-      :player-id="playerId"
-      :party="party"
-      :invites="partyInvites"
-      :loading="partyLoading"
-      :status-message="partyStatusMessage"
-      @create="$emit('party-create')"
-      @leave="$emit('party-leave')"
-      @toggle-ready="$emit('party-toggle-ready')"
-      @start-instance="$emit('party-start-instance')"
-      @return-to-town="$emit('party-return-to-town')"
-      @invite="$emit('party-invite', $event)"
-      @accept-invite="$emit('party-accept-invite', $event)"
-      @decline-invite="$emit('party-decline-invite', $event)"
-    />
     <div class="hud-shell__row">
       <HudOrb
         class="hud-shell__orb hud-shell__orb--left"
@@ -46,36 +29,14 @@
 <script>
 import Quickbar from '../hud/Quickbar.vue';
 import HudOrb from '../hud/HudOrb.vue';
-import PartyPanel from '../ui/world/PartyPanel.vue';
 
 export default {
   name: 'GameHUD',
   components: {
     Quickbar,
     HudOrb,
-    PartyPanel,
   },
   props: {
-    playerId: {
-      type: String,
-      default: null,
-    },
-    party: {
-      type: Object,
-      default: null,
-    },
-    partyInvites: {
-      type: Array,
-      default: () => [],
-    },
-    partyLoading: {
-      type: Object,
-      default: () => ({ active: false, state: null }),
-    },
-    partyStatusMessage: {
-      type: String,
-      default: '',
-    },
     playerVitals: {
       type: Object,
       required: true,
@@ -92,14 +53,6 @@ export default {
   emits: [
     'quick-slot',
     'request-remap',
-    'party-create',
-    'party-leave',
-    'party-toggle-ready',
-    'party-start-instance',
-    'party-return-to-town',
-    'party-invite',
-    'party-accept-invite',
-    'party-decline-invite',
   ],
   methods: {
     handleSlotActivate(slot, index) {
@@ -127,35 +80,27 @@ export default {
 
 .hud-shell__row {
   width: 100%;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: flex-end;
+  justify-content: space-between;
   gap: clamp(var(--space-md), 2vw, var(--space-xl));
-  pointer-events: auto;
-}
-
-.hud-shell__party {
-  align-self: flex-start;
-  margin-bottom: var(--space-sm);
-  width: min(100%, 360px);
+  padding: calc(var(--space-sm) * 1.25) var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: rgba(18, 24, 48, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.55);
   pointer-events: auto;
 }
 
 .hud-shell__orb {
+  flex: 0 0 auto;
   filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.55));
 }
 
-.hud-shell__orb--left {
-  grid-area: left;
-}
-
-.hud-shell__orb--right {
-  grid-area: right;
-}
-
 .hud-shell__quickbar {
-  grid-area: bar;
+  flex: 1 1 auto;
   transform: translateY(18px);
+  margin: 0 var(--space-md);
 }
 
 @media (width <= 1279px) {
@@ -170,15 +115,17 @@ export default {
 
 @media (width <= 767px) {
   .hud-shell__row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      'left right'
-      'bar bar';
-    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hud-shell__orb {
+    align-self: center;
   }
 
   .hud-shell__quickbar {
     transform: none;
+    margin: var(--space-sm) 0 0;
   }
 }
 </style>
