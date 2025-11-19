@@ -1,8 +1,8 @@
 import PF from 'pathfinding';
 import UI from '#shared/ui.js';
-import axios from 'axios';
 import config from '#server/config.js';
 import * as emoji from 'node-emoji';
+import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from './world.js';
 import createPlayerCombatController from '#server/core/entities/player/combat-controller.js';
 import createPlayerInventoryManager, { constructWear } from '#server/core/entities/player/inventory-manager.js';
@@ -314,67 +314,17 @@ class Player {
   }
 
   /**
-   * Update the player profile in the database
+   * Persist the player profile via the repository layer
    *
-   * @return void
+   * @param {object} options Additional persistence options
+   * @returns {Promise<object|null>}
    */
-  update() {
-    const url = `${process.env.SITE_URL}/api/auth/update`;
-
-    // Set correct bearer token
-    const reqConfig = {
-      headers: { Authorization: `Bearer ${this.token}` },
+  update(options = {}) {
+    const context = {
+      force: options.force !== undefined ? options.force : true,
     };
 
-    // Find player on server via their token
-    const getPlayer = world.players.find(p => p.token === this.token);
-
-    // Get player data
-    const playerData = {
-      x: getPlayer.x,
-      y: getPlayer.y,
-      username: getPlayer.username,
-      hp_current: getPlayer.hp.current,
-      hp_max: getPlayer.hp.max,
-    };
-
-    // Get inventory data
-    const inventoryData = getPlayer.inventory.slots;
-
-    // Get bank data
-    const bankData = getPlayer.bank;
-
-    // Get skills data
-    const skillsData = getPlayer.skills;
-
-    // Get wearable data
-    const wearData = getPlayer.wear;
-
-    Object.keys(wearData).forEach((property) => {
-      if (Object.prototype.hasOwnProperty.call(wearData, property)) {
-        wearData[property] = wearData[property] === null ? null : wearData[property].id;
-      }
-    });
-
-    // We are not looking at arrows for the time being -- remove them.
-    if (Object.prototype.hasOwnProperty.call(wearData, 'arrows')) {
-      delete wearData.arrows;
-    }
-
-    const data = {
-      uuid: this.uuid,
-      playerData,
-      inventoryData,
-      wearData,
-      skillsData,
-      bankData,
-    };
-
-    return new Promise((resolve) => {
-      axios.post(url, data, reqConfig).then((r) => {
-        resolve(r.data);
-      });
-    });
+    return playerPersistenceService.savePlayer(this, context);
   }
 }
 

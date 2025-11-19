@@ -5,6 +5,16 @@
       :viewBox="`0 0 ${viewBox} ${viewBox}`"
       role="presentation"
     >
+      <g class="flower-tree__guides">
+        <circle
+          v-for="guide in petalGuides"
+          :key="`guide-${guide.x}-${guide.y}-${guide.r}`"
+          :cx="guide.x"
+          :cy="guide.y"
+          :r="guide.r"
+        />
+      </g>
+
       <g class="flower-tree__connections">
         <line
           v-for="connection in connections"
@@ -73,6 +83,10 @@ export default {
       type: String,
       default: null,
     },
+    petalGuides: {
+      type: Array,
+      default: () => [],
+    },
   },
   methods: {
     onNodeClick(node) {
@@ -125,6 +139,12 @@ export default {
 .flower-tree__svg {
   width: 100%;
   height: 100%;
+}
+
+.flower-tree__guides circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 2;
 }
 
 .flower-tree__connections line {

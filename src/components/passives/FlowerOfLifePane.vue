@@ -6,8 +6,8 @@
           v-model.trim="searchQuery"
           type="search"
           class="flower-pane__search-input"
-          placeholder="Search petals or effects..."
-          aria-label="Search Flower of Life nodes"
+          placeholder="Search skill tree nodes or effects..."
+          aria-label="Search skill tree nodes"
         >
         <div class="flower-pane__filters">
           <label
@@ -56,6 +56,7 @@
           :nodes="renderNodes"
           :connections="renderConnections"
           :selected-id="selectedNodeId"
+          :petal-guides="petalGuides"
           @select="handleSelect"
         />
       </div>
@@ -222,7 +223,7 @@
           :disabled="!canReset"
           @click="resetTree"
         >
-          Reset Flower
+          Reset Skill Tree
         </button>
       </footer>
     </aside>
@@ -476,6 +477,21 @@ export default {
         };
       });
     },
+    petalGuides() {
+      const center = this.layout.center || (this.layout.viewBox / 2);
+      const radius = this.layout.guideRadius || (this.layout.ringSpacing * 2.2);
+      const spokes = [0, 60, 120, 180, 240, 300];
+      const guides = spokes.map((angle) => {
+        const radians = (angle * Math.PI) / 180;
+        return {
+          x: center + (radius * Math.cos(radians)),
+          y: center - (radius * Math.sin(radians)),
+          r: radius,
+        };
+      });
+      guides.unshift({ x: center, y: center, r: radius });
+      return guides;
+    },
   },
   watch: {
     searchQuery() {
@@ -618,7 +634,7 @@ export default {
       }
       this.resetFlowerOfLife();
       this.selectedNodeId = 'heart-of-bloom';
-      this.setFeedback('Flower of Life reset. All petals refunded.', 'success');
+      this.setFeedback('Skill tree reset. All petals refunded.', 'success');
       this.focusFirstMatch();
     },
     toggleManualGate(gate, value) {

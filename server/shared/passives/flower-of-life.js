@@ -1,15 +1,16 @@
 const ATTRIBUTE_IDS = ['strength', 'dexterity', 'intelligence'];
 
 const FLOWER_OF_LIFE_LAYOUT = {
-  viewBox: 640,
-  center: 320,
-  ringSpacing: 120,
+  viewBox: 720,
+  center: 360,
+  ringSpacing: 110,
+  guideRadius: 260,
   radii: {
-    keystone: 38,
-    notable: 30,
-    major: 30,
-    minor: 24,
-    default: 26,
+    keystone: 42,
+    notable: 34,
+    major: 32,
+    minor: 28,
+    default: 30,
   },
 };
 
@@ -17,8 +18,8 @@ const FLOWER_OF_LIFE_NODES = [
   {
     id: 'heart-of-bloom',
     label: 'Heart of Bloom',
-    summary: 'Awaken the Flower and gain +5 to all attributes.',
-    description: 'The living core of Delaford\'s Flower of Life. Binding to it channels latent anima into your form.',
+    summary: 'Awaken the skill tree and gain +5 to all attributes.',
+    description: 'The living core of Delaford\'s battle lattice. Binding to it channels latent anima into your form.',
     type: 'keystone',
     ring: 0,
     angle: 0,

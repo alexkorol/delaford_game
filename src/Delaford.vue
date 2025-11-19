@@ -86,7 +86,7 @@ const paneRegistry = {
   settings: { component: SettingsPane, title: 'Settings' },
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },
-  flowerOfLife: { component: FlowerOfLifePane, title: 'Flower of Life' },
+  flowerOfLife: { component: FlowerOfLifePane, title: 'Skill Tree' },
 };
 
 const defaultPaneAssignments = {
@@ -382,7 +382,7 @@ export default {
     };
 
     bus.$on('show-sidebar', this.showSidebar);
-    bus.$on('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$on('skill-tree:open', this.handleFlowerPaneOpen);
     bus.$on('game:map:dimensions', this.handleMapDimensions);
 
     // On logout, let's do a few things...
@@ -426,7 +426,7 @@ export default {
       this.partyStatusTimeout = null;
     }
 
-    bus.$off('flower-of-life:open', this.handleFlowerPaneOpen);
+    bus.$off('skill-tree:open', this.handleFlowerPaneOpen);
     bus.$off('game:map:dimensions', this.handleMapDimensions);
     bus.$off('show-sidebar', this.showSidebar);
     bus.$off('player:logout', this.logout);

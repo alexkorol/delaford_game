@@ -449,58 +449,84 @@ export default {
     });
   },
 
-  'player:take': (data) => {
-    const { playerIndex, todo } = data;
-    const { id } = Query.getItemData(todo.item.id);
+  'player:take': (data = {}) => {
+    const { playerIndex } = data;
+    const todo = data.todo || null;
+    const player = world.players[playerIndex];
+
+    if (!player) {
+      return;
+    }
+
+    if (!todo || !todo.item || !todo.item.id) {
+      console.warn(`[actions] player:take missing item metadata`, {
+        player: player.username,
+        payload: todo,
+      });
+      return;
+    }
+
+    if (!todo.at || typeof todo.at.x !== 'number' || typeof todo.at.y !== 'number') {
+      console.warn(`[actions] player:take missing ground coordinates`, {
+        player: player.username,
+        payload: todo,
+      });
+      return;
+    }
+
+    const baseData = Query.getItemData(todo.item.id) || {};
+    const itemId = baseData.id || todo.item.id;
+
     const itemToTake = world.items.findIndex(
       e => e.x === todo.at.x && e.y === todo.at.y && e.uuid === todo.item.uuid,
     );
     const worldItem = world.items[itemToTake];
-    if (worldItem) {
-      const player = world.players[playerIndex];
-      if (worldItem.boundTo && player && worldItem.boundTo !== player.uuid) {
-        Socket.sendMessageToPlayer(
-          playerIndex,
-          'That item is bound to another adventurer.',
-        );
-        return;
-      }
-
-      // If qty not specified, we are picking up 1 item.
-      const quantity = worldItem.qty || 1;
-      world.items.splice(itemToTake, 1);
-
-      Socket.broadcast('item:change', world.items);
-
-      console.log(
-        `Picking up: ${todo.item.id} (${todo.item.uuid.substr(0, 5)}...)`,
-      );
-
-      world.players[playerIndex].inventory.add(id, quantity, {
-        uuid: todo.item.uuid,
-        existingItem: worldItem,
-      });
-
-      // Add respawn timer on item (if is a respawn)
-      const resetItemIndex = world.respawns.items.findIndex(
-        i => i.respawn && i.x === todo.at.x && i.y === todo.at.y,
-      );
-
-      if (resetItemIndex !== -1) {
-        world.respawns.items[resetItemIndex].pickedUp = true;
-        world.respawns.items[
-          resetItemIndex
-        ].willRespawnIn = Item.calculateRespawnTime(
-          world.respawns.items[resetItemIndex].respawnIn,
-        );
-      }
-
-      // Tell client to update their inventory
-      Socket.emit('core:refresh:inventory', {
-        player: { socket_id: world.players[playerIndex].socket_id },
-        data: world.players[playerIndex].inventory.slots,
-      });
+    if (!worldItem) {
+      return;
     }
+
+    if (worldItem.boundTo && worldItem.boundTo !== player.uuid) {
+      Socket.sendMessageToPlayer(
+        playerIndex,
+        'That item is bound to another adventurer.',
+      );
+      return;
+    }
+
+    // If qty not specified, we are picking up 1 item.
+    const quantity = worldItem.qty || 1;
+    world.items.splice(itemToTake, 1);
+
+    Socket.broadcast('item:change', world.items);
+
+    console.log(
+      `Picking up: ${todo.item.id} (${todo.item.uuid.substr(0, 5)}...)`,
+    );
+
+    world.players[playerIndex].inventory.add(itemId, quantity, {
+      uuid: todo.item.uuid,
+      existingItem: worldItem,
+    });
+
+    // Add respawn timer on item (if is a respawn)
+    const resetItemIndex = world.respawns.items.findIndex(
+      i => i.respawn && i.x === todo.at.x && i.y === todo.at.y,
+    );
+
+    if (resetItemIndex !== -1) {
+      world.respawns.items[resetItemIndex].pickedUp = true;
+      world.respawns.items[
+        resetItemIndex
+      ].willRespawnIn = Item.calculateRespawnTime(
+        world.respawns.items[resetItemIndex].respawnIn,
+      );
+    }
+
+    // Tell client to update their inventory
+    Socket.emit('core:refresh:inventory', {
+      player: { socket_id: world.players[playerIndex].socket_id },
+      data: world.players[playerIndex].inventory.slots,
+    });
   },
 
   /**

@@ -10,6 +10,7 @@ import Socket from '#server/socket.js';
 import * as emoji from 'node-emoji';
 import { v4 as uuid } from 'uuid';
 import { performance } from 'node:perf_hooks';
+import playerPersistenceService from '#server/core/services/player-persistence.js';
 import world from '#server/core/world.js';
 import { partyService } from '#server/player/handlers/party.js';
 
@@ -30,6 +31,7 @@ class Delaford {
     this.loopInterval = Number(process.env.GAME_LOOP_INTERVAL_MS) || 100;
     this.schedulerLogInterval = Number(process.env.GAME_LOOP_LOG_INTERVAL_MS) || 10000;
     this.schedulerStats = { tickCount: 0, totalDelta: 0, maxDelta: 0, lastLog: performance.now() };
+    this.playerAutoSaveInterval = Number(process.env.PLAYER_AUTO_SAVE_INTERVAL_MS) || 120000;
     this.periodicTasks = [];
     this.handleConnection = this.connection.bind(this);
     this.loopActive = false;
@@ -122,6 +124,7 @@ class Delaford {
       Item.resourcesCheck();
     });
     this.addPeriodicTask('party:instances', 1500, () => partyService.evaluateInstances());
+    this.addPeriodicTask('player:auto-save', this.playerAutoSaveInterval, () => playerPersistenceService.flushAllPlayers());
   }
 
   addPeriodicTask(name, interval, handler) {

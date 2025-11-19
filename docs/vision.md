@@ -19,10 +19,10 @@
 - Implement Str/Dex/Int, health/mana, and scaling rules.
 - Create permadeath/cheat-death mechanics.
 - Add LLM-backed RP naming enforcement.
-- Design the "Flower of Life" passive tree.
+- Design the skill tree with a Flower-of-Life-inspired layout.
 
 ### Inventory & Items
-- Build 12×7 backpack and ragdoll equipment slots.
+- Build 127 backpack and ragdoll equipment slots.
 - Support nested containers (bags, cube) with recursive grids.
 - Introduce brands/bonds (prefix/suffix) affix system.
 - Bind items to player identity.
@@ -52,12 +52,12 @@
 ## Open Questions
 - How to host/secure LLM name validation (local vs remote)?
 - Which tech stack upgrades (Vue 3 + Vite?) are feasible short-term?
-- Permadeath mitigation currency or shrines—how is it earned?
+- Permadeath mitigation currency or shrineshow is it earned?
 - How deep should container recursion go (limits to avoid UI chaos)?
 - Should towns be per-region or global?
 
 ## Milestones (Draft)
-1. **MVP Movement & Inventory**: WASD polish, click cancel, 12×7 inventory skeleton.
+1. **MVP Movement & Inventory**: WASD polish, click cancel, 127 inventory skeleton.
 2. **Core Stats & Affixes**: character sheets, brands/bonds, monster parity.
 3. **UI Refresh**: new panes, chat overlay, responsive layout.
 4. **Instance Prototype**: party lobby, one tileset instance, simple loot loop.

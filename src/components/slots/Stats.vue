@@ -1,7 +1,7 @@
 <template>
   <div class="stats_slot">
-    <section class="flower-of-life">
-      <header>Flower of Life</header>
+    <section class="skill-tree">
+      <header>Skill Tree</header>
       <p class="summary">
         <strong>{{ flowerSummary.spent }}</strong>
         <span>/</span>
@@ -14,9 +14,9 @@
       <button
         type="button"
         class="flower-button"
-        @click="openFlowerOfLife"
+        @click="openSkillTree"
       >
-        Open Passive Tree
+        Open Skill Tree
       </button>
     </section>
 
@@ -222,15 +222,15 @@ export default {
     },
   },
   methods: {
-    openFlowerOfLife() {
-      bus.$emit('flower-of-life:open');
+    openSkillTree() {
+      bus.$emit('skill-tree:open');
     },
   },
 };
 </script>
 
 <style lang="scss" scoped>
-section.flower-of-life {
+section.skill-tree {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;

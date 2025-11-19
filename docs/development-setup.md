@@ -48,6 +48,10 @@ Delaford historically targeted the archived 2020-era runtime stack, but the proj
 | Variable | Purpose | Default |
 |---|---|---|
 | `SITE_URL` | Points the authentication layer at your API backend. | `http://website.test` |
+| `PLAYER_AUTO_SAVE_INTERVAL_MS` | Frequency for the server scheduler to flush all connected players to persistent storage. | `120000` (2 minutes) |
+| `PLAYER_SAVE_COOLDOWN_MS` | Minimum delay between saves for the same player when the scheduler runs. Use lower values if you want very aggressive persistence. | `60000` (1 minute) |
+
+The backend now snapshots connected players in the background. Raising the interval lowers write pressure on your API/database, while lowering it gives you quicker crash recovery at the cost of more frequent save calls.
 
 ## Useful commands
 
