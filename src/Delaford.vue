@@ -63,7 +63,7 @@ import FriendListPane from './components/slots/FriendList.vue';
 import SettingsPane from './components/slots/Settings.vue';
 import LogoutPane from './components/slots/Logout.vue';
 import QuestsPane from './components/slots/Quests.vue';
-import FlowerOfLifePane from './components/passives/FlowerOfLifePane.vue';
+import GeometricSkillTreePane from './components/passives/GeometricSkillTreePane.vue';
 
 import { createQuickbarSlots, getSkillExecutionProfile } from '@shared/skills/index.js';
 
@@ -86,7 +86,7 @@ const paneRegistry = {
   settings: { component: SettingsPane, title: 'Settings' },
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },
-  flowerOfLife: { component: FlowerOfLifePane, title: 'Skill Tree' },
+  flowerOfLife: { component: GeometricSkillTreePane, title: 'Skill Tree' },
 };
 
 const defaultPaneAssignments = {
