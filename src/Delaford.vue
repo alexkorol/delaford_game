@@ -91,7 +91,7 @@ const paneRegistry = {
 
 const defaultPaneAssignments = {
   left: 'stats',
-  right: 'inventory',
+  right: null,
 };
 
 const DEFAULT_CHAT_PREVIEW = 'Welcome to Delaford.';
@@ -295,16 +295,20 @@ export default {
       const scale = typeof resolvedDimensions.scale === 'number'
         ? resolvedDimensions.scale
         : (mapInstance && typeof mapInstance.scale === 'number' ? mapInstance.scale : 1);
-      const displayWidth = resolvedDimensions.displayWidth || (width * scale);
-      const displayHeight = resolvedDimensions.displayHeight || (height * scale);
-      return {
-        '--map-aspect-ratio': `${width} / ${height}`,
-        '--world-internal-width': `${width}px`,
-        '--world-internal-height': `${height}px`,
-        '--world-display-width': `${displayWidth}px`,
-        '--world-display-height': `${displayHeight}px`,
-        '--map-display-width': `${displayWidth}px`,
-        '--map-display-height': `${displayHeight}px`,
+      const baseDisplayWidth = resolvedDimensions.displayWidth || (width * scale);
+      const viewportWidth = this.viewportWidth || (typeof window !== 'undefined' ? window.innerWidth : baseDisplayWidth);
+      const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : baseDisplayWidth;
+      const availableWidth = viewportWidth - 8;
+      const targetWidth = Math.max(baseDisplayWidth, availableWidth);
+      const targetHeight = Math.max(targetWidth * (height / width), viewportHeight - 40);
+    return {
+      '--map-aspect-ratio': `${width} / ${height}`,
+      '--world-internal-width': `${width}px`,
+      '--world-internal-height': `${height}px`,
+      '--world-display-width': `${targetWidth}px`,
+        '--world-display-height': `${targetHeight}px`,
+        '--map-display-width': `${targetWidth}px`,
+        '--map-display-height': `${targetHeight}px`,
         '--world-display-scale': `${scale}`,
       };
     },
@@ -974,7 +978,7 @@ export default {
      * On NPC movement, update NPCs
      */
     npcMovement(data, meta = {}) {
-      if (!this.game || !this.game.map) {
+      if (!this.game || !this.game.map || typeof this.game.map.setNPCs !== 'function') {
         return;
       }
 
@@ -983,7 +987,7 @@ export default {
     },
 
     monsterState(data, meta = {}) {
-      if (!this.game || !this.game.map) {
+      if (!this.game || !this.game.map || typeof this.game.map.setMonsters !== 'function') {
         return;
       }
 

@@ -55,7 +55,7 @@ export default {
   props: {
     images: {
       type: Object,
-      required: true,
+      default: () => ({}),
     },
     columns: {
       type: Number,

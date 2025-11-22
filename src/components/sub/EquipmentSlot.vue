@@ -32,11 +32,11 @@ export default {
     },
     wear: {
       type: Object,
-      required: true,
+      default: () => ({}),
     },
     images: {
       type: Object,
-      required: true,
+      default: () => ({}),
     },
   },
   inject: {

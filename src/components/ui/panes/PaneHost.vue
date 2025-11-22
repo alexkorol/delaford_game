@@ -1,7 +1,10 @@
 <template>
   <div
     class="pane-host"
-    :class="[`pane-host--${layoutMode}`]"
+    :class="[
+      `pane-host--${layoutMode}`,
+      { 'pane-host--no-left': !showLeftPane, 'pane-host--no-right': !showRightPane },
+    ]"
   >
     <transition
       name="pane-slide"
@@ -238,6 +241,18 @@ export default {
   }
 
   &--mobile {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &--no-left {
+    grid-template-columns: minmax(0, 1fr) minmax(0, var(--pane-host-side-width));
+  }
+
+  &--no-right {
+    grid-template-columns: minmax(0, var(--pane-host-side-width)) minmax(0, 1fr);
+  }
+
+  &--no-left.pane-host--no-right {
     grid-template-columns: minmax(0, 1fr);
   }
 }

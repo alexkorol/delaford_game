@@ -13,7 +13,7 @@
         <equipment-slot
           slot-id="head"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
       </div>
@@ -22,13 +22,13 @@
         <equipment-slot
           slot-id="back"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <equipment-slot
           slot-id="necklace"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <div class="slot arrows" />
@@ -38,19 +38,19 @@
         <equipment-slot
           slot-id="right_hand"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <equipment-slot
           slot-id="armor"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <equipment-slot
           slot-id="left_hand"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
       </div>
@@ -59,19 +59,19 @@
         <equipment-slot
           slot-id="gloves"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <equipment-slot
           slot-id="feet"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
         <equipment-slot
           slot-id="ring"
           :wear="wear"
-          :images="images"
+          :images="resolvedImages"
           @open-context-menu="showContextMenu"
         />
       </div>
@@ -95,13 +95,20 @@ export default {
       type: Object,
       required: true,
     },
+    images: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   computed: {
     wear() {
-      return this.game.player.wear;
+      return (this.game && this.game.player && this.game.player.wear) ? this.game.player.wear : {};
     },
-    images() {
-      return this.game.map.images;
+    resolvedImages() {
+      if (this.images && Object.keys(this.images).length) {
+        return this.images;
+      }
+      return (this.game && this.game.map && this.game.map.images) ? this.game.map.images : {};
     },
   },
   created() {

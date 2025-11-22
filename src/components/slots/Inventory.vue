@@ -1,16 +1,14 @@
 <template>
-  <div
-    v-if="loaded"
-    class="inventory-pane"
-  >
+  <div class="inventory-pane">
     <EquipmentRagdoll
       :game="game"
+      :images="resolvedImages"
       class="inventory-pane__ragdoll"
     />
 
     <div class="inventory-pane__grid">
       <InventoryGrid
-        :images="game.map.images"
+        :images="resolvedImages"
         :columns="grid.columns"
         :rows="grid.rows"
         @commit="handleInventoryCommit"
@@ -25,8 +23,8 @@
 <script>
 import { watch } from 'vue';
 
-import bus from '../../core/utilities/bus.js';
 import { useInventoryStore } from '@/stores/inventory.js';
+import bus from '@/core/utilities/bus.js';
 import EquipmentRagdoll from '../inventory/EquipmentRagdoll.vue';
 import InventoryGrid from '../inventory/InventoryGrid.vue';
 import WorldDropZone from '../inventory/WorldDropZone.vue';
@@ -71,26 +69,18 @@ export default {
   },
   data() {
     return {
-      loaded: false,
       grid: {
         columns: INVENTORY_COLUMNS,
         rows: INVENTORY_ROWS,
       },
     };
   },
-  created() {
-    bus.$on('game:images:loaded', this.imagesLoaded);
-    if (this.game && this.game.map && this.game.map.images && Object.keys(this.game.map.images).length) {
-      this.loaded = true;
-    }
-  },
-  beforeUnmount() {
-    bus.$off('game:images:loaded', this.imagesLoaded);
+  computed: {
+    resolvedImages() {
+      return (this.game && this.game.map && this.game.map.images) ? this.game.map.images : {};
+    },
   },
   methods: {
-    imagesLoaded() {
-      this.loaded = true;
-    },
     handleInventoryCommit(result) {
       if (!result || result.cancelled) {
         return;

@@ -46,7 +46,9 @@ export default {
     };
 
     const containers = computed(() => (
-      inventoryStore ? inventoryStore.containerStack.value : []
+      inventoryStore && inventoryStore.containerStack
+        ? (inventoryStore.containerStack.value || [])
+        : []
     ));
 
     return {

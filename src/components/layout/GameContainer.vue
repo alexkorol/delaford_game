@@ -1,6 +1,7 @@
 <template>
   <div
     class="wrapper game-container"
+    :class="gameContainerClasses"
     @click.right.prevent="handleRightClick"
   >
     <PaneHost
@@ -21,23 +22,157 @@
         >
           <div class="game-container__stage-shell">
             <GameCanvas ref="canvasRef" :game="game" />
-            <PartyPanel
-              v-if="playerId"
-              class="game-container__party"
-              :player-id="playerId"
-              :party="party"
-              :invites="partyInvites"
-              :loading="partyLoading"
-              :status-message="partyStatusMessage"
-              @create="$emit('party-create')"
-              @leave="$emit('party-leave')"
-              @toggle-ready="$emit('party-toggle-ready')"
-              @start-instance="$emit('party-start-instance')"
-              @return-to-town="$emit('party-return-to-town')"
-              @invite="$emit('party-invite', $event)"
-              @accept-invite="$emit('party-accept-invite', $event)"
-              @decline-invite="$emit('party-decline-invite', $event)"
-            />
+            <div
+              ref="floatingLayerRef"
+      class="game-container__floating-layer"
+      v-if="!uiHidden"
+    >
+              <FloatingWindow
+                title="Inventory"
+                :open="floatingPanels.inventory.open"
+                :dock="viewMode === 'inventory' ? 'right' : floatingPanels.inventory.dock"
+                :position="inventoryPosition"
+                :width="viewMode === 'inventory' ? '520px' : floatingPanels.inventory.width"
+                :height="viewMode === 'inventory' ? '72vh' : floatingPanels.inventory.height"
+                :z-index="floatingPanels.inventory.zIndex"
+                :bounds="floatingBounds"
+                :enable-double-click-dock="false"
+                :allow-ghost-toggle="true"
+                @update:position="updatePanelPosition('inventory', $event)"
+                @update:dock="updatePanelDock('inventory', $event)"
+                @close="closePanel('inventory')"
+                @focus="focusPanel('inventory')"
+              >
+                <InventoryPane :game="game" />
+              </FloatingWindow>
+
+              <FloatingWindow
+                v-if="playerId"
+                title="Party"
+                :open="!uiHidden && floatingPanels.party.open"
+                :dock="floatingPanels.party.dock"
+                :position="floatingPanels.party.position"
+                :width="floatingPanels.party.width"
+                :z-index="floatingPanels.party.zIndex"
+                :bounds="floatingBounds"
+                :enable-double-click-dock="false"
+                :allow-ghost-toggle="true"
+                @update:position="updatePanelPosition('party', $event)"
+                @update:dock="updatePanelDock('party', $event)"
+                @close="closePanel('party')"
+                @focus="focusPanel('party')"
+              >
+                <PartyPanel
+                  class="game-container__party-panel"
+                  :player-id="playerId"
+                  :party="party"
+                  :invites="partyInvites"
+                  :loading="partyLoading"
+                  :status-message="partyStatusMessage"
+                  @create="$emit('party-create')"
+                  @leave="$emit('party-leave')"
+                  @toggle-ready="$emit('party-toggle-ready')"
+                  @start-instance="$emit('party-start-instance')"
+                  @return-to-town="$emit('party-return-to-town')"
+                  @invite="$emit('party-invite', $event)"
+                  @accept-invite="$emit('party-accept-invite', $event)"
+                  @decline-invite="$emit('party-decline-invite', $event)"
+                />
+              </FloatingWindow>
+
+              <FloatingWindow
+                title="Chat"
+                :open="!uiHidden && floatingPanels.chat.open"
+                :dock="floatingPanels.chat.dock"
+                :position="floatingPanels.chat.position"
+                :width="floatingPanels.chat.width"
+                :z-index="floatingPanels.chat.zIndex"
+                :bounds="floatingBounds"
+                :enable-double-click-dock="false"
+                :allow-ghost-toggle="true"
+                @update:position="updatePanelPosition('chat', $event)"
+                @update:dock="updatePanelDock('chat', $event)"
+                @close="closePanel('chat')"
+                @focus="focusPanel('chat')"
+              >
+                <Chatbox
+                  ref="chatboxRef"
+                  :game="game"
+                  :layout-mode="layoutMode"
+                  :pinned="chatPinned"
+                  :collapsed="!chatExpanded"
+                  :unread-count="chatUnreadCount"
+                  :auto-hide-seconds="chatAutoHideSeconds"
+                  @message-appended="$emit('chat-message', $event)"
+                  @toggle-pin="$emit('toggle-chat-pin')"
+                  @hover-state="$emit('chat-hover', $event)"
+                  @countdown-complete="$emit('chat-countdown-complete')"
+                />
+              </FloatingWindow>
+            </div>
+          </div>
+          <div
+            v-if="!uiHidden"
+            class="game-container__floating-controls"
+          >
+            <button
+              type="button"
+              class="floating-controls__btn"
+              :class="{ 'floating-controls__btn--active': floatingPanels.inventory.open }"
+              @click="togglePanel('inventory')"
+            >
+              Inventory
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn"
+              :class="{ 'floating-controls__btn--active': floatingPanels.party.open }"
+              @click="togglePanel('party')"
+            >
+              Party
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn"
+              :class="{ 'floating-controls__btn--active': floatingPanels.chat.open }"
+              @click="handleChatControl"
+            >
+              Chat
+              <span
+                v-if="chatUnreadCount > 0"
+                class="floating-controls__badge"
+              >{{ chatUnreadCount }}</span>
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn floating-controls__btn--ghost"
+              @click="resetPanels"
+            >
+              Reset Layout
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn floating-controls__btn--ghost"
+              @click="hardResetUI"
+            >
+              Hard Reset UI
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn floating-controls__btn--ghost"
+              :class="{ 'floating-controls__btn--active': viewMode === 'inventory' }"
+              @click="toggleViewMode"
+            >
+              Inventory Mode
+            </button>
+            <button
+              type="button"
+              class="floating-controls__btn floating-controls__btn--ghost"
+              :class="{ 'floating-controls__btn--active': uiHidden }"
+              @click="toggleUiHidden"
+            >
+              Hide UI
+            </button>
           </div>
           <GameHUD
             class="game-container__hud"
@@ -48,56 +183,40 @@
             @request-remap="handleQuickbarRemap"
           />
         </div>
-
-        <div
-          class="chat-shell"
-          :class="chatShellClasses"
-        >
-          <button
-            type="button"
-            class="chat-shell__toggle"
-            @click="$emit('toggle-chat')"
-          >
-            <span class="chat-shell__toggle-label">
-              {{ chatToggleLabel }}
-            </span>
-            <span
-              v-if="chatUnreadCount > 0"
-              class="chat-shell__badge"
-            >
-              {{ chatUnreadCount }}
-            </span>
-          </button>
-
-          <Chatbox
-            ref="chatboxRef"
-            :game="game"
-            :layout-mode="layoutMode"
-            :pinned="chatPinned"
-            :collapsed="!chatExpanded"
-            :unread-count="chatUnreadCount"
-            :auto-hide-seconds="chatAutoHideSeconds"
-            @message-appended="$emit('chat-message', $event)"
-            @toggle-pin="$emit('toggle-chat-pin')"
-            @hover-state="$emit('chat-hover', $event)"
-            @countdown-complete="$emit('chat-countdown-complete')"
-          />
-        </div>
       </div>
     </PaneHost>
 
     <ContextMenu :game="game" />
+
+    <button
+      v-if="uiHidden"
+      class="game-container__show-ui"
+      type="button"
+      @click="toggleUiHidden"
+    >
+      Show UI
+    </button>
   </div>
 </template>
 
 <script>
-import { computed, ref, toRefs } from 'vue';
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  toRefs,
+  watch,
+} from 'vue';
 import PaneHost from '../ui/panes/PaneHost.vue';
 import GameCanvas from '../GameCanvas.vue';
 import Chatbox from '../Chatbox.vue';
 import ContextMenu from '../sub/ContextMenu.vue';
 import GameHUD from './GameHUD.vue';
 import PartyPanel from '../ui/world/PartyPanel.vue';
+import FloatingWindow from '../ui/panes/FloatingWindow.vue';
+import InventoryPane from '../slots/Inventory.vue';
 
 export default {
   name: 'GameContainer',
@@ -108,6 +227,8 @@ export default {
     ContextMenu,
     GameHUD,
     PartyPanel,
+    FloatingWindow,
+    InventoryPane,
   },
   props: {
     game: {
@@ -248,6 +369,210 @@ export default {
       return false;
     };
 
+    const floatingPanels = reactive({
+      inventory: {
+        open: true,
+        dock: 'right',
+        position: { x: 24, y: 80 },
+        width: '500px',
+        height: '58vh',
+        zIndex: 52,
+      },
+      party: {
+        open: true,
+        dock: 'left',
+        position: { x: 24, y: 20 },
+        width: '340px',
+        zIndex: 51,
+      },
+      chat: {
+        open: true,
+        dock: 'right',
+        position: { x: 24, y: 520 },
+        width: '400px',
+        zIndex: 53,
+      },
+    });
+
+    const defaultFloatingPanels = JSON.parse(JSON.stringify(floatingPanels));
+    const STORAGE_KEY = 'delaford:floating-panels';
+    const viewMode = ref('default');
+    const uiHidden = ref(false);
+
+    const floatingLayerRef = ref(null);
+    const floatingBounds = ref({
+      left: 0,
+      top: 0,
+      width: 0,
+      height: 0,
+    });
+    const zCounter = ref(60);
+
+    const clampPositionToBounds = (position = {}) => {
+      const bounds = floatingBounds.value || {};
+      const allowance = 240;
+      const { x = 0, y = 0 } = position;
+      const maxX = Math.max(0, (bounds.width || 0) - 220);
+      const maxY = Math.max(0, (bounds.height || 0) - 200);
+      return {
+        x: Math.min(Math.max(-allowance, x), (maxX || x) + allowance),
+        y: Math.min(Math.max(-allowance, y), (maxY || y) + allowance),
+      };
+    };
+
+    const updateFloatingBounds = () => {
+      const rect = floatingLayerRef.value
+        ? floatingLayerRef.value.getBoundingClientRect()
+        : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      floatingBounds.value = {
+        left: 0,
+        top: 0,
+        width: window.innerWidth || rect.width,
+        height: window.innerHeight || rect.height,
+      };
+    };
+
+    const focusPanel = (key) => {
+      if (!floatingPanels[key]) {
+        return;
+      }
+      zCounter.value += 1;
+      floatingPanels[key].zIndex = zCounter.value;
+    };
+
+    const updatePanelPosition = (key, position) => {
+      if (!floatingPanels[key]) {
+        return;
+      }
+      if (key === 'inventory' && viewMode.value === 'inventory') {
+        viewMode.value = 'default';
+      }
+      floatingPanels[key].position = clampPositionToBounds(position);
+      floatingPanels[key].dock = 'floating';
+      focusPanel(key);
+    };
+
+    const updatePanelDock = (key, dock) => {
+      if (!floatingPanels[key]) {
+        return;
+      }
+      floatingPanels[key].dock = dock;
+      focusPanel(key);
+    };
+
+    const closePanel = (key) => {
+      if (!floatingPanels[key]) {
+        return;
+      }
+      floatingPanels[key].open = false;
+    };
+
+    const togglePanel = (key) => {
+      if (!floatingPanels[key]) {
+        return;
+      }
+      floatingPanels[key].open = !floatingPanels[key].open;
+      if (floatingPanels[key].open) {
+        focusPanel(key);
+      }
+    };
+
+    const resetPanels = () => {
+      Object.keys(defaultFloatingPanels).forEach((key) => {
+        floatingPanels[key] = JSON.parse(JSON.stringify(defaultFloatingPanels[key]));
+      });
+      zCounter.value = 60;
+      viewMode.value = 'default';
+      uiHidden.value = false;
+    };
+
+    const hardResetUI = () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      resetPanels();
+    };
+
+    const loadSavedPanels = () => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) {
+          return;
+        }
+        const parsed = JSON.parse(saved);
+        Object.keys(floatingPanels).forEach((key) => {
+          if (parsed[key]) {
+            floatingPanels[key] = {
+              ...floatingPanels[key],
+              ...parsed[key],
+              position: clampPositionToBounds(parsed[key].position || floatingPanels[key].position),
+            };
+          }
+        });
+        if (parsed.viewMode) {
+          viewMode.value = parsed.viewMode;
+        }
+        if (typeof parsed.uiHidden === 'boolean') {
+          uiHidden.value = parsed.uiHidden;
+        }
+      } catch (error) {
+        console.error('Failed to load floating panels layout', error);
+      }
+    };
+
+    const persistPanels = () => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      const snapshot = JSON.parse(JSON.stringify(floatingPanels));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          ...snapshot,
+          viewMode: viewMode.value,
+          uiHidden: uiHidden.value,
+        }));
+      } catch (error) {
+        console.error('Failed to save floating panels layout', error);
+      }
+    };
+
+    const handleChatControl = () => {
+      const wasOpen = floatingPanels.chat.open;
+      togglePanel('chat');
+      if (!wasOpen && !props.chatExpanded) {
+        emit('toggle-chat');
+      }
+    };
+
+    const toggleViewMode = () => {
+      viewMode.value = viewMode.value === 'inventory' ? 'default' : 'inventory';
+    };
+
+    const toggleUiHidden = () => {
+      uiHidden.value = !uiHidden.value;
+    };
+
+    onMounted(() => {
+      updateFloatingBounds();
+      window.addEventListener('resize', updateFloatingBounds);
+      loadSavedPanels();
+    });
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', updateFloatingBounds);
+    });
+
+    watch(() => props.layoutMode, () => {
+      updateFloatingBounds();
+    });
+
+    watch(floatingPanels, persistPanels, { deep: true });
+    watch(viewMode, persistPanels);
+    watch(uiHidden, persistPanels);
+
     expose({ paneHostRef, chatboxRef, canvasRef, triggerSkill });
 
     return {
@@ -255,10 +580,37 @@ export default {
       chatboxRef,
       canvasRef,
       playerId,
+      floatingPanels,
+      floatingBounds,
+      floatingLayerRef,
       handleRightClick,
       handleQuickSlot,
       handleQuickbarRemap,
       triggerSkill,
+      updatePanelPosition,
+      updatePanelDock,
+      closePanel,
+      togglePanel,
+      focusPanel,
+      handleChatControl,
+      toggleViewMode,
+      toggleUiHidden,
+      hardResetUI,
+      viewMode,
+      uiHidden,
+      gameContainerClasses: computed(() => ({
+        'game-container--inventory-mode': viewMode.value === 'inventory',
+        'game-container--ui-hidden': uiHidden.value,
+      })),
+      inventoryPosition: computed(() => {
+        if (viewMode.value === 'inventory' && floatingPanels.inventory.dock !== 'floating') {
+          const bounds = floatingBounds.value || {};
+          const width = 520;
+          const x = Math.max(-40, (bounds.width || window.innerWidth || 1280) - width - 32);
+          return { x, y: 24 };
+        }
+        return floatingPanels.inventory.position;
+      }),
     };
   },
 };
@@ -273,7 +625,7 @@ export default {
   justify-content: center;
   align-items: stretch;
   position: relative;
-  padding: clamp(1rem, 2.5vw, 3rem);
+  padding: clamp(0.15rem, 0.5vw, 1rem);
   width: 100%;
   min-height: 0;
   box-sizing: border-box;
@@ -298,15 +650,15 @@ export default {
 }
 
 .game-container__world-shell {
-  --world-shell-padding: clamp(var(--space-lg), 3vw, var(--space-2xl));
+  --world-shell-padding: clamp(var(--space-sm), 1.5vw, var(--space-lg));
 
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   padding: var(--world-shell-padding);
-  gap: clamp(var(--space-lg), 2vw, var(--space-xl));
-  width: min(100%, var(--world-display-width, 100%));
-  max-width: min(96vw, var(--world-display-width, 1200px));
+  gap: clamp(var(--space-md), 1.5vw, var(--space-lg));
+  width: 100%;
+  max-width: 100%;
   margin: 0 auto;
   border-radius: var(--radius-lg);
   background: rgba(8, 10, 20, 0.65);
@@ -325,31 +677,16 @@ export default {
 .game-container__stage-shell {
   position: relative;
   width: 100%;
-  max-width: var(--world-display-width, 100%);
+  max-width: none;
   aspect-ratio: var(--map-aspect-ratio, 16 / 9);
   display: flex;
   align-items: stretch;
   justify-content: center;
   min-height: 0;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow: visible;
   background: rgba(4, 6, 12, 0.85);
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45);
-}
-
-.game-container__party {
-  position: absolute;
-  top: var(--space-lg);
-  left: var(--space-lg);
-  max-width: min(320px, 26vw);
-  pointer-events: auto;
-  z-index: 5;
-}
-
-@media (width <= 1023px) {
-  .game-container__party {
-    max-width: min(360px, 50vw);
-  }
 }
 
 .game-container__stage-shell :deep(.game) {
@@ -369,67 +706,99 @@ export default {
   width: 100%;
 }
 
-.chat-shell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  width: min(var(--world-display-width, 100%), 100%);
-  margin: clamp(var(--space-lg), 3vw, var(--space-2xl)) auto 0;
+.game-container__floating-layer {
+  position: absolute;
+  inset: var(--space-sm);
+  pointer-events: none;
+  display: grid;
+  grid-auto-flow: row;
   gap: var(--space-sm);
+  z-index: 8;
+}
+
+.game-container__floating-layer :deep(.floating-window) {
   pointer-events: auto;
 }
 
-.chat-shell--desktop {
-  position: relative;
-  left: auto;
-  transform: none;
-  bottom: auto;
-  padding: 0;
-  width: 100%;
-  pointer-events: auto;
-}
-
-.chat-shell--desktop :deep(.chatbox) {
-  pointer-events: auto;
-  width: min(100%, 420px);
-}
-
-.chat-shell__toggle {
-  position: relative;
+.game-container__floating-controls {
+  position: fixed;
+  right: var(--space-md);
+  bottom: var(--space-md);
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: rgba(10, 12, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  z-index: 150;
+  flex-wrap: wrap;
+}
+
+.floating-controls__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(12, 16, 28, 0.82);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(12, 16, 28, 0.78);
+  color: #f5f5f5;
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  z-index: 45;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
 
-.chat-shell--expanded:not(.chat-shell--desktop) .chat-shell__toggle {
-  opacity: 0;
-  pointer-events: none;
+.floating-controls__btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
-.chat-shell__toggle-label {
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.floating-controls__btn--active {
+  background: rgba(255, 215, 79, 0.15);
+  border-color: rgba(255, 215, 79, 0.5);
+  color: #ffe082;
 }
 
-.chat-shell__badge {
-  min-width: 22px;
+.floating-controls__badge {
+  min-width: 20px;
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--color-accent);
   color: #020307;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.75em;
-  text-align: center;
+}
+
+.game-container--inventory-mode .game-container__floating-controls {
+  justify-content: flex-end;
+}
+
+.game-container--ui-hidden :deep(.pane-host__side),
+.game-container--ui-hidden :deep(.pane-host__overlay),
+.game-container--ui-hidden .game-container__floating-layer,
+.game-container--ui-hidden .game-container__floating-controls,
+.game-container--ui-hidden .game-container__hud {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game-container__show-ui {
+  position: fixed;
+  right: var(--space-md);
+  bottom: var(--space-md);
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(12, 16, 28, 0.85);
+  color: #f5f5f5;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+}
+
+.game-container__party-panel {
+  min-width: 280px;
 }
 
 @media (width <= 639px) {
@@ -443,24 +812,13 @@ export default {
     max-width: 100%;
   }
 
-  .chat-shell {
-    position: relative;
-    width: 100%;
-    padding-bottom: var(--space-xl);
+  .game-container__floating-layer {
+    inset: var(--space-xs);
   }
 
-  .chat-shell__toggle {
-    position: fixed;
-    right: var(--space-md);
-    bottom: var(--space-md);
-  }
-
-  .game-container__party {
-    top: var(--space-md);
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - (2 * var(--space-md)));
-    max-width: none;
+  .floating-controls__btn {
+    padding: 8px 10px;
+    font-size: 0.9rem;
   }
 }
 </style>
