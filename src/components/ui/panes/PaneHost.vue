@@ -57,13 +57,14 @@
       <div
         v-if="showOverlay"
         class="pane-host__overlay"
+        :class="overlayClasses"
         role="dialog"
         aria-modal="true"
         @click.self="$emit('overlay-close')"
       >
         <PaneCard
           ref="overlayCard"
-          class="pane-host__overlay-card"
+          :class="overlayCardClasses"
           :title="overlayTitle"
           :dismissible="true"
           :aria-label="`${overlayTitle} overlay`"
@@ -168,6 +169,22 @@ export default {
       }
       return this.overlayPaneEntry.title || this.capitalise(this.overlayPane.id);
     },
+    overlayOptions() {
+      const entryOptions = (this.overlayPaneEntry && this.overlayPaneEntry.options) || {};
+      const paneOptions = (this.overlayPane && this.overlayPane.options) || {};
+      return { fullscreen: false, ...entryOptions, ...paneOptions };
+    },
+    overlayClasses() {
+      return {
+        'pane-host__overlay--fullscreen': this.overlayOptions.fullscreen,
+      };
+    },
+    overlayCardClasses() {
+      return {
+        'pane-host__overlay-card': true,
+        'pane-host__overlay-card--fullscreen': this.overlayOptions.fullscreen,
+      };
+    },
     showLeftPane() {
       if (!this.leftPaneComponent) {
         return false;
@@ -266,6 +283,38 @@ export default {
 .pane-host__overlay-card {
   max-width: min(720px, 94vw);
   width: 100%;
+}
+
+.pane-host__overlay--fullscreen {
+  padding: clamp(var(--space-lg), 3vw, var(--space-2xl));
+}
+
+.pane-host__overlay-card--fullscreen {
+  max-width: none;
+  width: min(96vw, 100%);
+  height: min(92vh, 100%);
+}
+
+.pane-host__overlay-card--fullscreen :deep(.pane-card) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-host__overlay-card--fullscreen :deep(.pane-card__body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(var(--space-md), 1vw, var(--space-lg));
+  padding: clamp(var(--space-lg), 2vw, var(--space-xl));
+}
+
+.pane-host__overlay-card--fullscreen :deep(.pane-card__body > *) {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .pane-host--tablet .pane-host__side {

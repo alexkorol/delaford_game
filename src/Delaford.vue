@@ -86,7 +86,7 @@ const paneRegistry = {
   settings: { component: SettingsPane, title: 'Settings' },
   logout: { component: LogoutPane, title: 'Logout' },
   quests: { component: QuestsPane, title: 'Quests' },
-  flowerOfLife: { component: GeometricSkillTreePane, title: 'Skill Tree' },
+  flowerOfLife: { component: GeometricSkillTreePane, title: 'Skill Tree', options: { fullscreen: true } },
 };
 
 const defaultPaneAssignments = {
