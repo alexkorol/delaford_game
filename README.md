@@ -14,6 +14,12 @@ This fork is a fresh take on the original Delaford codebase. The goal is to buil
 
 The high-level roadmap is captured in [`docs/vision.md`](docs/vision.md). Its a living document that gathers feature specs, UX references, and open questions.
 
+## Fork Highlights
+
+- Smooth, interpolated movement controllers for local and remote entities, improving playback without sacrificing authority.
+- Modernized Vite/Volta dev stack with parallel client/server startup and refreshed linting/testing harnesses (Vitest + Playwright).
+- WASD-first input and Diablo/PoE-inspired systems guiding new content and UX planning.
+
 ## Quick Start
 
 ```bash
@@ -69,6 +75,15 @@ Legacy docs from the original project have been removed or archived. Everything 
    - Infinite realm concepts (Abyss/Pandemonium equivalents).
 
 Each stream will break into issues/PRs with detailed implementation notes.
+
+## Roadmap
+
+- [x] Foundation & Tooling — Vite/Volta dev stack, linting rules, and testing harnesses are in place.
+- [ ] Gameplay Core — Str/Dex/Int stats, permadeath/cheat-death loops, and RP name validation.
+- [ ] Inventory & Items — 127-slot backpack, nested containers, and brands/bonds affixes.
+- [ ] UI/UX — PoE-inspired panes, chat overlay, and pixel-perfect rendering that degrades gracefully.
+- [ ] Monsters & Combat — Shared stat pipeline, AI behaviours, and interpolated movement during fights.
+- [ ] Networking & World — Party instances, persistent towns, and semi-random map generation.
 
 ## Contribution Guide (WIP)
 
