@@ -16,7 +16,7 @@ const projectRoot = path.resolve(serverDir, '..');
 const distDir = path.join(projectRoot, 'dist');
 
 const port = process.env.PORT || 6500;
-const env = process.env.NODE_ENV || 'production';
+const env = process.env.NODE_ENV || 'development';
 const app = express();
 
 const hasClientBundle = () => (

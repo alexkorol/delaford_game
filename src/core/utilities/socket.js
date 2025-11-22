@@ -5,7 +5,25 @@ class Socket {
 
   static socketsWithListeners = new WeakSet();
 
+  static MAX_QUEUE_SIZE = 100;
+
+  static enqueue(message) {
+    Socket.queue.push(message);
+
+    if (Socket.queue.length > Socket.MAX_QUEUE_SIZE) {
+      Socket.queue.shift();
+    }
+  }
+
   static flushQueue = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (typeof WebSocket === 'undefined') {
+      return;
+    }
+
     if (!window.ws || window.ws.readyState !== WebSocket.OPEN) {
       return;
     }
@@ -19,7 +37,7 @@ class Socket {
   };
 
   static ensureListeners() {
-    if (!window.ws) {
+    if (typeof window === 'undefined' || !window.ws) {
       return;
     }
 
@@ -54,12 +72,24 @@ class Socket {
       data,
     });
 
+    if (typeof window === 'undefined' || typeof WebSocket === 'undefined') {
+      console.warn(`[socket] Unable to emit ${event}: WebSocket not available in this environment.`);
+      return;
+    }
+
     if (window.ws && window.ws.readyState === WebSocket.OPEN) {
       window.ws.send(payload);
       return;
     }
 
-    Socket.queue.push(payload);
+    if (!window.ws) {
+      console.warn(`[socket] Queuing ${event}, waiting for websocket to initialise.`);
+      Socket.enqueue(payload);
+      Socket.waitForOpen = true;
+      return;
+    }
+
+    Socket.enqueue(payload);
     Socket.waitForOpen = true;
 
     if (window.ws) {

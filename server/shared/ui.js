@@ -135,22 +135,31 @@ class UI {
    * @param {array} inventory Your current inventory
    * @returns {integer}
    */
-  static getOpenSlot(inventory, location = 'inventory') {
-    if (inventory.length === 0) return 0;
-    let slotPosition = false;
-
+  static getOpenSlot(inventory = [], location = 'inventory') {
+    const slots = Array.isArray(inventory) ? inventory : [];
     const slotsAvailable = {
       inventory: 84,
       bank: 200,
     };
 
-    for (let index = 0; index < slotsAvailable[location]; index += 1) {
-      if (!inventory.find(e => e.slot === index) && slotPosition === false) {
-        slotPosition = index;
+    const maxSlots = slotsAvailable[location];
+    if (typeof maxSlots !== 'number') {
+      return false;
+    }
+
+    const occupied = new Set(
+      slots
+        .map(entry => entry && entry.slot)
+        .filter(slot => Number.isInteger(slot)),
+    );
+
+    for (let index = 0; index < maxSlots; index += 1) {
+      if (!occupied.has(index)) {
+        return index;
       }
     }
 
-    return slotPosition;
+    return false;
   }
 
   /**
