@@ -3,10 +3,7 @@
     class="game"
     :style="canvasStyle"
   >
-    <div
-      class="first-action"
-      v-html="action"
-    />
+    <div class="first-action">{{ action }}</div>
     <div
       v-if="current !== false"
       :style="getPaneDimensions"
@@ -21,6 +18,7 @@
     <canvas
       id="game-map"
       tabindex="0"
+      aria-label="Game world"
       class="main-canvas gameMap"
       :height="canvasDimensions.height"
       :width="canvasDimensions.width"

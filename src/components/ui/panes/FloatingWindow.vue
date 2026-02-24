@@ -22,6 +22,7 @@
             type="button"
             class="floating-window__dock-btn"
             :class="{ 'floating-window__dock-btn--active': dock === dockOption }"
+            :aria-label="`Dock ${dockOption}`"
             @click.stop="applyDock(dockOption)"
           >
             {{ dockLabel(dockOption) }}
@@ -32,6 +33,7 @@
           type="button"
           class="floating-window__ghost"
           :class="{ 'floating-window__ghost--active': isGhost }"
+          aria-label="Toggle transparency"
           @click.stop="toggleGhost"
         >
           👁
@@ -40,6 +42,7 @@
           v-if="closable"
           type="button"
           class="floating-window__close"
+          aria-label="Close"
           @click.stop="requestClose"
         >
           ×
@@ -425,6 +428,11 @@ export default {
     background: rgba(255, 215, 79, 0.18);
     border-color: rgba(255, 215, 79, 0.5);
   }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
+  }
 }
 
 .floating-window__close {
@@ -440,6 +448,11 @@ export default {
   &:hover {
     border-color: rgba(255, 255, 255, 0.4);
     background: rgba(0, 0, 0, 0.55);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
   }
 }
 
@@ -463,6 +476,11 @@ export default {
   &--active {
     opacity: 0.65;
     border-color: rgba(255, 215, 79, 0.45);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.8);
+    outline-offset: 2px;
   }
 }
 

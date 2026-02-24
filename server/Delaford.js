@@ -218,6 +218,28 @@ class Delaford {
   connection(ws) {
     // Assign UUID to every connection
     ws.id = uuid();
+    ws.authenticated = false;
+
+    // Per-connection rate limiter (token bucket)
+    const RATE_TOKENS_MAX = 30;
+    const RATE_REFILL_PER_SEC = 10;
+    ws._rateTokens = RATE_TOKENS_MAX;
+    ws._rateLastRefill = Date.now();
+
+    const consumeRateToken = () => {
+      const now = Date.now();
+      const elapsed = (now - ws._rateLastRefill) / 1000;
+      ws._rateTokens = Math.min(RATE_TOKENS_MAX, ws._rateTokens + elapsed * RATE_REFILL_PER_SEC);
+      ws._rateLastRefill = now;
+      if (ws._rateTokens < 1) {
+        return false;
+      }
+      ws._rateTokens -= 1;
+      return true;
+    };
+
+    // Events that don't require authentication
+    const PUBLIC_EVENTS = new Set(['player:login']);
 
     // Add player to server's player list
     console.log(`${emoji.get('computer')}  A client (${ws.id.substring(0, 5)}...) connected.`);
@@ -256,6 +278,18 @@ class Delaford {
 
       if (typeof Handler[data.event] !== 'function') {
         console.warn(`[socket] Unknown event "${data.event}" from ${ws.id.substring(0, 5)}...`);
+        return;
+      }
+
+      // Rate limit: drop messages when the bucket is empty
+      if (!consumeRateToken()) {
+        console.warn(`[socket] Rate limited ${ws.id.substring(0, 5)}... event="${data.event}"`);
+        return;
+      }
+
+      // Require authentication for non-public events
+      if (!PUBLIC_EVENTS.has(data.event) && !ws.authenticated) {
+        console.warn(`[socket] Unauthenticated event "${data.event}" from ${ws.id.substring(0, 5)}...`);
         return;
       }
 

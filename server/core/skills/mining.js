@@ -4,6 +4,9 @@ import world from '#server/core/world.js';
 import Skill from './index.js';
 
 export default class Mining extends Skill {
+  // Track which players are currently mining to prevent concurrent attempts
+  static _activeMiningLocks = new Set();
+
   constructor(playerIndex, rockId) {
     super(playerIndex);
     this.player = world.players[playerIndex];
@@ -43,29 +46,59 @@ export default class Mining extends Skill {
    * Swing your pickaxe at a rock to mine
    */
   pickAtRock() {
-    let counter = 0;
-    console.log(`Mining for ${this.rock.resources}`);
+    const playerUuid = this.player ? this.player.uuid : null;
+    const rock = this.rock;
+    console.log(`Mining for ${rock ? rock.resources : 'unknown'}`);
+
+    if (!rock) {
+      return Promise.reject(new Error('That rock is no longer available.'));
+    }
+
+    if (rock.function === 'no-mining-resource') {
+      return Promise.reject(new Error(rock.resources));
+    }
+
+    if (!this.checkForPickaxe()) {
+      return Promise.reject(new Error('You need a pickaxe to mine rocks.'));
+    }
+
+    // Prevent concurrent mining by the same player
+    if (playerUuid && Mining._activeMiningLocks.has(playerUuid)) {
+      return Promise.reject(new Error('You are already mining.'));
+    }
+
+    if (playerUuid) {
+      Mining._activeMiningLocks.add(playerUuid);
+    }
 
     return new Promise((resolve, reject) => {
-      if (this.rock.function === 'no-mining-resource') {
-        reject(new Error(this.rock.resources));
-      } else if (this.checkForPickaxe()) {
-        const action = setInterval(() => {
-          counter += 1;
-          console.log('Picking at rock...');
+      // TODO
+      // Create algorithm to determine amount of time spent mining
+      // based on player's mining level, rock type, and pickaxe
+      setTimeout(() => {
+        if (playerUuid) {
+          Mining._activeMiningLocks.delete(playerUuid);
+        }
 
-          // TODO
-          // Create algorithm to determine amount
-          // of time spent mining for a rock based
-          // on a player's mining level and that rock and their pickaxe
-          if (counter === 1) {
-            clearInterval(action);
-            resolve(this.rock);
-          }
-        }, 1000);
-      } else {
-        reject(new Error('You need a pickaxe to mine rocks.'));
-      }
+        // Re-validate state after the mining delay
+        if (!this.player || !world.players.includes(this.player)) {
+          reject(new Error('Mining interrupted.'));
+          return;
+        }
+
+        if (!this.checkForPickaxe()) {
+          reject(new Error('You no longer have a pickaxe.'));
+          return;
+        }
+
+        const currentRock = this.rock;
+        if (!currentRock || currentRock.function === 'no-mining-resource') {
+          reject(new Error('That rock is no longer available.'));
+          return;
+        }
+
+        resolve(currentRock);
+      }, 1000);
     });
   }
 

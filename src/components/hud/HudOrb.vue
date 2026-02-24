@@ -3,6 +3,7 @@
     class="hud-orb"
     :class="variant"
     type="button"
+    :aria-label="`${label}: ${displayValue}`"
     @click="$emit('activate')"
   >
     <span class="hud-orb__label">{{ label }}</span>
