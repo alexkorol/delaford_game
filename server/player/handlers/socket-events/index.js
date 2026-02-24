@@ -46,13 +46,17 @@ export default {
     const { id, said } = data;
     const { viewport } = config.map;
 
+    if (typeof said !== 'string' || !said.trim()) {
+      return;
+    }
+
     const speaker = world.players.find(p => p.socket_id === id);
     if (!speaker) {
       return;
     }
 
     const { username, x, y } = speaker;
-    
+
     // Put a limit on the length of a player message to 50 characters.
     const text = said.length > 50 ? said.substring(0, 50) : said;
 

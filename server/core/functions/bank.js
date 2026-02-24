@@ -7,6 +7,9 @@ export default class Bank {
   constructor(playerUuid, itemId, quantity, type) {
     // Data references
     this.playerIndex = world.players.findIndex(p => p.uuid === playerUuid);
+    if (this.playerIndex === -1) {
+      throw new Error('Player not found in world.');
+    }
     this.inventory = world.players[this.playerIndex].inventory;
     this.bankSlots = world.players[this.playerIndex].bank;
 
