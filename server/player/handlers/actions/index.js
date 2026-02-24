@@ -180,6 +180,10 @@ export default {
       s => s.slot === data.data.miscData.slot,
     );
 
+    if (!itemInventory) {
+      return;
+    }
+
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
     if (playerIndex === -1) {
       return;
@@ -307,6 +311,9 @@ export default {
     }
   },
   'player:context-menu:action': (incoming) => {
+    if (!incoming.data || !incoming.data.data || !incoming.data.data.item || !incoming.data.player) {
+      return;
+    }
     const miscData = incoming.data.data.item.miscData || false;
     const action = new Action(incoming.data.player.socket_id, miscData);
     action.do(incoming.data.data, incoming.data.queueItem);
@@ -351,6 +358,11 @@ export default {
 
     if (player.skills.smithing.level >= smithingLevelToSmelt[itemClickedOn]) {
       const barSmelted = await smithing.smelt(player.inventory.slots);
+
+      // Re-validate player still exists after async operation
+      if (!world.players[playerIndex]) {
+        return;
+      }
 
       if (barSmelted) {
         smithing.updateExperience(barSmelted.experience);
@@ -704,6 +716,11 @@ export default {
 
     try {
       const rockMined = await mining.pickAtRock();
+
+      // Re-validate player still exists after async operation
+      if (!world.players[data.playerIndex]) {
+        return;
+      }
 
       // Tell user of successful resource gathering
       Socket.sendMessageToPlayer(
