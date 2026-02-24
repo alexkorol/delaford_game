@@ -19,71 +19,56 @@ class Authentication {
    * Logs the player in and returns their JWT token
    *
    * @param {object} data The player credentials
+   * @returns {Promise<string>} The JWT access token
    */
-  static getToken(data) {
+  static async getToken(data) {
     const url = `${process.env.SITE_URL}/api/auth/login`;
 
-    return new Promise((resolve, reject) => {
-      axios
-        .post(url, data)
-        .then((r) => {
-          resolve(r.data.access_token);
-        })
-        .catch(() => {
-          reject(
-            new Error({
-              error: 401,
-              message: 'Username and password are incorrect.',
-            }),
-          );
-        });
-    });
+    try {
+      const response = await axios.post(url, data);
+      return response.data.access_token;
+    } catch {
+      throw new Error('Username and password are incorrect.');
+    }
   }
 
   /**
    * Gets the player profile upon login
    *
    * @param {string} token Their JWT authentication token
+   * @returns {Promise<object>} The player profile
    */
-  static getProfile(token) {
+  static async getProfile(token) {
     const url = `${process.env.SITE_URL}/api/auth/me`;
-    const config = {
-      headers: { Authorization: `Bearer ${token}` },
-    };
 
-    return new Promise((resolve, reject) => {
-      axios
-        .post(url, null, config)
-        .then(r => resolve(r.data))
-        .catch((error) => {
-          console.log(error.response);
-          reject(error.response);
-        });
-    });
+    try {
+      const response = await axios.post(url, null, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[auth] Failed to fetch profile.', error.response?.status);
+      throw error;
+    }
   }
 
   /**
    * Logs the player out and saves the data.
    *
    * @param {string} token Their JWT authentication token
+   * @returns {Promise<object>} The logout response
    */
   static async logout(token) {
     const url = `${process.env.SITE_URL}/api/auth/logout`;
 
-    const config = {
-      headers: { Authorization: `Bearer ${token}` },
-    };
-
-    return new Promise((resolve, reject) => {
-      axios
-        .post(url, {}, config)
-        .then((r) => {
-          resolve(r.data);
-        })
-        .catch((error) => {
-          reject(error.message);
-        });
-    });
+    try {
+      const response = await axios.post(url, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.message);
+    }
   }
 
   /**

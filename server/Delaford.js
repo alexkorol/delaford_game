@@ -241,10 +241,24 @@ class Delaford {
     });
 
     ws.on('message', async (msg) => {
-      const data = JSON.parse(msg);
+      let data;
+      try {
+        data = JSON.parse(msg);
+      } catch {
+        console.warn(`[socket] Received malformed JSON from ${ws.id}`);
+        return;
+      }
 
-      // Client-sent events from WebSocket
-      // are processed through this method
+      if (!data || typeof data.event !== 'string') {
+        console.warn(`[socket] Missing event name from ${ws.id}`);
+        return;
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(Handler, data.event)) {
+        console.warn(`[socket] Unknown event "${data.event}" from ${ws.id}`);
+        return;
+      }
+
       Handler[data.event](data, ws, this);
     });
 
