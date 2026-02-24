@@ -1,7 +1,12 @@
 <!-- eslint-disable -->
 <template>
   <div class="container">
-    <span @click="togglePlayer">
+    <button
+      type="button"
+      class="audio-toggle"
+      :aria-label="isMuted ? 'Unmute music' : 'Mute music'"
+      @click="togglePlayer"
+    >
       <svg
         v-if="isMuted"
         version="1.1"
@@ -25,7 +30,7 @@
         <path d="M18 12c0-1.978-0.975-3.828-2.606-4.95l-0.412-0.284-0.566 0.825 0.413 0.284c1.359 0.934 2.172 2.475 2.172 4.125s-0.813 3.191-2.175 4.125l-0.412 0.284 0.566 0.825 0.413-0.284c1.634-1.122 2.609-2.972 2.609-4.95z"/>
         <path d="M13.694 9.525l-0.412-0.281-0.563 0.822 0.412 0.281c0.544 0.375 0.869 0.991 0.869 1.65s-0.325 1.275-0.869 1.65l-0.412 0.281 0.566 0.825 0.413-0.281c0.816-0.559 1.306-1.484 1.306-2.475-0.003-0.987-0.491-1.912-1.309-2.472z"/>
       </svg>
-    </span>
+    </button>
 
     <audio id="player" ref="player" loop>
       <source
@@ -41,7 +46,7 @@ import bus from '../../core/utilities/bus.js';
 export default {
   data() {
     return {
-      audio: false,
+      audio: null,
     };
   },
   computed: {
@@ -61,14 +66,20 @@ export default {
     },
   },
   created() {
-    bus.$on('music:start', async () => {
+    this._onMusicStart = async () => {
       await this.$nextTick();
       this.startPlayer();
-    });
-    bus.$on('music:stop', async () => {
+    };
+    this._onMusicStop = async () => {
       await this.$nextTick();
       this.stopPlayer();
-    });
+    };
+    bus.$on('music:start', this._onMusicStart);
+    bus.$on('music:stop', this._onMusicStop);
+  },
+  beforeUnmount() {
+    bus.$off('music:start', this._onMusicStart);
+    bus.$off('music:stop', this._onMusicStop);
   },
   methods: {
     /**
@@ -115,6 +126,16 @@ export default {
   left: 1em;
   margin: 0;
   padding: 0;
+
+  .audio-toggle {
+    appearance: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: inherit;
+    line-height: 1;
+  }
 
   svg {
     cursor: pointer;

@@ -970,7 +970,7 @@ export default {
         } else {
           this.game.ensureAnimationController(updated);
         }
-        this.$set(this.game.map.players, playerIndex, updated);
+        this.game.map.players[playerIndex] = updated;
       }
     },
 

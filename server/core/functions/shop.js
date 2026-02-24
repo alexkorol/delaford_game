@@ -288,10 +288,11 @@ class Shop {
       }
 
       // Substract the quantity of the items we have bought
-      const qtyAfterPurchase = this.shop[this.shopItemIndex].qty - isBuying;
+      const shopQty = this.shop[this.shopItemIndex].qty;
+      const qtyAfterPurchase = shopQty - isBuying;
 
       if (qtyAfterPurchase > 0 || this.buyingStoreProduct()) {
-        this.shop[this.shopItemIndex].qty = qtyAfterPurchase;
+        this.shop[this.shopItemIndex].qty = Math.max(0, qtyAfterPurchase);
       } else {
         // Remove sprite with quantity equals to zero only
         // when item's origin is from a player.

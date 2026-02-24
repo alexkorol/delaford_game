@@ -10,7 +10,7 @@
           type="range"
           min="1"
           max="5"
-          steps="1"
+          step="1"
           value="1"
         >
       </div>
@@ -67,7 +67,7 @@ div.settings {
   }
 
   input[type="range"] {
-    width: 98%;
+    width: 100%;
   }
 
   div.fps-range {

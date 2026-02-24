@@ -18,10 +18,12 @@
     <div class="inputs">
       <form
         :class="{ hasErrors: invalid }"
-        action=""
         autocomplete="off"
+        @submit.prevent="login"
       >
+        <label for="login-username" class="sr-only">Username</label>
         <input
+          id="login-username"
           ref="usernameField"
           v-model="username"
           placeholder="Username"
@@ -30,15 +32,15 @@
           autocorrect="off"
           spellcheck="false"
           autocomplete="off"
-          @keyup.enter="login"
         >
+        <label for="login-password" class="sr-only">Password</label>
         <input
+          id="login-password"
           v-model="password"
           placeholder="Password"
           type="password"
           class="password"
           autocomplete="off"
-          @keyup.enter="login"
         >
       </form>
 
@@ -281,9 +283,19 @@ div.form {
   }
 
   .guest_account {
+    margin-top: 1em;
+  }
+
+  .sr-only {
     position: absolute;
-    left: 1em;
-    bottom: 1em;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
 </style>

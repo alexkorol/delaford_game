@@ -202,7 +202,7 @@ export default {
     console.log(
       `Dropping: ${data.item.id} (${itemInventory.qty || 0}) at ${
         world.players[playerIndex].x
-      }, ${world.players[playerIndex].x}`,
+      }, ${world.players[playerIndex].y}`,
     );
 
     Socket.broadcast('world:itemDropped', world.items);
@@ -601,6 +601,12 @@ export default {
       quantity,
     );
 
+    // Validate action type before dynamic dispatch
+    const allowedShopActions = ['buy', 'sell', 'value'];
+    if (!allowedShopActions.includes(data.doing)) {
+      return;
+    }
+
     // We will be buying or selling an item
     const response = shop[data.doing]();
 
@@ -670,6 +676,11 @@ export default {
       data.item.params.quantity,
       data.doing,
     );
+
+    const allowedBankActions = ['deposit', 'withdraw'];
+    if (!allowedBankActions.includes(data.doing)) {
+      return;
+    }
 
     try {
       const { inventory, bankItems } = await bank[data.doing]();

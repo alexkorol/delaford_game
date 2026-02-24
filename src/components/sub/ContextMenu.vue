@@ -15,8 +15,7 @@
         :key="index"
         class="action"
         @click="selectAction($event, item)"
-        v-html="item.label"
-      />
+      >{{ item.label }}</li>
       <li
         class="action"
         @click="selectAction($event, { action: { name: 'cancel' } })"
@@ -41,8 +40,8 @@ export default {
   },
   data() {
     return {
-      items: false,
-      mouseEvent: false,
+      items: [],
+      mouseEvent: null,
       actions: {},
       view: false,
       tile: {
@@ -256,7 +255,7 @@ $menu_font_hover_color: #ffd829;
 
 div {
   position: absolute;
-  z-index: 99999999;
+  z-index: 500;
 
   ul#actions {
     font-family: "GameFont", sans-serif;
@@ -270,7 +269,7 @@ div {
     max-width: $menu_max_width;
     min-width: $menu_min_width;
     font-size: 12px;
-    z-index: 999999;
+    z-index: 501;
 
     li.action {
       cursor: pointer;

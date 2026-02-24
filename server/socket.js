@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import world from '#server/core/world.js';
 
 /**
@@ -127,8 +127,12 @@ class Socket {
   }
 
   static sendMessageToPlayer(playerIndex, message) {
+    const player = world.players[playerIndex];
+    if (!player || !player.socket_id) {
+      return;
+    }
     this.emit('game:send:message', {
-      player: { socket_id: world.players[playerIndex].socket_id },
+      player: { socket_id: player.socket_id },
       text: message,
     });
   }

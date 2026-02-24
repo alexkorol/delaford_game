@@ -268,7 +268,6 @@ export default {
     openScreen(incoming) {
       this.current = incoming.data.screen;
       this.screenData = incoming.data.payload;
-      console.log(this.screenData);
       bus.$emit('pane:data', this.screenData);
     },
     /**

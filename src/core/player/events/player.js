@@ -114,7 +114,9 @@ export default {
    */
   'player:left': (data, context) => {
     const playerIndex = context.game.map.players.findIndex((p) => data.data === p.socket_id);
-    context.game.map.players.splice(playerIndex, 1);
+    if (playerIndex !== -1) {
+      context.game.map.players.splice(playerIndex, 1);
+    }
   },
 
   /**
