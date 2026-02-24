@@ -151,11 +151,12 @@ export default {
       }
 
       if (props.dock !== 'floating') {
+        const inset = 'var(--space-md)';
         const dockStyles = {
-          left: { left: '16px', top: '16px', bottom: '16px', width: normaliseSize(props.width) },
-          right: { right: '16px', top: '16px', bottom: '16px', width: normaliseSize(props.width) },
-          bottom: { left: '16px', right: '16px', bottom: '16px', width: 'auto' },
-          top: { left: '16px', right: '16px', top: '16px', width: 'auto' },
+          left: { left: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
+          right: { right: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
+          bottom: { left: inset, right: inset, bottom: inset, width: 'auto' },
+          top: { left: inset, right: inset, top: inset, width: 'auto' },
         };
         return {
           zIndex: props.zIndex,

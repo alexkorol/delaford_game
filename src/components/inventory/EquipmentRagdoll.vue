@@ -151,6 +151,8 @@ export default {
 @use 'sass:color';
 
 .equipment-ragdoll {
+  --eq-slot-size: clamp(40px, 6vw, 48px);
+
   position: relative;
   display: grid;
   grid-template-columns: 1fr;
@@ -190,8 +192,8 @@ export default {
 }
 
 .slot {
-  width: 48px;
-  height: 48px;
+  width: var(--eq-slot-size);
+  height: var(--eq-slot-size);
   background-color: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;

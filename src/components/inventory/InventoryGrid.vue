@@ -205,7 +205,7 @@ export default {
 
       return {
         backgroundImage: `url(${backgroundSrc(tileset)})`,
-        backgroundPosition: `left -${column * 32}px top -${row * 32}px`,
+        backgroundPosition: `left -${column * CELL_SIZE_PX}px top -${row * CELL_SIZE_PX}px`,
       };
     };
 
