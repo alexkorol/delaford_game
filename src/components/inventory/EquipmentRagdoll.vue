@@ -1,6 +1,6 @@
 <template>
   <div class="equipment-ragdoll">
-    <svg class="equipment-ragdoll__skeleton">
+    <svg class="equipment-ragdoll__skeleton" viewBox="0 0 160 200" preserveAspectRatio="xMidYMid meet">
       <line x1="77" x2="77" y1="25" y2="190" />
       <line x1="25" x2="25" y1="130" y2="190" />
       <line x1="130" x2="130" y1="130" y2="190" />
@@ -156,19 +156,21 @@ export default {
   grid-template-columns: 1fr;
   grid-template-rows: auto;
   justify-items: center;
-  padding: 8px 12px;
+  padding: var(--space-sm) var(--space-md);
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid color.adjust(#1e1e1e, $lightness: 10%);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: 'GameFont', serif;
 
   &__skeleton {
     position: absolute;
-    top: 16px;
+    top: var(--space-lg);
     left: 50%;
     transform: translateX(-50%);
-    width: 160px;
-    height: 200px;
+    width: 100%;
+    max-width: 160px;
+    height: auto;
+    aspect-ratio: 160 / 200;
     stroke: rgba(255, 255, 255, 0.15);
   }
 
@@ -176,8 +178,8 @@ export default {
     position: relative;
     display: grid;
     grid-auto-rows: minmax(40px, auto);
-    gap: 8px;
-    padding-top: 6px;
+    gap: var(--space-sm);
+    padding-top: var(--space-xs);
     z-index: 1;
   }
 }
@@ -186,7 +188,7 @@ export default {
   display: grid;
   grid-auto-flow: column;
   justify-content: center;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 
 .slot {

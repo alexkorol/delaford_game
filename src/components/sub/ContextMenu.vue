@@ -250,38 +250,40 @@ export default {
 <style lang="scss" scoped>
 $menu_bg_color: #8d8d8d;
 $menu_font_color: #fff;
-$menu_min_width: 100px;
-$menu_max_width: 195px;
+$menu_min_width: 120px;
+$menu_max_width: 220px;
 $menu_font_hover_color: #ffd829;
 
 div {
   position: absolute;
-  z-index: 99999999;
+  z-index: 500;
 
   ul#actions {
     font-family: "GameFont", sans-serif;
-    box-shadow: 2.5px 2.5px 0 0 rgba(0, 0, 0, 0.75);
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.75);
     outline: none;
     background: $menu_bg_color;
     display: block;
     list-style: none;
     margin: 0;
-    padding: 0 0 3px 0;
+    padding: var(--space-xs) 0;
     max-width: $menu_max_width;
     min-width: $menu_min_width;
-    font-size: 12px;
-    z-index: 999999;
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-sm);
 
     li.action {
       cursor: pointer;
       color: $menu_font_color;
       text-align: left;
-      padding: 2px 5px;
+      padding: var(--space-xs) var(--space-sm);
       text-shadow: 1px 1px 0 #000;
       margin: 0;
+      line-height: 1.4;
 
       &:hover {
         color: $menu_font_hover_color;
+        background: rgba(0, 0, 0, 0.15);
       }
     }
   }

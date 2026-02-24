@@ -99,19 +99,30 @@ export default {
 .inventory-pane {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 16px;
+  gap: var(--space-lg);
   align-items: start;
   width: 100%;
   box-sizing: border-box;
 
   &__ragdoll {
-    min-width: 190px;
+    min-width: 170px;
   }
 
   &__grid {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-md);
+  }
+}
+
+@media (width <= 639px) {
+  .inventory-pane {
+    grid-template-columns: 1fr;
+
+    &__ragdoll {
+      justify-self: center;
+      min-width: auto;
+    }
   }
 }
 </style>

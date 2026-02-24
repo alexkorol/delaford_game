@@ -151,11 +151,12 @@ export default {
       }
 
       if (props.dock !== 'floating') {
+        const inset = 'var(--space-lg)';
         const dockStyles = {
-          left: { left: '16px', top: '16px', bottom: '16px', width: normaliseSize(props.width) },
-          right: { right: '16px', top: '16px', bottom: '16px', width: normaliseSize(props.width) },
-          bottom: { left: '16px', right: '16px', bottom: '16px', width: 'auto' },
-          top: { left: '16px', right: '16px', top: '16px', width: 'auto' },
+          left: { left: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
+          right: { right: inset, top: inset, bottom: inset, width: normaliseSize(props.width) },
+          bottom: { left: inset, right: inset, bottom: inset, width: 'auto' },
+          top: { left: inset, right: inset, top: inset, width: 'auto' },
         };
         return {
           zIndex: props.zIndex,
@@ -407,7 +408,7 @@ export default {
 .floating-window__dock {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-xs);
 }
 
 .floating-window__dock-btn {
@@ -444,7 +445,7 @@ export default {
 
 .floating-window__body {
   padding: var(--space-md);
-  min-height: 120px;
+  min-height: 80px;
   max-height: 80vh;
   overflow: auto;
 }

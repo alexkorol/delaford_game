@@ -727,7 +727,7 @@ export default {
   display: inline-flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 10px 12px;
+  padding: var(--space-md);
   border-radius: var(--radius-lg);
   background: rgba(10, 12, 20, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -739,7 +739,7 @@ export default {
 .floating-controls__btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
   padding: 8px 12px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -787,7 +787,7 @@ export default {
   position: fixed;
   right: var(--space-md);
   bottom: var(--space-md);
-  padding: 10px 14px;
+  padding: var(--space-md) var(--space-lg);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   background: rgba(12, 16, 28, 0.85);

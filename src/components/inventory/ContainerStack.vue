@@ -61,28 +61,28 @@ export default {
 
 <style lang="scss" scoped>
 .container-stack {
-  margin-top: 16px;
-  padding: 12px 14px;
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.86);
 }
 
 .container-stack header {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .container-stack h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .container-stack p {
-  margin: 4px 0 0 0;
-  font-size: 12px;
+  margin: var(--space-xs) 0 0 0;
+  font-size: var(--font-size-sm);
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -91,15 +91,15 @@ export default {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .container-stack__entry {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 4px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.35);
   border: 1px dashed rgba(255, 255, 255, 0.12);
 }
@@ -111,12 +111,12 @@ export default {
 }
 
 .container-stack__timestamp {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   color: rgba(255, 255, 255, 0.5);
 }
 
 .container-stack__status {
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: rgba(255, 255, 255, 0.45);

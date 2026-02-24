@@ -99,17 +99,13 @@ export default {
 
 .hud-shell__quickbar {
   flex: 1 1 auto;
-  transform: translateY(18px);
   margin: 0 var(--space-md);
+  align-self: center;
 }
 
 @media (width <= 1279px) {
   .hud-shell__row {
     gap: clamp(var(--space-sm), 2vw, var(--space-lg));
-  }
-
-  .hud-shell__quickbar {
-    transform: translateY(12px);
   }
 }
 
@@ -124,7 +120,6 @@ export default {
   }
 
   .hud-shell__quickbar {
-    transform: none;
     margin: var(--space-sm) 0 0;
   }
 }
