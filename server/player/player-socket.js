@@ -6,6 +6,9 @@ class PlayerSocket {
   }
 
   emit(event, data) {
+    if (!this.client) {
+      return;
+    }
     // Send the player back their needed data
     this.client.send(JSON.stringify({
       event,

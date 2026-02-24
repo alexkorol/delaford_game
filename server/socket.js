@@ -127,6 +127,9 @@ class Socket {
   }
 
   static sendMessageToPlayer(playerIndex, message) {
+    if (playerIndex === -1 || !world.players[playerIndex]) {
+      return;
+    }
     this.emit('game:send:message', {
       player: { socket_id: world.players[playerIndex].socket_id },
       text: message,
