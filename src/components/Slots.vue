@@ -165,12 +165,12 @@ div.slots {
 
   div.top_slots {
     display: grid;
-    grid-template-columns: 25% 50% 25%;
+    grid-template-columns: repeat(3, 1fr);
   }
 
   div.bottom_slots {
     display: grid;
-    grid-template-columns: 25% 25% 25% 25%;
+    grid-template-columns: repeat(4, 1fr);
     background: #ababab;
 
     div:last-child {

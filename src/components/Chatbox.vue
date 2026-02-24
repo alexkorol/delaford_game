@@ -52,8 +52,8 @@
           </span>
           <span
             class="chatbox__text"
-            v-html="message.display"
-          />
+            :style="message.colorStyle || ''"
+          >{{ message.displayText }}</span>
           <span class="chatbox__time">{{ message.displayTime }}</span>
         </li>
       </ul>
@@ -145,7 +145,8 @@ export default {
           username: '',
           color: '#1D56F2',
           timestamp: Date.now(),
-          display: 'Welcome to Delaford.',
+          displayText: 'Welcome to Delaford.',
+          colorStyle: '',
           displayTime: formatTime(Date.now()),
         },
       ],
@@ -216,7 +217,6 @@ export default {
         color = '#1D56F2',
       } = normalised;
 
-      this.said = text;
       this.appendChat({ type, username, color, text });
     },
     appendChat({ type, username, color, text }) {
@@ -224,13 +224,14 @@ export default {
         return;
       }
       const timestamp = Date.now();
-      const display = this.formatMessage(type, username, color, text);
+      const formatted = this.formatMessage(type, color, text);
       const message = {
         type,
         username,
         color,
         text,
-        display,
+        displayText: formatted.displayText,
+        colorStyle: formatted.colorStyle,
         timestamp,
         displayTime: formatTime(timestamp),
       };
@@ -239,13 +240,14 @@ export default {
       this.$emit('message-appended', { ...message });
       this.$nextTick(() => this.scrollToBottom());
     },
-    formatMessage(type, username, color, text) {
-      switch (type) {
-      case 'chat':
-        return `<span class="chatbox__text--chat" style="color:${color}">${text}</span>`;
-      default:
-        return text;
+    formatMessage(type, color, text) {
+      const sanitisedColor = typeof color === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(color)
+        ? color
+        : '';
+      if (type === 'chat' && sanitisedColor) {
+        return { displayText: text, colorStyle: `color:${sanitisedColor}` };
       }
+      return { displayText: text, colorStyle: '' };
     },
     sendMessage() {
       const payload = this.said && this.said.trim();
@@ -326,7 +328,9 @@ export default {
   flex-direction: column;
   width: var(--chat-width);
   max-width: 100%;
+
   @include glass-panel(rgba(16, 20, 32, 0.78));
+
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: transform 180ms ease-out, opacity 180ms ease-out;
@@ -443,7 +447,7 @@ export default {
 }
 
 .chatbox__text {
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .chatbox__text--chat {

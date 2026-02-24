@@ -84,7 +84,7 @@ export default {
   align-items: flex-end;
   justify-content: space-between;
   gap: clamp(var(--space-md), 2vw, var(--space-xl));
-  padding: calc(var(--space-sm) * 1.25) var(--space-lg);
+  padding: calc(var(--space-sm) * 1.25) var(--space-lg) calc(var(--space-sm) * 1.25 + 18px);
   border-radius: var(--radius-lg);
   background: rgba(18, 24, 48, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);

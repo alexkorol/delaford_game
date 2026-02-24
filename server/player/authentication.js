@@ -31,10 +31,7 @@ class Authentication {
         })
         .catch(() => {
           reject(
-            new Error({
-              error: 401,
-              message: 'Username and password are incorrect.',
-            }),
+            new Error('Username and password are incorrect.'),
           );
         });
     });

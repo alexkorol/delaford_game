@@ -83,10 +83,15 @@ export default {
    * A player moves to a new tile via keyboard
    */
   'player:move': (data) => {
-    const playerIndex = world.players.findIndex(player => player.uuid === data.data.id);
+    const payload = data.data || {};
+    const playerIndex = world.players.findIndex(player => player.uuid === payload.id);
+    if (playerIndex === -1) {
+      return;
+    }
+
     const player = world.players[playerIndex];
     const startedAt = Date.now();
-    player.move(data.data.direction, { startedAt, direction: data.data.direction });
+    player.move(payload.direction, { startedAt, direction: payload.direction });
 
     Player.broadcastMovement(player);
   },
@@ -120,17 +125,32 @@ export default {
   },
 
   /**
-   * Queue up an player action to executed they reach their destination
+   * Queue up a player action to be executed when they reach their destination
    */
   'player:queueAction': (data) => {
+    if (!data.player || !data.player.socket_id) {
+      return;
+    }
+
     const playerIndex = world.players.findIndex(p => p.socket_id === data.player.socket_id);
+    if (playerIndex === -1) {
+      return;
+    }
 
     world.players[playerIndex].queue.push(data);
     world.players[playerIndex].action = data.actionToQueue;
   },
 
   'player:pane:close': (data) => {
-    const playerIndex = world.players.findIndex(p => p.uuid === data.data.id);
+    const payload = data.data || {};
+    if (!payload.id) {
+      return;
+    }
+
+    const playerIndex = world.players.findIndex(p => p.uuid === payload.id);
+    if (playerIndex === -1) {
+      return;
+    }
 
     world.players[playerIndex].currentPane = false;
   },
