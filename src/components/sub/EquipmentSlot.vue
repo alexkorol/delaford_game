@@ -143,10 +143,11 @@ export default {
         return {};
       }
 
+      const TILE_SIZE = 32;
       const { column = 0, row = 0, tileset = 'weapons' } = this.item.graphics || {};
       return {
         backgroundImage: `url(${this.getTilesetSrc(tileset)})`,
-        backgroundPosition: `left -${column * 32}px top -${row * 32}px`,
+        backgroundPosition: `left -${column * TILE_SIZE}px top -${row * TILE_SIZE}px`,
       };
     },
     isDropTarget() {
@@ -167,8 +168,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: var(--eq-slot-size, 48px);
+  height: var(--eq-slot-size, 48px);
   box-sizing: border-box;
   background-repeat: no-repeat;
   background-position: center;

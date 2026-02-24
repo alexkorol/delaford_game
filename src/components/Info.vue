@@ -69,6 +69,8 @@ export default {
 @use 'sass:color';
 
 $info_text_color: rgb(68, 68, 68);
+$health_bg: #c62828;
+$health_fill: #558b2f;
 
 div.info {
   margin-bottom: auto;
@@ -86,23 +88,30 @@ div.info {
     width: 100%;
     box-sizing: border-box;
     border: 2px solid #525252;
-    background: #e43a3a;
+    background: $health_bg;
     height: 20px;
+    border-radius: 2px;
+    overflow: hidden;
 
     .bar {
-      width: 50%;
       height: 100%;
-      background: #7cb342;
+      background: $health_fill;
+      transition: width 0.25s ease-out;
 
       div {
         font-size: 10px;
         color: white;
         padding: 2px 0 0 4px;
+        white-space: nowrap;
       }
     }
   }
 
   .stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+
     strong {
       font-weight: bold;
     }
@@ -113,21 +122,13 @@ div.info {
       font-size: 12px;
 
       .def_label {
-        margin-left: .5em;
+        margin-left: 0.5em;
       }
-    }
-
-    .level {
-      float: left;
-    }
-
-    .att_def {
-      float: right;
     }
 
     span.integer {
       color: color.adjust($info_text_color, $lightness: 15%);
-      margin-left: .5em;
+      margin-left: 0.5em;
     }
   }
 }

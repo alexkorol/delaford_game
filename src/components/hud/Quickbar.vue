@@ -158,7 +158,7 @@ export default {
   letter-spacing: 0.08em;
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .quickbar {
     min-width: min(90vw, 520px);
     padding: var(--space-xs) var(--space-sm);

@@ -13,6 +13,9 @@ export default {
    */
   equippedAnItem(data) {
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+    if (playerIndex === -1) {
+      return;
+    }
     const player = world.players[playerIndex];
     const equippingItem = player.inventory.slots.find(s => s.slot === data.item.miscData.slot);
     const baseItem = wearableItems.find(i => i.id === data.item.id) || equippingItem;
@@ -54,6 +57,10 @@ export default {
   unequipItem(data) {
     return new Promise((resolve) => {
       const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+      if (playerIndex === -1) {
+        resolve(400);
+        return;
+      }
       const player = world.players[playerIndex];
       const baseItem = wearableItems.find(i => i.id === data.item.id);
 

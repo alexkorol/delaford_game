@@ -11,6 +11,9 @@ class Shop {
   constructor(shopId, playerUuid, itemId, type, quantity) {
     // Our player's reference and index
     this.playerIndex = world.players.findIndex(p => p.uuid === playerUuid);
+    if (this.playerIndex === -1) {
+      throw new Error('Player not found in world.');
+    }
     this.inventory = world.players[this.playerIndex].inventory;
 
     // How many spaces available in the player's inventory?

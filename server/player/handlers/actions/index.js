@@ -181,6 +181,9 @@ export default {
     );
 
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+    if (playerIndex === -1) {
+      return;
+    }
     const player = world.players[playerIndex];
     world.players[playerIndex].inventory.slots = world.players[
       playerIndex
@@ -210,7 +213,13 @@ export default {
    */
   'item:equip': async (data) => {
     const playerIndex = world.players.findIndex(p => p.uuid === data.id);
+    if (playerIndex === -1) {
+      return;
+    }
     const getItem = wearableItems.find(i => i.id === data.item.id);
+    if (!getItem) {
+      return;
+    }
     const alreadyWearing = world.players[playerIndex].wear[getItem.slot];
     if (alreadyWearing) {
       await pipe.player.unequipItem({
@@ -309,6 +318,9 @@ export default {
     const playerIndex = world.players.findIndex(
       player => player.uuid === data.player.uuid,
     );
+    if (playerIndex === -1) {
+      return;
+    }
     const itemClickedOn = data.player.currentPaneData[data.data.miscData.slot];
 
     const smith = new Smithing(playerIndex, itemClickedOn, 'forge');
@@ -329,6 +341,9 @@ export default {
     const playerIndex = world.players.findIndex(
       player => player.uuid === data.player.uuid,
     );
+    if (playerIndex === -1) {
+      return;
+    }
     const smithing = new Smithing(playerIndex, itemClickedOn, 'smelt');
     const smithingLevelToSmelt = Smithing.bars();
 
@@ -359,6 +374,9 @@ export default {
       data.todo = data;
     }
     const { playerIndex } = data;
+    if (playerIndex === -1 || !world.players[playerIndex]) {
+      return;
+    }
     const player = world.players[playerIndex];
     world.players[data.playerIndex].currentPane = 'furnace';
 
@@ -389,6 +407,9 @@ export default {
       data.todo = data;
     }
     const { playerIndex } = data;
+    if (playerIndex === -1 || !world.players[playerIndex]) {
+      return;
+    }
     const player = world.players[playerIndex];
     world.players[data.playerIndex].currentPane = 'anvil';
 
@@ -429,6 +450,9 @@ export default {
 
   'player:resource:goldenplaque:push': (data) => {
     const { playerIndex } = data;
+    if (playerIndex === undefined || playerIndex === -1 || !world.players[playerIndex]) {
+      return;
+    }
 
     const { id } = UI.randomElementFromArray(wearableItems);
 
@@ -537,6 +561,9 @@ export default {
       data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
       data.todo = data;
     }
+    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+      return;
+    }
     console.log('Accessing trade shop...', data.todo.item.id);
     world.players[data.playerIndex].currentPane = 'shop';
     world.players[data.playerIndex].objectId = data.todo.item.id;
@@ -549,7 +576,8 @@ export default {
   },
 
   'player:screen:npc:trade:action:value': (data) => {
-    const quantity = data.item.params ? data.item.params.quantity : 0;
+    const rawQty = data.item.params ? data.item.params.quantity : 0;
+    const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
     const shop = new Shop(
       data.player.objectId,
       data.id,
@@ -563,7 +591,8 @@ export default {
    * A player wants to buy or sell an item (and sometimes check its value)
    */
   'player:screen:npc:trade:action': (data) => {
-    const quantity = data.item.params ? data.item.params.quantity : 0;
+    const rawQty = data.item.params ? data.item.params.quantity : 0;
+    const quantity = Number.isFinite(rawQty) ? Math.max(0, Math.floor(rawQty)) : 0;
     const shop = new Shop(
       data.player.objectId,
       data.id,
@@ -599,6 +628,9 @@ export default {
       data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
       data.todo = data;
     }
+    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+      return;
+    }
     world.players[data.playerIndex].currentPane = 'smelt';
 
     Socket.emit('open:screen', {
@@ -615,6 +647,9 @@ export default {
     if (data.playerIndex === undefined) {
       data.playerIndex = world.players.findIndex(p => p.uuid === data.player.uuid);
       data.todo = data;
+    }
+    if (data.playerIndex === -1 || !world.players[data.playerIndex]) {
+      return;
     }
     world.players[data.playerIndex].currentPane = 'bank';
 
