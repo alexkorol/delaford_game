@@ -27,7 +27,7 @@ export default {
       console.log(`${data.data.username} logged in with a bad password.`);
 
       Socket.emit('player:login-error', {
-        data: JSON.stringify(error),
+        data: error && error.message ? error.message : 'Login failed.',
         player: { socket_id: ws.id },
       });
     }
@@ -142,8 +142,12 @@ export default {
       return;
     }
 
-    world.players[playerIndex].queue.push(data);
-    world.players[playerIndex].action = data.actionToQueue;
+    const player = world.players[playerIndex];
+    if (player.queue.length >= 20) {
+      return;
+    }
+    player.queue.push(data);
+    player.action = data.actionToQueue;
   },
 
   'player:pane:close': (data) => {

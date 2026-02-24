@@ -8,6 +8,11 @@
     <div
       v-if="hp"
       class="health"
+      role="progressbar"
+      :aria-valuenow="hp.current"
+      :aria-valuemin="0"
+      :aria-valuemax="hp.max"
+      aria-label="Health"
     >
       <div
         :style="displayHealthPercentage"
@@ -44,19 +49,28 @@ export default {
       return this.game.player;
     },
     hp() {
+      const hpData = this.game.player && this.game.player.hp;
+      if (!hpData) {
+        return null;
+      }
       return {
-        current: this.game.player.hp.current,
-        max: this.game.player.hp.max,
+        current: hpData.current || 0,
+        max: hpData.max || 0,
       };
     },
     getHealthPercentage() {
+      if (!this.hp || !this.hp.max) {
+        return 0;
+      }
       return (this.hp.current / this.hp.max) * 100;
     },
     getAttack() {
-      return this.game.player.combat.attack;
+      const combat = this.game.player && this.game.player.combat;
+      return combat ? combat.attack : 0;
     },
     getDefence() {
-      return this.game.player.combat.defense;
+      const combat = this.game.player && this.game.player.combat;
+      return combat ? combat.defense : 0;
     },
     displayHealthPercentage() {
       return `width:${this.getHealthPercentage}%`;

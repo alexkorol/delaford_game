@@ -1,11 +1,11 @@
 <template>
   <div class="equipment-ragdoll">
-    <svg class="equipment-ragdoll__skeleton">
-      <line x1="77" x2="77" y1="25" y2="190" />
-      <line x1="25" x2="25" y1="130" y2="190" />
-      <line x1="130" x2="130" y1="130" y2="190" />
-      <line x1="137" x2="27" y1="145" y2="145" />
-      <line x1="132" x2="27" y1="93" y2="93" />
+    <svg class="equipment-ragdoll__skeleton" viewBox="0 0 160 200" preserveAspectRatio="xMidYMid meet">
+      <line x1="80" x2="80" y1="25" y2="185" />
+      <line x1="28" x2="28" y1="130" y2="185" />
+      <line x1="132" x2="132" y1="130" y2="185" />
+      <line x1="132" x2="28" y1="145" y2="145" />
+      <line x1="132" x2="28" y1="93" y2="93" />
     </svg>
 
     <div class="equipment-ragdoll__slots">

@@ -93,10 +93,24 @@ app.get('/api/identity/accounts/:accountId', (req, res) => {
   return res.json(account);
 });
 
-app.get('/world/items', (_req, res) => res.send(world.items));
-app.get('/world/players', (_req, res) => res.send(world.players));
-app.get('/world/respawns', (_req, res) => res.send(world.respawns));
-app.get('/world/shops', (_req, res) => res.send(world.shops));
+// World data endpoints — only available in development for debugging.
+// In production these would leak game state (player positions, items, etc.).
+if (env === 'development') {
+  app.get('/world/items', (_req, res) => res.json(world.items || []));
+  app.get('/world/players', (_req, res) => {
+    // Strip sensitive fields before sending
+    const safe = (world.players || []).map((p) => ({
+      uuid: p.uuid,
+      username: p.username,
+      x: p.x,
+      y: p.y,
+      level: p.level,
+    }));
+    res.json(safe);
+  });
+  app.get('/world/respawns', (_req, res) => res.json(world.respawns || {}));
+  app.get('/world/shops', (_req, res) => res.json(world.shops || []));
+}
 
 app.use((_req, res) => {
 

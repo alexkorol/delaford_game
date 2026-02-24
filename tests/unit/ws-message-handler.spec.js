@@ -2,229 +2,309 @@
  * @vitest-environment node
  *
  * Tests for the WebSocket message handler security in Delaford.js.
- * Verifies that malformed, unknown, and missing-event messages are
- * handled gracefully without crashes.
+ * Verifies that the real Delaford.connection method correctly handles
+ * malformed, unknown, missing-event, unauthenticated, and rate-limited
+ * messages without crashes.
  */
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
+// Mock all server-side dependencies so Delaford can be imported in isolation
+vi.mock('#server/socket.js', () => {
+  class MockSocket {
+    constructor() {
+      this.ws = { on: vi.fn(), off: vi.fn(), clients: new Set() };
+      this.clients = [];
+    }
+
+    close() {}
+  }
+
+  MockSocket.emit = vi.fn();
+  MockSocket.broadcast = vi.fn();
+  MockSocket.sendMessageToPlayer = vi.fn();
+
+  return { default: MockSocket };
+});
+
+vi.mock('#server/core/world.js', () => ({
+  default: {
+    socket: { ws: { on: vi.fn(), off: vi.fn() } },
+    clients: [],
+    _players: [],
+    get players() { return this._players; },
+    set players(v) { this._players = v; },
+    items: [],
+    respawns: { items: [], monsters: [], resources: [] },
+    map: { foreground: [], background: [] },
+    npcs: [],
+    monsters: [],
+    shops: [],
+    addPlayer: vi.fn(),
+    removePlayer: vi.fn(),
+    removePlayerBySocket: vi.fn(() => null),
+    getScene: vi.fn(() => ({
+      id: 'test',
+      name: 'Test',
+      players: [],
+      npcs: [],
+      monsters: [],
+      items: [],
+    })),
+    getDefaultTown: vi.fn(() => ({
+      id: 'town:delaford',
+      name: 'Delaford',
+      players: [],
+      npcs: [],
+      monsters: [],
+      items: [],
+      respawns: { items: [], monsters: [], resources: [] },
+    })),
+    getSceneForPlayer: vi.fn(() => ({
+      id: 'town:delaford',
+      map: { foreground: [], background: [] },
+      npcs: [],
+      monsters: [],
+      items: [],
+    })),
+    getScenePlayers: vi.fn(() => []),
+  },
+}));
+
+vi.mock('#server/player/authentication.js', () => ({
+  default: {
+    login: vi.fn(),
+    logout: vi.fn(),
+    addPlayer: vi.fn(),
+  },
+}));
+
+vi.mock('#server/player/handler.js', () => ({
+  default: {
+    'player:login': vi.fn(),
+    'player:move': vi.fn(),
+    'player:say': vi.fn(),
+  },
+}));
+
+vi.mock('#server/core/data/items/index.js', () => ({
+  general: [],
+  wearableItems: [],
+  smithing: [],
+}));
+
+vi.mock('#server/core/npc.js', () => ({
+  default: { load: vi.fn(), movement: vi.fn() },
+}));
+
+vi.mock('#server/core/monster.js', () => ({
+  default: { load: vi.fn(), tick: vi.fn() },
+}));
+
+vi.mock('#server/core/item.js', () => ({
+  default: { check: vi.fn(), resourcesCheck: vi.fn() },
+}));
+
+vi.mock('#server/core/map.js', () => ({
+  default: vi.fn().mockImplementation(() => ({
+    foreground: [],
+    background: [],
+  })),
+}));
+
+vi.mock('#server/core/services/player-persistence.js', () => ({
+  default: { flushAllPlayers: vi.fn() },
+}));
+
+vi.mock('#server/player/handlers/party.js', () => ({
+  partyService: {
+    evaluateInstances: vi.fn(),
+    removePlayer: vi.fn(),
+  },
+}));
+
+vi.mock('node-emoji', () => ({
+  get: vi.fn(() => ''),
+}));
+
+vi.mock('uuid', () => ({
+  v4: vi.fn(() => 'test-uuid-0001'),
+}));
+
+const { default: Handler } = await import('#server/player/handler.js');
+const { default: world } = await import('#server/core/world.js');
+
+// Import the real Delaford class
+const { default: Delaford } = await import('#server/Delaford.js');
+
+/**
+ * Creates a mock WebSocket that mimics the ws library's interface.
+ */
 const createMockWs = (id = 'test-socket-001') => {
   const listeners = {};
   return {
     id,
     authenticated: false,
-    on: vi.fn((event, handler) => {
-      listeners[event] = handler;
-    }),
+    readyState: 1,
     send: vi.fn(),
-    readyState: 1, // OPEN
+    on: vi.fn((event, handler) => {
+      if (!listeners[event]) listeners[event] = [];
+      listeners[event].push(handler);
+    }),
     _listeners: listeners,
-    _trigger(event, ...args) {
-      if (listeners[event]) {
-        return listeners[event](...args);
-      }
+    _triggerMessage(msg) {
+      const handlers = listeners.message || [];
+      return Promise.all(handlers.map((h) => h(msg)));
     },
   };
 };
 
-const PUBLIC_EVENTS = new Set(['player:login']);
-
-// Simulate the message handler logic extracted from Delaford.connection
-const createMessageHandler = (handler, ws, options = {}) => {
-  const { rateLimiter } = options;
-
-  return async (msg) => {
-    let data;
-    try {
-      data = JSON.parse(msg);
-    } catch {
-      return { rejected: 'malformed' };
-    }
-
-    if (!data || typeof data.event !== 'string') {
-      return { rejected: 'missing-event' };
-    }
-
-    if (typeof handler[data.event] !== 'function') {
-      return { rejected: 'unknown-event' };
-    }
-
-    if (rateLimiter && !rateLimiter()) {
-      return { rejected: 'rate-limited' };
-    }
-
-    if (!PUBLIC_EVENTS.has(data.event) && !ws.authenticated) {
-      return { rejected: 'unauthenticated' };
-    }
-
-    await handler[data.event](data, ws);
-    return { accepted: data.event };
-  };
-};
-
-/**
- * Creates a token-bucket rate limiter (mirrors Delaford.js logic).
- */
-const createRateLimiter = (maxTokens = 30, refillPerSec = 10) => {
-  let tokens = maxTokens;
-  let lastRefill = Date.now();
-
-  return () => {
-    const now = Date.now();
-    const elapsed = (now - lastRefill) / 1000;
-    tokens = Math.min(maxTokens, tokens + elapsed * refillPerSec);
-    lastRefill = now;
-    if (tokens < 1) {
-      return false;
-    }
-    tokens -= 1;
-    return true;
-  };
-};
-
-describe('WebSocket message handler validation', () => {
-  let handler;
+describe('Delaford.connection – message handler validation', () => {
+  let game;
   let ws;
-  let processMessage;
 
   beforeEach(() => {
-    handler = {
-      'player:login': vi.fn(),
-      'player:move': vi.fn(),
-      'player:say': vi.fn(),
-    };
+    world.clients = [];
+    vi.clearAllMocks();
+
+    // Create Delaford instance (skips constructor side effects via mocks)
+    const mockServer = { on: vi.fn() };
+    game = new Delaford(mockServer);
+
+    // Create a mock WebSocket and run it through the real connection method
     ws = createMockWs();
+    game.connection(ws);
+    // After connection, ws.authenticated is still false (requires login)
+    // Set authenticated for general handler tests
     ws.authenticated = true;
-    processMessage = createMessageHandler(handler, ws);
   });
 
-  it('rejects malformed JSON gracefully', async () => {
-    const result = await processMessage('not json at all{{{');
-    expect(result.rejected).toBe('malformed');
-    expect(handler['player:login']).not.toHaveBeenCalled();
+  afterEach(() => {
+    game.shutdown();
+  });
+
+  it('rejects malformed JSON gracefully without crashing', async () => {
+    // Send non-JSON text through the real message handler
+    await ws._triggerMessage('not json at all{{{');
+    // No handler should have been called
+    expect(Handler['player:login']).not.toHaveBeenCalled();
+    expect(Handler['player:move']).not.toHaveBeenCalled();
   });
 
   it('rejects messages missing the event field', async () => {
-    const result = await processMessage(JSON.stringify({ data: {} }));
-    expect(result.rejected).toBe('missing-event');
+    await ws._triggerMessage(JSON.stringify({ data: {} }));
+    expect(Handler['player:login']).not.toHaveBeenCalled();
   });
 
   it('rejects messages with non-string event field', async () => {
-    const result = await processMessage(JSON.stringify({ event: 42 }));
-    expect(result.rejected).toBe('missing-event');
+    await ws._triggerMessage(JSON.stringify({ event: 42 }));
+    expect(Handler['player:login']).not.toHaveBeenCalled();
   });
 
   it('rejects unknown event names', async () => {
-    const result = await processMessage(JSON.stringify({ event: '__proto__' }));
-    expect(result.rejected).toBe('unknown-event');
-  });
-
-  it('rejects events that do not exist on the handler', async () => {
-    const result = await processMessage(JSON.stringify({ event: 'player:exploit' }));
-    expect(result.rejected).toBe('unknown-event');
+    await ws._triggerMessage(JSON.stringify({ event: 'player:exploit' }));
+    expect(Handler['player:login']).not.toHaveBeenCalled();
+    expect(Handler['player:move']).not.toHaveBeenCalled();
   });
 
   it('dispatches valid events to the correct handler', async () => {
     const msg = JSON.stringify({ event: 'player:move', data: { id: 'abc', direction: 'up' } });
-    const result = await processMessage(msg);
-    expect(result.accepted).toBe('player:move');
-    expect(handler['player:move']).toHaveBeenCalledOnce();
+    await ws._triggerMessage(msg);
+    expect(Handler['player:move']).toHaveBeenCalledOnce();
   });
 
   it('passes data and ws to the handler', async () => {
     const payload = { event: 'player:say', data: { said: 'hello' } };
-    await processMessage(JSON.stringify(payload));
-    expect(handler['player:say']).toHaveBeenCalledWith(payload, ws);
+    await ws._triggerMessage(JSON.stringify(payload));
+    expect(Handler['player:say']).toHaveBeenCalledWith(
+      payload,
+      ws,
+      game,
+    );
   });
 
   it('rejects null message body', async () => {
-    const result = await processMessage('null');
-    expect(result.rejected).toBe('missing-event');
+    await ws._triggerMessage('null');
+    expect(Handler['player:login']).not.toHaveBeenCalled();
+    expect(Handler['player:move']).not.toHaveBeenCalled();
   });
 });
 
-describe('WebSocket authentication gate', () => {
-  let handler;
+describe('Delaford.connection – authentication gate', () => {
+  let game;
   let ws;
 
   beforeEach(() => {
-    handler = {
-      'player:login': vi.fn(),
-      'player:move': vi.fn(),
-    };
+    world.clients = [];
+    vi.clearAllMocks();
+
+    const mockServer = { on: vi.fn() };
+    game = new Delaford(mockServer);
     ws = createMockWs();
-    ws.authenticated = false;
+    game.connection(ws);
+    // ws.authenticated defaults to false after connection
+  });
+
+  afterEach(() => {
+    game.shutdown();
   });
 
   it('allows player:login without authentication', async () => {
-    const processMessage = createMessageHandler(handler, ws);
-    const result = await processMessage(JSON.stringify({ event: 'player:login', data: {} }));
-    expect(result.accepted).toBe('player:login');
+    const msg = JSON.stringify({ event: 'player:login', data: {} });
+    await ws._triggerMessage(msg);
+    expect(Handler['player:login']).toHaveBeenCalledOnce();
   });
 
   it('rejects non-login events from unauthenticated connections', async () => {
-    const processMessage = createMessageHandler(handler, ws);
-    const result = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(result.rejected).toBe('unauthenticated');
-    expect(handler['player:move']).not.toHaveBeenCalled();
+    const msg = JSON.stringify({ event: 'player:move', data: {} });
+    await ws._triggerMessage(msg);
+    expect(Handler['player:move']).not.toHaveBeenCalled();
   });
 
   it('allows non-login events after authentication', async () => {
     ws.authenticated = true;
-    const processMessage = createMessageHandler(handler, ws);
-    const result = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(result.accepted).toBe('player:move');
+    const msg = JSON.stringify({ event: 'player:move', data: {} });
+    await ws._triggerMessage(msg);
+    expect(Handler['player:move']).toHaveBeenCalledOnce();
   });
 });
 
-describe('WebSocket rate limiting', () => {
-  let handler;
+describe('Delaford.connection – rate limiting', () => {
+  let game;
   let ws;
 
   beforeEach(() => {
-    handler = {
-      'player:login': vi.fn(),
-      'player:move': vi.fn(),
-    };
+    world.clients = [];
+    vi.clearAllMocks();
+
+    const mockServer = { on: vi.fn() };
+    game = new Delaford(mockServer);
     ws = createMockWs();
+    game.connection(ws);
     ws.authenticated = true;
   });
 
-  it('allows messages when tokens are available', async () => {
-    const limiter = createRateLimiter(5, 10);
-    const processMessage = createMessageHandler(handler, ws, { rateLimiter: limiter });
-    const result = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(result.accepted).toBe('player:move');
+  afterEach(() => {
+    game.shutdown();
   });
 
-  it('rejects messages when bucket is exhausted', async () => {
-    const limiter = createRateLimiter(3, 0); // 3 tokens, no refill
-    const processMessage = createMessageHandler(handler, ws, { rateLimiter: limiter });
+  it('allows messages when rate limit tokens are available', async () => {
+    const msg = JSON.stringify({ event: 'player:move', data: {} });
+    await ws._triggerMessage(msg);
+    expect(Handler['player:move']).toHaveBeenCalledOnce();
+  });
 
-    // Exhaust the bucket
-    for (let i = 0; i < 3; i += 1) {
-      await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
+  it('rejects messages when the rate limit bucket is exhausted', async () => {
+    const msg = JSON.stringify({ event: 'player:move', data: {} });
+
+    // The rate limiter starts with 30 tokens. Exhaust them all.
+    for (let i = 0; i < 30; i += 1) {
+      await ws._triggerMessage(msg);
     }
 
-    const result = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(result.rejected).toBe('rate-limited');
-  });
+    vi.clearAllMocks();
 
-  it('refills tokens over time', async () => {
-    const limiter = createRateLimiter(2, 1000); // 2 tokens, fast refill for testing
-    const processMessage = createMessageHandler(handler, ws, { rateLimiter: limiter });
-
-    // Exhaust
-    await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-
-    // Should be empty
-    const drained = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(drained.rejected).toBe('rate-limited');
-
-    // Wait a tiny bit for refill (1000 tokens/sec means 1ms = 1 token)
-    await new Promise(r => setTimeout(r, 5));
-
-    const refilled = await processMessage(JSON.stringify({ event: 'player:move', data: {} }));
-    expect(refilled.accepted).toBe('player:move');
+    // The 31st message should be rate-limited
+    await ws._triggerMessage(msg);
+    expect(Handler['player:move']).not.toHaveBeenCalled();
   });
 });

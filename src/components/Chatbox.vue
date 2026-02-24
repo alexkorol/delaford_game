@@ -254,11 +254,13 @@ export default {
       if (!payload) {
         return;
       }
+      // Enforce the maxlength from the input element
+      const sanitised = payload.slice(0, 120);
       const player = this.game && this.game.player;
       if (!player || !player.socket_id) {
         return;
       }
-      Socket.emit('player:say', { said: payload, id: player.socket_id });
+      Socket.emit('player:say', { said: sanitised, id: player.socket_id });
       this.clearInput();
     },
     clearInput() {

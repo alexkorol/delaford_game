@@ -10,12 +10,9 @@ class Query {
    * @returns {object}
    */
   static getForegroundData(id) {
-    return foregroundObjects
-      .map((t) => {
-        t.context = 'action';
-        return t;
-      })
-      .find(item => item.id === id);
+    const item = foregroundObjects.find(t => t.id === id);
+    if (!item) return undefined;
+    return { ...item, context: 'action' };
   }
 
   /**
